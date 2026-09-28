@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HALE-WAM</title>
+<meta name="description" content="One 176M-parameter transformer that describes the scene, samples actions with flow matching, and imagines future frames with a DiT.">
+<meta property="og:title" content="HALE-WAM: A Compact World–Action Model that Perceives, Reasons, Acts and Imagines">
+<meta property="og:description" content="One 176M-parameter transformer that describes the scene, samples actions with flow matching, and imagines future frames with a DiT.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#fbfaf7;--fg:#1d1d1f;--muted:#5b5b63;--card:#ffffff;--line:#e4e2dc;--accent:#2f5bd3;--accent-soft:#e8eefc;--code:#f3f2ee;--chip:#efeee9}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111214;--fg:#ececee;--muted:#a0a0aa;--card:#1a1b1f;--line:#2c2d33;--accent:#8aa8ff;--accent-soft:#1e2640;--code:#1f2025;--chip:#24252b}}
+:root[data-theme="dark"]{--bg:#111214;--fg:#ececee;--muted:#a0a0aa;--card:#1a1b1f;--line:#2c2d33;--accent:#8aa8ff;--accent-soft:#1e2640;--code:#1f2025;--chip:#24252b}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.65 "Source Serif 4",Georgia,serif}
+.wrap{max-width:920px;margin:0 auto;padding:0 16px}
+header.hero{padding:64px 0 28px;text-align:center}
+.kicker{font:600 13px/1 Inter,system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+h1{font:700 clamp(30px,5.4vw,48px)/1.15 Inter,system-ui,sans-serif;margin:14px 0 10px;letter-spacing:-.02em}
+.subtitle{font-size:clamp(17px,2.4vw,21px);color:var(--muted);max-width:720px;margin:0 auto}
+.authors{margin:20px 0 4px;font:500 16px Inter,system-ui,sans-serif}
+.affil{color:var(--muted);font:14px Inter,system-ui,sans-serif}
+.buttons{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:26px 0 8px}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;background:var(--fg);color:var(--bg);text-decoration:none;font:600 14px Inter,system-ui,sans-serif}
+.btn.alt{background:transparent;color:var(--fg);border:1px solid var(--line)}
+.btn:hover{opacity:.88}
+section{padding:26px 0;border-top:1px solid var(--line)}
+h2{font:700 24px/1.3 Inter,system-ui,sans-serif;margin:0 0 14px;letter-spacing:-.01em}
+h3{font:650 17px/1.35 Inter,system-ui,sans-serif;margin:0 0 6px}
+p{margin:0 0 12px}
+.tldr{background:var(--accent-soft);border-radius:14px;padding:18px 20px;font-size:18px}
+.tldr b{font-family:Inter,system-ui,sans-serif}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.card p{font-size:15.5px;color:var(--muted);margin:0}
+figure{margin:0 0 18px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;overflow-x:auto}
+figcaption{font:14px/1.5 Inter,system-ui,sans-serif;color:var(--muted);margin-top:10px}
+.mermaid{display:flex;justify-content:center;min-width:0}
+.mermaid svg{max-width:100%;height:auto}
+pre{background:var(--code);border:1px solid var(--line);border-radius:12px;padding:14px 16px;overflow-x:auto;font:13.5px/1.55 "JetBrains Mono",ui-monospace,monospace;margin:0 0 12px}
+code{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:.9em}
+table{width:100%;border-collapse:collapse;font:15px/1.5 Inter,system-ui,sans-serif}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:600}
+td code{background:var(--chip);padding:1px 6px;border-radius:6px}
+.tablewrap{overflow-x:auto}
+.note{font:14px/1.55 Inter,system-ui,sans-serif;color:var(--muted)}
+footer{padding:32px 0 48px;color:var(--muted);font:14px Inter,system-ui,sans-serif;text-align:center;border-top:1px solid var(--line)}
+a{color:var(--accent)}
+.theme{position:fixed;top:12px;right:12px;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:999px;padding:6px 12px;font:13px Inter,system-ui,sans-serif;cursor:pointer}
+</style>
+</head>
+<body>
+<button class="theme" id="theme" aria-label="Toggle dark mode">Theme</button>
+<div class="wrap">
+<header class="hero">
+  <div class="kicker">World model · VLA · Flow matching</div>
+  <h1>HALE-WAM: A Compact World–Action Model that Perceives, Reasons, Acts and Imagines</h1>
+  <p class="subtitle">From a few camera frames, robot state and an instruction, one causal MoE transformer writes a response, samples a 16-step action chunk with flow matching, and draws the future with a Diffusion Transformer.</p>
+  <div class="authors">B A NaveenKumar</div>
+  <div class="affil">Independent research · 2026</div>
+  <div class="buttons"><a class="btn" href="paper.pdf">Paper (PDF)</a><a class="btn alt" href="https://github.com/basaanithanaveenkumar/HALE-WAM">Code</a><a class="btn alt" href="https://github.com/basaanithanaveenkumar/HALE-WAM/tree/main/docs">Docs</a><a class="btn alt" href="https://github.com/basaanithanaveenkumar/HALE-WAM/blob/main/docs/blog/2026-09-28-teaching-a-policy-to-imagine.md">Blog</a></div>
+</header>
+<section><div class="tldr"><b>TL;DR.</b> <code>&lt;halo_action&gt;</code> hidden states condition a flow-matching velocity field over action chunks. <code>&lt;halo_world_video&gt;</code> hidden states become per-frame queries for a pixel-space DiT, with frame-index embeddings, a pixel anchor, gated adaLN, CFG, Heun sampling and anti-blur losses.</div></section>
+<section><h2>Abstract</h2><p>Robot policies that can also predict the visual consequences of their actions are easier to inspect and can learn from video without action labels. HALE-WAM is a 176M-parameter world–action model that, from a few camera frames, a proprioceptive state and a language instruction, jointly generates a text response, samples a continuous action chunk with a conditional flow-matching head, and imagines future RGB frames with a Diffusion Transformer.</p><p>All three outputs are read from a single causal mixture-of-experts transformer through special tokens. Each predicted frame receives its own conditioning vector, built from a cross-attended query, a sinusoidal frame-index embedding, a pixel encoding of the last observed frame and a learned null token for classifier-free guidance, which modulates the DiT through a gated adaLN-Zero pathway. Frames are sampled with Heun's second-order solver, and training adds VGG-perceptual, SSIM and temporal-smoothness losses on the analytic clean-frame estimate to reduce blur.</p></section>
+<section><h2>Highlights</h2><div class="grid"><div class="card"><h3>Perceive · Reason · Act · Imagine</h3><p>One MoE decoder (8 layers, 6 routed + 2 shared experts) read by three heads: language, action and world model.</p></div><div class="card"><h3>Flow-matching actions</h3><p>A velocity MLP conditioned on the <code>&lt;halo_action&gt;</code> hidden state maps noise to a 16-step chunk in 24 Euler steps and can represent multi-modal actions.</p></div><div class="card"><h3>Per-frame DiT conditioning</h3><p>Decoder query + cross-attention, sinusoidal frame index and pixel anchor, fused with the timestep through a sigmoid gate into adaLN-Zero.</p></div><div class="card"><h3>CFG + Heun sampling</h3><p>A learned null context (p = 0.1) enables classifier-free guidance, and a second-order Heun solver halves truncation error versus Euler.</p></div><div class="card"><h3>Anti-blur losses</h3><p>VGG perceptual, SSIM and temporal smoothness on x̂₁ = x_t + (1−t)·v, which comes for free from the straight-line flow.</p></div><div class="card"><h3>Practical training</h3><p>AMP, gradient accumulation and checkpointing, full-state resume, TensorBoard, and GIFs of text, actions and imagined frames.</p></div></div></section>
+<section><h2>Architecture</h2><figure><div class="mermaid">flowchart TB
+  F[&quot;N context frames&lt;br/&gt;[B, N, 3, 224, 224]&quot;] --&gt; VIT[&quot;ViT (6 dense layers, patch 16)&lt;br/&gt;+ MLP projector&quot;]
+  T[&quot;ChatML tokens&lt;br/&gt;&amp;lt;image&amp;gt; &amp;lt;state&amp;gt; &amp;lt;halo_action&amp;gt; &amp;lt;halo_world_video&amp;gt;&quot;] --&gt; EMB[&quot;token embedding 49,156 × 512&quot;]
+  S[&quot;state [B, N_s, 32]&quot;] --&gt; SE[&quot;StateEncoder MLP&quot;]
+  VIT --&gt; SEQ[&quot;[ N·196 patches ; text with state embeddings in place ] + positions&quot;]
+  EMB --&gt; SEQ
+  SE --&gt; SEQ
+  SEQ --&gt; DEC[&quot;Causal decoder × 8&lt;br/&gt;MHA (padding mask) + DeepSeekMoE (6 routed + 2 shared, top-2)&lt;br/&gt;gradient checkpointing&quot;]
+  DEC --&gt;|&quot;every position&quot;| LM[&quot;LM head → text&quot;]
+  DEC --&gt;|&quot;h at &amp;lt;halo_action&amp;gt;&quot;| FM[&quot;Flow-matching head&lt;br/&gt;v(x_t, t, h) → 16 × action_dim&quot;]
+  DEC --&gt;|&quot;h at &amp;lt;halo_world_video&amp;gt;&quot;| DIT[&quot;DiT world model&quot;]
+  DEC --&gt;|&quot;mean of patch states (past frames)&quot;| DIT
+  F --&gt;|&quot;last observed frame&quot;| DIT
+  DIT --&gt; FUT[&quot;future frames&lt;br/&gt;[B, F, 3, 224, 224]&quot;]</div><figcaption><b>Figure 1.</b> System overview: one decoder, three heads.</figcaption></figure><figure><div class="mermaid">flowchart TB
+  Q[&quot;query_i = W·h_wv,i  or  learned world_action_token[f+i]&quot;] --&gt; CA[&quot;Cross-attention&lt;br/&gt;Q = query_i, K/V = visual context&quot;]
+  CA --&gt; FFN[&quot;residual + LN → FFN → residual + LN&quot;]
+  FFN --&gt; ADD1[&quot;+ W_p · sinusoidal(f + i)&lt;br/&gt;(frame identity)&quot;]
+  ADD1 --&gt; ADD2[&quot;+ Dropout₀.₂( PixelEnc(last frame) )&lt;br/&gt;(scene anchor)&quot;]
+  ADD2 --&gt; CFG{&quot;training and&lt;br/&gt;rand &amp;lt; 0.1?&quot;}
+  CFG --&gt;|yes| NULL[&quot;learned null context&quot;]
+  CFG --&gt;|no| CI[&quot;c_i&quot;]
+  NULL --&gt; GATE
+  CI --&gt; GATE[&quot;c̃ = σ(W_g·c_i) ⊙ emb(t) + W_c·c_i&quot;]
+  GATE --&gt; ADALN[&quot;adaLN-Zero in each of 8 DiT blocks&quot;]</div><figcaption><b>Figure 2.</b> Per-frame conditioning for the DiT world model.</figcaption></figure><figure><div class="mermaid">flowchart LR
+  subgraph Training
+    X0[&quot;x₀ ~ N(0, I)&quot;] --&gt; XT[&quot;x_t = (1−t)·x₀ + t·x₁&quot;]
+    X1[&quot;x₁ = GT chunk (16 × d_a)&quot;] --&gt; XT
+    TT[&quot;t ~ U(0,1)&quot;] --&gt; XT
+    XT --&gt; V[&quot;v_θ = MLP([x_t, sin(t), h_act])&lt;br/&gt;4 layers × 1024, ReLU&quot;]
+    V --&gt; L[&quot;MSE(v_θ, x₁ − x₀)&quot;]
+  end
+  subgraph Inference
+    N0[&quot;x ← noise&quot;] --&gt; LOOP[&quot;repeat 24×: x ← x + v_θ(x, t, h_act)·Δt&quot;]
+    LOOP --&gt; A[&quot;action chunk&quot;]
+  end</div><figcaption><b>Figure 3.</b> Flow-matching action head: training and inference.</figcaption></figure><figure><div class="mermaid">sequenceDiagram
+  participant D as Dataloader (EO / MoMa)
+  participant M as HaloVLM
+  participant L as Losses
+  participant O as AdamW + AMP scaler
+  D-&gt;&gt;M: images, input_ids, attention_mask, states, image_mask
+  M--&gt;&gt;L: logits, action_hiddens, visual_context_emb, world_video_hiddens
+  D-&gt;&gt;L: labels, actions, action_mask, future_frames
+  L-&gt;&gt;L: CE(text, offset by N·196)
+  L-&gt;&gt;L: flow-matching MSE on action chunks
+  L-&gt;&gt;L: CFM(frames) + 0.1·VGG + 0.4·(1−SSIM) + 0.2·temporal on x̂₁ = x_t + (1−t)·v
+  L-&gt;&gt;O: total = CE + 1·act + 8·vis   (÷ grad_accum_steps)
+  O-&gt;&gt;M: unscale, clip 1.0, step every grad_accum_steps</div><figcaption><b>Figure 4.</b> Training step: CE + flow matching + visual losses.</figcaption></figure></section>
+<section><h2>Parameter budget (default config, measured)</h2><div class="tablewrap"><table><thead><tr><th>Module</th><th>Parameters</th></tr></thead><tbody><tr><td>ViT (dense, 6 layers)</td><td>10.0M</td></tr><tr><td>Image projector</td><td>0.23M</td></tr><tr><td>Token embedding</td><td>25.2M</td></tr><tr><td>Position embedding</td><td>1.0M</td></tr><tr><td>Decoder (MoE, 8 layers)</td><td>68.8M</td></tr><tr><td>LM head</td><td>25.2M</td></tr><tr><td>State encoder</td><td>0.40M</td></tr><tr><td>Flow-matching head</td><td>3.0M</td></tr><tr><td>DiT world model</td><td>42.5M</td></tr><tr><td><b>Total</b></td><td><b>176.3M</b></td></tr></tbody></table></div></section>
+<section><h2>Qualitative results</h2>
+<figure><img src="static/training_viz_sample1.gif" alt="Training visualisation: context frames, generated text, action curves, and ground-truth versus predicted future frame" style="width:100%;height:auto;border-radius:8px">
+<figcaption>Training step 24,000 on an AIRoA MoMa episode (“Pull the chain to turn off the light”). The response matches the ground truth, and the imagined fifth frame shows the lamp switched off. The frame is over-contrasted and has 8×8 patch artefacts.</figcaption></figure>
+<figure><img src="static/diffusion_viz_sample1.gif" alt="DiT denoising from noise to a predicted frame" style="width:100%;max-width:520px;height:auto;border-radius:8px;display:block;margin:0 auto">
+<figcaption>DiT velocity-field integration from pure noise (t = 0) to a predicted frame (t = 1).</figcaption></figure>
+<p class="note">These are qualitative samples from a single run. Quantitative evaluation (action error, PSNR/SSIM/LPIPS against horizon, conditioning ablations) is in progress.</p></section>
+<section><h2>Quick start</h2><pre><code>git clone https://github.com/basaanithanaveenkumar/HALE-WAM &amp;&amp; cd HALE-WAM
+uv venv &amp;&amp; source .venv/bin/activate &amp;&amp; uv pip install -e .
+python scripts/train.py --dataset moma --moma_data_root /path/to/moma \
+  --moma_num_frames 5 --num_predict_frames 5 --batch_size 1 --grad_accum_steps 8</code></pre><pre><code>logits, action_h, vis_ctx, wv_h = model(images, input_ids, attention_mask, states)
+actions = model.sample_actions(action_h)              # [B, n_act, 16, action_dim]
+frames  = model.predict_visual_future(images, vis_ctx, num_frames=5,
+                                      world_video_query_hiddens=wv_h)[&quot;rgb&quot;]</code></pre></section>
+<section><h2>Citation</h2><pre><code>@misc{naveenkumar2026halewam,
+  title  = {HALE-WAM: A Compact World--Action Model that Perceives,
+            Reasons, Acts and Imagines in One Transformer},
+  author = {NaveenKumar, B A},
+  year   = {2026},
+  url    = {https://github.com/basaanithanaveenkumar/HALE-WAM}
+}</code></pre></section>
+</div>
+<footer>HALE-WAM · <a href="https://github.com/basaanithanaveenkumar/HALE-WAM">Source on GitHub</a> · MIT License</footer>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+const root = document.documentElement;
+const saved = (() => { try { return localStorage.getItem('theme'); } catch (e) { return null; } })();
+if (saved) root.dataset.theme = saved;
+const isDark = () => root.dataset.theme ? root.dataset.theme === 'dark'
+  : matchMedia('(prefers-color-scheme: dark)').matches;
+const sources = [...document.querySelectorAll('.mermaid')].map(el => el.textContent);
+async function render() {
+  mermaid.initialize({ startOnLoad: false, theme: isDark() ? 'dark' : 'neutral', securityLevel: 'strict',
+    flowchart: { curve: 'basis', htmlLabels: true } });
+  const els = document.querySelectorAll('.mermaid');
+  els.forEach((el, i) => { el.removeAttribute('data-processed'); el.textContent = sources[i]; });
+  await mermaid.run({ nodes: els });
+}
+document.getElementById('theme').addEventListener('click', () => {
+  root.dataset.theme = isDark() ? 'light' : 'dark';
+  try { localStorage.setItem('theme', root.dataset.theme); } catch (e) {}
+  render();
+});
+render();
+</script>
+</body>
+</html>

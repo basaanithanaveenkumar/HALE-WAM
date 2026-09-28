@@ -73,3 +73,5 @@ __pycache__/
 
 # Logs
 *.log
+# Project page preview copies (populated by the Pages workflow)
+project-page/static/
