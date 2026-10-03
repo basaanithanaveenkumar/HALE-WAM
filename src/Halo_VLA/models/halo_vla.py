@@ -4,7 +4,7 @@ from config import HaloVLMConfig
 from models.vit import VisTransformer
 from models.transformer import DecoderTransformer
 from models.lm_head import LMHead
-from models.image_proj import ImageProjector
+from models.image_proj import build_image_projector
 from models.state_encoder import StateEncoder
 # --- Flow matching action decoder replaces MLP ActionDecoder ---
 from models.flow_action_decoder import FlowActionDecoder
@@ -89,10 +89,7 @@ class HaloVLM(nn.Module):
         self.token_emb = nn.Embedding(network_config.vocab_size, network_config.emb_dim)
         self.pos_embed = nn.Embedding(network_config.max_position_embeddings, network_config.emb_dim)
         self.lm_head = LMHead(hidden_size=network_config.emb_dim, vocab_size=network_config.vocab_size)
-        self.image_projector = ImageProjector(
-            vision_dim=network_config.proj_vision_dim or network_config.emb_dim,
-            llm_dim=network_config.proj_llm_dim or network_config.emb_dim,
-        )
+        self.image_projector = build_image_projector(network_config)
         self.state_encoder = StateEncoder(config=network_config)
 
         # --- Flow matching decoder: replaces the MLP ActionDecoder ---

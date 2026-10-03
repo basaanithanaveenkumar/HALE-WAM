@@ -649,7 +649,11 @@ def train(args):
         state_dim=args.state_dim,
         action_chunk_size=args.action_chunk_size,
         num_visual_predict_frames=args.num_predict_frames,
+        proj_type=args.projector_type,
     )
+    if args.num_query_tokens is not None:
+        config.qformer_num_queries = args.num_query_tokens
+        config.gated_xattn_num_latents = args.num_query_tokens
     if args.visual_loss_weight is not None:
         config.visual_loss_weight = args.visual_loss_weight
     visual_loss_weight = config.visual_loss_weight
@@ -825,7 +829,7 @@ def train(args):
                 )
 
                 num_images = (input_ids == config.image_token_id).sum(dim=1).max().item()
-                num_patches = (config.img_size // config.patch_size) ** 2
+                num_patches = config.num_image_tokens_per_image
                 num_prepended = num_images * num_patches
 
                 lang_loss = compute_language_loss(logits, labels, num_prepended)
@@ -1033,6 +1037,18 @@ def parse_args():
     p.add_argument("--action_dim", type=int, default=32)
     p.add_argument("--state_dim", type=int, default=32)
     p.add_argument("--action_chunk_size", type=int, default=16)
+    p.add_argument(
+        "--projector_type",
+        default="mlp",
+        choices=("mlp", "qformer", "gated_cross_attention"),
+        help="Vision -> decoder projector: per-patch MLP, Q-Former, or gated cross-attention.",
+    )
+    p.add_argument(
+        "--num_query_tokens",
+        type=int,
+        default=None,
+        help="Image tokens per image for qformer / gated_cross_attention (default: config value).",
+    )
     p.add_argument("--max_samples", type=int, default=2000,
                     help="Limit dataset to N samples for fast loading (None = all)")
 

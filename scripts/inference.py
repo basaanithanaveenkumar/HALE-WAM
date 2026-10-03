@@ -336,7 +336,7 @@ def evaluate_dataset(args):
 
         # --- Language loss (cross-entropy) ---
         num_images = (input_ids == config.image_token_id).sum(dim=1).max().item()
-        num_patches = (config.img_size // config.patch_size) ** 2
+        num_patches = config.num_image_tokens_per_image
         num_prepended = num_images * num_patches
 
         text_logits = logits[:, num_prepended:-1, :]

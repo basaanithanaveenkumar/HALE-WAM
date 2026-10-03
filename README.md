@@ -89,6 +89,9 @@ Han-WAM/
 ├── src/Halo_VLA/models/
 │   ├── halo_vla.py              # Main model: forward, action loss, visual loss
 │   ├── vit.py                   # Vision Transformer encoder
+│   ├── image_proj.py            # Vision -> decoder projector (MLP / Q-Former / gated cross-attention)
+│   ├── qformer.py               # Q-Former (BLIP-2 style learned queries)
+│   ├── gated_cross_attention.py # Gated cross-attention (Flamingo style)
 │   ├── transformer.py           # Decoder transformer blocks
 │   ├── moe.py                   # DeepSeek Mixture-of-Experts FFN
 │   ├── flow_action_decoder.py   # Flow matching action decoder
@@ -232,6 +235,29 @@ config = HaloVLMConfig(
     num_visual_predict_frames=5,
 )
 ```
+
+### Image projector: MLP, Q-Former or gated cross-attention
+
+`proj_type` chooses how ViT patch features enter the decoder:
+
+| `proj_type` | Decoder tokens per image | Config fields |
+|---|---|---|
+| `"mlp"` (default) | one per ViT patch | `proj_vision_dim`, `proj_llm_dim` |
+| `"qformer"` | `qformer_num_queries` | `qformer_hidden_dim`, `_num_layers`, `_num_heads`, `_cross_attention_freq`, `_ffn_mult`, `_dropout` |
+| `"gated_cross_attention"` | `gated_xattn_num_latents` | `gated_xattn_hidden_dim`, `_num_layers`, `_num_heads`, `_ffn_mult`, `_dropout`, `_gate_init` |
+
+```python
+config = HaloVLMConfig(proj_type="qformer", qformer_num_queries=32, qformer_num_layers=2)
+config = HaloVLMConfig(proj_type="gated_cross_attention", gated_xattn_num_latents=32, gated_xattn_gate_init=0.0)
+```
+
+* **Q-Former** — learned queries self-attend and cross-attend to the patch features (every `qformer_cross_attention_freq`-th layer).
+* **Gated cross-attention** — learned latents read the patches through `tanh(alpha) * CrossAttn(...)` and `tanh(alpha) * FFN(...)`
+  residuals with learned gates. `gated_xattn_gate_init=0.0` is the Flamingo identity start (image enters as the gates open);
+  the default `1.0` lets image information flow from step 0.
+* `config.num_image_tokens_per_image` gives the decoder tokens one image occupies; `scripts/train.py` and `scripts/inference.py`
+  use it to align the language loss. Train with `--projector_type qformer --num_query_tokens 32`.
+* Checkpoints trained with one `proj_type` cannot be loaded into another. The default `"mlp"` keeps the old state-dict keys.
 
 ---
 

@@ -59,9 +59,31 @@ class HaloVLMConfig:
     # Positional embeddings
     max_position_embeddings: int = 2000
 
-    # Image projector
+    # Image projector (vision encoder -> decoder token space)
     proj_vision_dim: int | None = None   # defaults to emb_dim
     proj_llm_dim: int | None = None      # defaults to emb_dim
+    # "mlp"                   3-layer MLP, one decoder token per ViT patch (default)
+    # "qformer"               BLIP-2 style learned queries -> qformer_num_queries tokens
+    # "gated_cross_attention" Flamingo style tanh-gated cross-attention -> gated_xattn_num_latents tokens
+    proj_type: str = "mlp"
+
+    # Q-Former (proj_type="qformer")
+    qformer_num_queries: int = 32
+    qformer_hidden_dim: int | None = None   # None -> min(proj_llm_dim, 768); divisible by num_heads
+    qformer_num_layers: int = 2
+    qformer_num_heads: int = 8
+    qformer_cross_attention_freq: int = 1   # cross-attend to the image in every N-th layer
+    qformer_ffn_mult: int = 4
+    qformer_dropout: float = 0.0
+
+    # Gated cross-attention (proj_type="gated_cross_attention")
+    gated_xattn_num_latents: int = 32
+    gated_xattn_hidden_dim: int | None = None
+    gated_xattn_num_layers: int = 2
+    gated_xattn_num_heads: int = 8
+    gated_xattn_ffn_mult: int = 4
+    gated_xattn_dropout: float = 0.0
+    gated_xattn_gate_init: float = 1.0      # 0.0 = Flamingo identity start; >0 lets images flow at step 0
 
     # Action decoder
     action_dim: int = 7                  # output dims (e.g. 6-DOF + gripper)
@@ -122,3 +144,17 @@ class HaloVLMConfig:
         "You are a robotic VLA assistant. Given images and states, "
         "describe observations or output <halo_action> with a predicted trajectory."
     )
+
+    def __post_init__(self) -> None:
+        valid = ("mlp", "qformer", "gated_cross_attention")
+        if self.proj_type not in valid:
+            raise ValueError(f"proj_type must be one of {valid}, got {self.proj_type!r}")
+
+    @property
+    def num_image_tokens_per_image(self) -> int:
+        """Decoder tokens one image occupies: ViT patches for ``mlp``, else the connector size."""
+        if self.proj_type == "qformer":
+            return self.qformer_num_queries
+        if self.proj_type == "gated_cross_attention":
+            return self.gated_xattn_num_latents
+        return (self.img_size // self.patch_size) ** 2
