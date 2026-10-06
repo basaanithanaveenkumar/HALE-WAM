@@ -280,7 +280,19 @@ Detailed developer documentation lives in [`docs/`](docs/):
 
 | Document | Contents |
 |---|---|
+| [`docs/getting-started.md`](docs/getting-started.md) | Install, smoke test, first training runs |
+| [`docs/architecture.md`](docs/architecture.md) | Mermaid architecture diagrams (system, flow head, DiT conditioning, sampler, training step) |
+| [`docs/configuration.md`](docs/configuration.md) | Every `HaloVLMConfig` field and training flag |
 | [`docs/world_model.md`](docs/world_model.md) | Full technical write-up of the DiT world model — per-frame conditioning, CFG, Heun solver, auxiliary losses, and bug fixes |
+| [`docs/blog/`](docs/blog/README.md) | Blog posts, including *Teaching a robot policy to imagine* |
+
+### Paper, project page and skills
+
+| | |
+|---|---|
+| arXiv paper | [`paper/main.tex`](paper/main.tex) — build with `make -C paper` |
+| Project page | [basaanithanaveenkumar.github.io/HALE-WAM](https://basaanithanaveenkumar.github.io/HALE-WAM/) ([source](project-page/index.html), deployed by `.github/workflows/pages.yml`) |
+| Claude Code skills | [`.claude/skills/`](.claude/skills) — `hale-wam-dev`, `hale-wam-train`, `hale-wam-world-model`, `hale-publish` |
 
 ---
 
