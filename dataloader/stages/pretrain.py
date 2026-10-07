@@ -3,11 +3,20 @@
 Pre-training uses web-scale video/image data and large open-world robot
 teleoperation corpora to learn generalised visual-motor representations.
 
-Datasets registered here:
+VLM datasets (image-text alignment):
+  - ``laion-aesthetics``    : LAION-2B-en aesthetic subset (≥5.0 quality)
+  - ``cc3m``                : Conceptual Captions 3M
+  - ``cc12m``               : Conceptual Captions 12M
+  - ``datacomp-1b``         : DataComp-1B CommonPool
+  - ``wit``                 : Wikipedia Image Text
+  - ``redcaps``             : RedCaps 12M Reddit captions
+
+VLA datasets (robot teleoperation):
   - ``eo-data-interleave``  : EO-Data1.5M interleaved subsets (web robot QA)
   - ``open-x-pretrain``     : Open X-Embodiment large-scale mix
   - ``bridge-v2``           : Bridge Data V2 (60K diverse manipulation demos)
   - ``fractal-rt1``         : Google RT-1 training corpus (130K episodes)
+  - ``bc-z``                : BC-Z 25K episodes across 100 tasks
 
 Usage::
 
@@ -36,6 +45,60 @@ from loguru import logger
 # ---------------------------------------------------------------------------
 
 PRETRAIN_DATASETS: dict[str, dict[str, Any]] = {
+    # -----------------------------------------------------------------------
+    # VLM image-text alignment datasets
+    # -----------------------------------------------------------------------
+    "laion-aesthetics": {
+        "hf_path": "laion/laion2B-en-aesthetic",
+        "subsets": None,
+        "description": "LAION-2B-en aesthetic subset (≥5.0); ~600M image-text pairs.",
+        "paper_reference": "Schuhmann et al. (2022) LAION-5B",
+        "n_episodes_approx": 600_000_000,
+        "data_type": "vlm",
+    },
+    "cc3m": {
+        "hf_path": "pixparse/cc3m-wds",
+        "subsets": None,
+        "description": "Conceptual Captions 3M — 3.3M image-alt-text pairs.",
+        "paper_reference": "Sharma et al. (2018) CC3M",
+        "n_episodes_approx": 3_300_000,
+        "data_type": "vlm",
+    },
+    "cc12m": {
+        "hf_path": "pixparse/cc12m-wds",
+        "subsets": None,
+        "description": "Conceptual Captions 12M — ~12M image-text pairs.",
+        "paper_reference": "Changpinyo et al. (2021) CC12M",
+        "n_episodes_approx": 12_000_000,
+        "data_type": "vlm",
+    },
+    "datacomp-1b": {
+        "hf_path": "mlfoundations/datacomp_1b",
+        "subsets": None,
+        "description": "DataComp-1B CommonPool — 1.28B CLIP-filtered image-text pairs.",
+        "paper_reference": "Gadre et al. (2023) DataComp",
+        "n_episodes_approx": 1_280_000_000,
+        "data_type": "vlm",
+    },
+    "wit": {
+        "hf_path": "google/wit",
+        "subsets": None,
+        "description": "Wikipedia-based Image Text — 37.6M curated image-caption pairs.",
+        "paper_reference": "Srinivasan et al. (2021) WIT",
+        "n_episodes_approx": 37_600_000,
+        "data_type": "vlm",
+    },
+    "redcaps": {
+        "hf_path": "red_caps",
+        "subsets": None,
+        "description": "RedCaps — 12M human-written image-text pairs from Reddit.",
+        "paper_reference": "Desai et al. (2021) RedCaps",
+        "n_episodes_approx": 12_000_000,
+        "data_type": "vlm",
+    },
+    # -----------------------------------------------------------------------
+    # VLA robot teleoperation datasets
+    # -----------------------------------------------------------------------
     "eo-data-interleave": {
         "hf_path": "IPEC-COMMUNITY/EO-Data1.5M",
         "subsets": [
@@ -50,6 +113,7 @@ PRETRAIN_DATASETS: dict[str, dict[str, Any]] = {
         ),
         "paper_reference": "EO-Data1.5M (IPEC-COMMUNITY, 2024)",
         "n_episodes_approx": 1_500_000,
+        "data_type": "vla",
     },
     "open-x-pretrain": {
         "hf_path": "jxu124/OpenX-Embodiment",
@@ -60,6 +124,7 @@ PRETRAIN_DATASETS: dict[str, dict[str, Any]] = {
         ),
         "paper_reference": "Open X-Embodiment Collaboration (2023)",
         "n_episodes_approx": 2_000_000,
+        "data_type": "vla",
     },
     "bridge-v2": {
         "hf_path": "lerobot/bridge_v2",
@@ -70,6 +135,7 @@ PRETRAIN_DATASETS: dict[str, dict[str, Any]] = {
         ),
         "paper_reference": "Walke et al. (2023) Bridge Data V2",
         "n_episodes_approx": 60_000,
+        "data_type": "vla",
     },
     "fractal-rt1": {
         "hf_path": "google-deepmind/fractal20220817-data",
@@ -80,6 +146,15 @@ PRETRAIN_DATASETS: dict[str, dict[str, Any]] = {
         ),
         "paper_reference": "Brohan et al. (2022) RT-1",
         "n_episodes_approx": 130_000,
+        "data_type": "vla",
+    },
+    "bc-z": {
+        "hf_path": "lerobot/bc_z",
+        "subsets": None,
+        "description": "BC-Z — 25K robot episodes across 100 tasks.",
+        "paper_reference": "Jang et al. (2022) BC-Z",
+        "n_episodes_approx": 25_000,
+        "data_type": "vla",
     },
 }
 

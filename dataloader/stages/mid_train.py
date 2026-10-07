@@ -1,13 +1,23 @@
 """Phase 2 — Mid-training dataloaders for Halo-VLA.
 
-Mid-training uses domain-specific robot manipulation data to adapt pretrained
-representations to the target workspace and object distribution.
+Mid-training uses curated domain-specific data to adapt pretrained representations
+to the target workspace, object distribution, and instruction-following style.
 
-Datasets registered here:
+VLM datasets (vision-language connector pretraining):
+  - ``llava-pretrain-558k``    : LLaVA Pretrain 558K curated BLIP captions
+  - ``sharegpt4v-pt``          : ShareGPT4V-PT 1.2M GPT-4V captions
+  - ``blip-laion-cc-sbu-558k`` : BLIP LAION+CC+SBU 558K captions
+  - ``recap-datacomp-1b``      : Recap DataComp-1B 1.28B recaptioned pairs
+  - ``allava-vflan``           : AllaVA-vFLAN 1.3M task-diverse QA
+
+VLA datasets (robot domain adaptation):
   - ``droid``       : DROID full Franka corpus (76K diverse demos)
   - ``airoa-moma``  : AIRoA-MoMA HSR teleoperation (RGB video + metadata)
   - ``eo-data-qa``  : EO-Data1.5M QA subsets (12 task-structured categories)
   - ``rh20t``       : RH20T contact-rich manipulation (110K demos)
+  - ``taco-play``   : TACO-Play kitchen manipulation (3.2K demos)
+  - ``pusht``       : Push-T 2D pushing (300 demos)
+  - ``aloha-sim``   : ALOHA simulation bimanual (1K demos)
 
 Usage::
 
@@ -33,6 +43,49 @@ from loguru import logger
 # ---------------------------------------------------------------------------
 
 MID_TRAIN_DATASETS: dict[str, dict[str, Any]] = {
+    # -----------------------------------------------------------------------
+    # VLM connector-pretraining datasets
+    # -----------------------------------------------------------------------
+    "llava-pretrain-558k": {
+        "hf_path": "liuhaotian/LLaVA-Pretrain",
+        "description": "LLaVA Pretrain 558K — curated BLIP captions for connector pretraining.",
+        "paper_reference": "Liu et al. (2023) LLaVA",
+        "n_episodes_approx": 558_000,
+        "data_type": "vlm",
+    },
+    "sharegpt4v-pt": {
+        "hf_path": "Lin-Chen/ShareGPT4V",
+        "subsets": ["ShareGPT4V-PT"],
+        "description": "ShareGPT4V-PT — 1.2M GPT-4V-generated high-quality captions.",
+        "paper_reference": "Chen et al. (2023) ShareGPT4V",
+        "n_episodes_approx": 1_200_000,
+        "data_type": "vlm",
+    },
+    "blip-laion-cc-sbu-558k": {
+        "hf_path": "liuhaotian/LLaVA-Pretrain",
+        "description": "BLIP LAION+CC+SBU 558K filtered pretrain captions.",
+        "paper_reference": "Li et al. (2022) BLIP",
+        "n_episodes_approx": 558_000,
+        "data_type": "vlm",
+    },
+    "recap-datacomp-1b": {
+        "hf_path": "UCSC-VLAA/Recap-DataComp-1B",
+        "description": "Recap DataComp-1B — 1.28B LLaMA-recaptioned image-text pairs.",
+        "paper_reference": "Li et al. (2024) Recap-DataComp-1B",
+        "n_episodes_approx": 1_280_000_000,
+        "data_type": "vlm",
+    },
+    "allava-vflan": {
+        "hf_path": "FreedomIntelligence/ALLaVA-4V",
+        "subsets": ["allava_vflan"],
+        "description": "AllaVA-vFLAN — 1.3M diverse VQA, reasoning and captioning.",
+        "paper_reference": "Chen et al. (2024) AllaVA",
+        "n_episodes_approx": 1_300_000,
+        "data_type": "vlm",
+    },
+    # -----------------------------------------------------------------------
+    # VLA domain-adaptation datasets
+    # -----------------------------------------------------------------------
     "droid": {
         "hf_path": "lerobot/droid_100",
         "description": (
@@ -42,6 +95,7 @@ MID_TRAIN_DATASETS: dict[str, dict[str, Any]] = {
         "paper_reference": "Khazatsky et al. (2024) DROID",
         "n_episodes_approx": 76_000,
         "dataset_cls": "DroidDataset",
+        "data_type": "vla",
     },
     "airoa-moma": {
         "hf_path": "airoa-org/airoa-moma",
@@ -52,6 +106,7 @@ MID_TRAIN_DATASETS: dict[str, dict[str, Any]] = {
         "paper_reference": "AIRoA-MoMA (2024)",
         "n_episodes_approx": None,  # depends on local clone
         "dataset_cls": "AiroaMomaDataset",
+        "data_type": "vla",
     },
     "eo-data-qa": {
         "hf_path": "IPEC-COMMUNITY/EO-Data1.5M",
@@ -68,6 +123,7 @@ MID_TRAIN_DATASETS: dict[str, dict[str, Any]] = {
         "paper_reference": "EO-Data1.5M (IPEC-COMMUNITY, 2024)",
         "n_episodes_approx": 700_000,
         "dataset_cls": "EODataset",
+        "data_type": "vla",
     },
     "rh20t": {
         "hf_path": "lerobot/rh20t",
@@ -77,7 +133,29 @@ MID_TRAIN_DATASETS: dict[str, dict[str, Any]] = {
         ),
         "paper_reference": "Fang et al. (2023) RH20T",
         "n_episodes_approx": 110_000,
-        "dataset_cls": None,  # generic HF wrapper
+        "dataset_cls": None,
+        "data_type": "vla",
+    },
+    "taco-play": {
+        "hf_path": "lerobot/taco_play",
+        "description": "TACO-Play — 3.2K kitchen manipulation demos (RGB + depth + end-effector).",
+        "paper_reference": "Rosete-Beas et al. (2023) TACO-Play",
+        "n_episodes_approx": 3_200,
+        "data_type": "vla",
+    },
+    "pusht": {
+        "hf_path": "lerobot/pusht",
+        "description": "Push-T — 300 2D pushing demos for diffusion policy benchmarking.",
+        "paper_reference": "Chi et al. (2023) Diffusion Policy",
+        "n_episodes_approx": 300,
+        "data_type": "vla",
+    },
+    "aloha-sim": {
+        "hf_path": "lerobot/aloha_sim_insertion_human",
+        "description": "ALOHA simulation — 1K bimanual insertion episodes (sim).",
+        "paper_reference": "Zhao et al. (2023) ACT",
+        "n_episodes_approx": 1_000,
+        "data_type": "vla",
     },
 }
 

@@ -1,14 +1,27 @@
 """Phase 3 — Post-training dataloaders for Halo-VLA.
 
-Post-training uses small, task-specific demonstration sets to maximise success
-rate on the target robot platform and task suite.
+Post-training uses small, task-specific demonstration and instruction-tuning
+sets to maximise metric performance on target benchmarks.
 
-Datasets registered here:
-  - ``droid-task``      : DROID task-specific subset (curated per task)
-  - ``eo-data-task``    : EO-Data1.5M task-targeted subsets
-  - ``airoa-task``      : AIRoA-MoMA task-filtered episodes
-  - ``libero``          : LIBERO simulation benchmark (40 tasks, 1,693 eps)
-  - ``metaworld-mt50``  : Meta-World MT50 (50 tasks, 2,500 eps)
+VLM datasets (instruction-following fine-tuning):
+  - ``llava-instruct-665k``   : LLaVA Instruct 665K multi-turn SFT
+  - ``textvqa``                : TextVQA 28K reading-comprehension VQA
+  - ``scienceqa``              : ScienceQA 21K multimodal science QA
+  - ``chartqa``                : ChartQA 20K chart reasoning
+  - ``infographics-vqa``       : InfographicsVQA 30K document VQA
+  - ``seed-bench``             : SEED-Bench 19K multi-choice VQA
+  - ``llava-plus``             : LLaVA-Plus tool-augmented SFT
+
+VLA datasets (robot task fine-tuning):
+  - ``droid-task``             : DROID task-specific subset (curated per task)
+  - ``eo-data-task``           : EO-Data1.5M task-targeted subsets
+  - ``airoa-task``             : AIRoA-MoMA task-filtered episodes
+  - ``libero-goal``            : LIBERO-Goal 10-task goal-conditioned benchmark
+  - ``libero-spatial``         : LIBERO-Spatial 10-task spatial reasoning
+  - ``libero-object``          : LIBERO-Object 10-task object-manipulation
+  - ``libero-100``             : LIBERO-100 full 100-task benchmark
+  - ``aloha-bimanual``         : ALOHA real bimanual demos (200 eps)
+  - ``metaworld-mt50``         : Meta-World MT50 (50 tasks, 2,500 eps)
 
 Usage::
 
@@ -37,6 +50,61 @@ from loguru import logger
 # ---------------------------------------------------------------------------
 
 POST_TRAIN_DATASETS: dict[str, dict[str, Any]] = {
+    # -----------------------------------------------------------------------
+    # VLM instruction-following fine-tuning datasets
+    # -----------------------------------------------------------------------
+    "llava-instruct-665k": {
+        "hf_path": "liuhaotian/LLaVA-Instruct-150K",
+        "description": "LLaVA Instruct 665K — multi-turn conversation SFT with GPT-4.",
+        "paper_reference": "Liu et al. (2023) LLaVA",
+        "n_episodes_approx": 665_000,
+        "data_type": "vlm",
+    },
+    "textvqa": {
+        "hf_path": "lmms-lab/textvqa",
+        "description": "TextVQA — 28K reading-comprehension VQA on scene text.",
+        "paper_reference": "Singh et al. (2019) TextVQA",
+        "n_episodes_approx": 28_000,
+        "data_type": "vlm",
+    },
+    "scienceqa": {
+        "hf_path": "derek-thomas/ScienceQA",
+        "description": "ScienceQA — 21K multi-modal science questions with explanations.",
+        "paper_reference": "Lu et al. (2022) ScienceQA",
+        "n_episodes_approx": 21_208,
+        "data_type": "vlm",
+    },
+    "chartqa": {
+        "hf_path": "HuggingFaceM4/ChartQA",
+        "description": "ChartQA — 20K chart-based reasoning questions.",
+        "paper_reference": "Masry et al. (2022) ChartQA",
+        "n_episodes_approx": 20_000,
+        "data_type": "vlm",
+    },
+    "infographics-vqa": {
+        "hf_path": "jordyvl/DocVQA_InfographicsVQA_questions_answers",
+        "description": "InfographicsVQA — 30K document and infographic VQA pairs.",
+        "paper_reference": "Mathew et al. (2021) InfographicVQA",
+        "n_episodes_approx": 30_035,
+        "data_type": "vlm",
+    },
+    "seed-bench": {
+        "hf_path": "AILab-CVC/SEED-Bench",
+        "description": "SEED-Bench — 19K multiple-choice VQA spanning 12 dimensions.",
+        "paper_reference": "Li et al. (2023) SEED-Bench",
+        "n_episodes_approx": 19_242,
+        "data_type": "vlm",
+    },
+    "llava-plus": {
+        "hf_path": "liuhaotian/LLaVA-Plus-Data",
+        "description": "LLaVA-Plus — tool-augmented multi-step instruction-following SFT.",
+        "paper_reference": "Liu et al. (2023) LLaVA-Plus",
+        "n_episodes_approx": 100_000,
+        "data_type": "vlm",
+    },
+    # -----------------------------------------------------------------------
+    # VLA task-specific fine-tuning datasets
+    # -----------------------------------------------------------------------
     "droid-task": {
         "hf_path": "lerobot/droid_100",
         "description": (
@@ -45,6 +113,7 @@ POST_TRAIN_DATASETS: dict[str, dict[str, Any]] = {
         ),
         "paper_reference": "Khazatsky et al. (2024) DROID",
         "n_episodes_approx": 500,  # per task after filtering
+        "data_type": "vla",
     },
     "eo-data-task": {
         "hf_path": "IPEC-COMMUNITY/EO-Data1.5M",
@@ -58,6 +127,7 @@ POST_TRAIN_DATASETS: dict[str, dict[str, Any]] = {
         "description": "EO-Data1.5M task-targeted subsets for physical reasoning fine-tuning.",
         "paper_reference": "EO-Data1.5M (IPEC-COMMUNITY, 2024)",
         "n_episodes_approx": 50_000,
+        "data_type": "vla",
     },
     "airoa-task": {
         "hf_path": "airoa-org/airoa-moma",
@@ -67,18 +137,49 @@ POST_TRAIN_DATASETS: dict[str, dict[str, Any]] = {
         ),
         "paper_reference": "AIRoA-MoMA (2024)",
         "n_episodes_approx": None,
+        "data_type": "vla",
     },
-    "libero": {
-        "hf_path": "physical-intelligence/libero",
-        "description": "LIBERO — 40 tasks, 1,693 episodes on a Franka arm (simulation).",
+    "libero-goal": {
+        "hf_path": "lerobot/libero_goal",
+        "description": "LIBERO-Goal — 10 goal-conditioned tasks on a Franka arm (sim).",
+        "paper_reference": "Liu et al. (2023) LIBERO",
+        "n_episodes_approx": 500,
+        "data_type": "vla",
+    },
+    "libero-spatial": {
+        "hf_path": "lerobot/libero_spatial",
+        "description": "LIBERO-Spatial — 10 spatial-reasoning tasks on a Franka arm (sim).",
+        "paper_reference": "Liu et al. (2023) LIBERO",
+        "n_episodes_approx": 500,
+        "data_type": "vla",
+    },
+    "libero-object": {
+        "hf_path": "lerobot/libero_object",
+        "description": "LIBERO-Object — 10 object-manipulation tasks on a Franka arm (sim).",
+        "paper_reference": "Liu et al. (2023) LIBERO",
+        "n_episodes_approx": 500,
+        "data_type": "vla",
+    },
+    "libero-100": {
+        "hf_path": "lerobot/libero_10",
+        "description": "LIBERO-100 — full 100-task benchmark, 5 demo suites on Franka.",
         "paper_reference": "Liu et al. (2023) LIBERO",
         "n_episodes_approx": 1_693,
+        "data_type": "vla",
+    },
+    "aloha-bimanual": {
+        "hf_path": "lerobot/aloha_mobile_cabinet",
+        "description": "ALOHA real bimanual demos — 200 cabinet-manipulation episodes.",
+        "paper_reference": "Zhao et al. (2023) ACT",
+        "n_episodes_approx": 200,
+        "data_type": "vla",
     },
     "metaworld-mt50": {
         "hf_path": "lerobot/metaworld_mt50",
         "description": "Meta-World MT50 — 50 tasks, 2,500 episodes on a Sawyer arm.",
         "paper_reference": "Yu et al. (2020) Meta-World",
         "n_episodes_approx": 2_500,
+        "data_type": "vla",
     },
 }
 
