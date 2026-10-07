@@ -1,6 +1,6 @@
 <div align="center">
 
-# Halo-VLA
+# Halo-WAM
 
 ### A compact Vision-Language-Action model with an integrated world model
 
