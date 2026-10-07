@@ -156,6 +156,94 @@ PRETRAIN_DATASETS: dict[str, dict[str, Any]] = {
         "n_episodes_approx": 25_000,
         "data_type": "vla",
     },
+    "droid-v1": {
+        "hf_path": "lerobot/droid_1.0.1",
+        "subsets": None,
+        "description": (
+            "DROID 1.0.1 — 76K trajectories, 564 scenes, 86 tasks, 50 operators. "
+            "In-the-wild Franka Panda; high scene diversity; key OXE complement."
+        ),
+        "paper_reference": "Khazatsky et al. (2024) DROID",
+        "n_episodes_approx": 76_000,
+        "data_type": "vla",
+    },
+    "libero-pretrain": {
+        "hf_path": "HuggingFaceVLA/libero",
+        "subsets": None,
+        "description": (
+            "LIBERO (HuggingFaceVLA edition) — 130+ tasks, 5K+ episodes on Franka. "
+            "LeRobot v0.4.0 official. Multi-task instruction-following pretraining."
+        ),
+        "paper_reference": "Liu et al. (2023) LIBERO",
+        "n_episodes_approx": 5_000,
+        "data_type": "vla",
+    },
+    "openEAI-dataset": {
+        "hf_path": "OpenEAI/OpenEAI-Dataset",
+        "subsets": None,
+        "description": (
+            "OpenEAI-Dataset — ~3.12 TB unified HDF5 aggregating "
+            "OXE + UMI Community + DROID + BC-Z in a single format."
+        ),
+        "paper_reference": "OpenEAI (2024)",
+        "n_episodes_approx": 3_000_000,
+        "data_type": "vla",
+    },
+    "lerobot-community-v3": {
+        "hf_path": "lerobot/community_dataset_v3",
+        "subsets": None,
+        "description": (
+            "LeRobot Community Dataset v3 — 791 datasets across 46 robot types, "
+            "from 851 sources. Datasets v3.0 format, OXE-scale chunked episodes."
+        ),
+        "paper_reference": "Cadène et al. (2024) LeRobot",
+        "n_episodes_approx": 5_000_000,
+        "data_type": "vla",
+    },
+    "robogene": {
+        "hf_path": "X-Humanoid/RoboGene",
+        "subsets": None,
+        "description": (
+            "RoboGene — diversity-driven agentic VLA pretraining. "
+            "Addresses limited scene variety and physical grounding. LeRobot-compatible."
+        ),
+        "paper_reference": "X-Humanoid (2024) RoboGene",
+        "n_episodes_approx": 500_000,
+        "data_type": "vla",
+    },
+    "being-h0": {
+        "hf_path": "BeingBeyond/Being-H0",
+        "subsets": None,
+        "description": (
+            "Being-H0 — large-scale human video pretraining via explicit hand motion "
+            "modelling. Bridges embodiment gap with egocentric 2D/3D cues."
+        ),
+        "paper_reference": "BeingBeyond (2024) Being-H0",
+        "n_episodes_approx": 100_000,
+        "data_type": "vla",
+    },
+    "agibot-world": {
+        "hf_path": "lerobot/xvla-agibot-world",
+        "subsets": None,
+        "description": (
+            "AgiBot World — bimanual real-world manipulation used in X-VLA pretraining. "
+            "Dexterous tasks with rich scene diversity."
+        ),
+        "paper_reference": "AgiBot (2024) AgiBot World",
+        "n_episodes_approx": 200_000,
+        "data_type": "vla",
+    },
+    "h-tac-ttp": {
+        "hf_path": "BeingBeyond/TTP",
+        "subsets": None,
+        "description": (
+            "H-Tac TTP (Tactile Transformer Pretraining) — tactile sensor "
+            "pretraining for dexterous manipulation. Contact dynamics beyond vision."
+        ),
+        "paper_reference": "BeingBeyond (2024) H-Tac",
+        "n_episodes_approx": 50_000,
+        "data_type": "vla",
+    },
 }
 
 PRETRAIN_DATASET_NAMES: tuple[str, ...] = tuple(PRETRAIN_DATASETS)
