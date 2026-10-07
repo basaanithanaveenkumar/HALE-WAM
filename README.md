@@ -32,6 +32,44 @@ Halo-VLA is a single unified model that handles **language grounding**, **robot 
 
 ---
 
+## How it works
+
+One transformer reads your robot's camera frames, its joint state, and a language instruction — then writes back three things at the same time: a text description of the scene, a 16-step action trajectory, and a prediction of what the scene will look like after the move.
+
+```mermaid
+flowchart LR
+  subgraph INPUT["What you give it"]
+    CAM["📷 Camera frames\n(N RGB images)"]
+    JOINTS["🦾 Joint angles\n& gripper state"]
+    CMD["💬 Instruction\n'Pick up the cup'"]
+  end
+
+  subgraph MODEL["HALE-WAM — one transformer, three heads"]
+    direction TB
+    VIT["Vision encoder\nturns pixels → patch tokens"]
+    DEC["Causal decoder\nreads scene + instruction"]
+    FM["Flow-matching head\nplans the movement"]
+    DIT["Diffusion world model\nimagines the future"]
+  end
+
+  subgraph OUTPUT["What it gives back"]
+    TXT["💬 Scene description"]
+    MOVE["🎮 Motor commands\n(16-step trajectory)"]
+    NEXT["🖼️ Predicted\nnext frame"]
+  end
+
+  CAM --> VIT --> DEC
+  JOINTS --> DEC
+  CMD --> DEC
+  DEC --> TXT
+  DEC --> FM --> MOVE
+  DEC --> DIT --> NEXT
+```
+
+> **Why predict the future frame?** A model that can also imagine what it expects to see is easier to debug and can learn from video without needing action labels.
+
+---
+
 ## Architecture
 
 ### Key components
