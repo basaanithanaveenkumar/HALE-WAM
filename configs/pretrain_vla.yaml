@@ -5,17 +5,20 @@
 # Goal: learn generalised visual-motor representations transferable
 # across embodiments, viewpoints, and task families.
 #
-# VLA datasets (12 total):
-#   Core:      open-x-embodiment (~2M), bridge-v2 (60K),
-#              fractal-rt1 (130K), bc-z (25K),
-#              droid-v1 (76K), libero-pretrain (5K)
-#   Packs:     openEAI-dataset (3M), lerobot-community-v3 (5M),
-#              robogene (500K)
-#   Human/tac: being-h0 (100K), agibot-world (200K), h-tac-ttp (50K)
+# VLA datasets (17 total):
+#   Core:         open-x-embodiment (~2M), bridge-v2 (60K),
+#                 fractal-rt1 (130K), bc-z (25K),
+#                 droid-v1 (76K), libero-pretrain (5K)
+#   Packs:        openEAI-dataset (3M), lerobot-community-v3 (5M),
+#                 robogene (500K)
+#   Human/tac:    being-h0 (100K), agibot-world (200K), h-tac-ttp (50K)
+#   Synthetic:    syngrasp-1b (1B), robocasa (100K)
+#   Egocentric:   ego4d (9.6K h), vitra (500K), egovla (1M)
 #
-# VLM datasets (6 total, for joint visual grounding):
+# VLM datasets (7 total, for joint visual grounding):
 #   laion-aesthetics (600M), cc3m (3.3M), cc12m (12M),
-#   datacomp-1b (1.28B), wit (37.6M), redcaps (12M)
+#   datacomp-1b (1.28B), wit (37.6M), redcaps (12M),
+#   something-something-v2 (220K)
 # ============================================================
 
 inherits: base.yaml
@@ -25,23 +28,33 @@ inherits: base.yaml
 # ------------------------------------------------------------------
 data:
   source: stage_pretrain
-  # VLA robot teleoperation streams
+  # VLA robot teleoperation + simulation + egocentric streams
   vla_datasets:
     enabled: true
     dataset_names:
+      # Core cross-embodiment
       - open-x-embodiment
       - bridge-v2
       - fractal-rt1
       - bc-z
       - droid-v1
       - libero-pretrain
+      # Aggregated packs
       - openEAI-dataset
       - lerobot-community-v3
       - robogene
+      # Human-video / tactile
       - being-h0
       - agibot-world
       - h-tac-ttp
-  # VLM image-text streams (visual grounding)
+      # Synthetic / simulation
+      - syngrasp-1b
+      - robocasa
+      # Egocentric human video (cross-embodiment bridge)
+      - ego4d
+      - vitra
+      - egovla
+  # VLM image-text streams (visual grounding + backbone preservation)
   vlm_datasets:
     enabled: true
     dataset_names:
@@ -51,6 +64,7 @@ data:
       - datacomp-1b
       - wit
       - redcaps
+      - something-something-v2   # procedural human-object video for temporal grounding
   streaming: true
   prefetch_workers: 8
   max_samples_per_dataset: null     # stream full corpora

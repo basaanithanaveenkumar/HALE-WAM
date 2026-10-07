@@ -2,6 +2,7 @@
 
 Mid-training uses curated domain-specific data to adapt pretrained representations
 to the target workspace, object distribution, and instruction-following style.
+This phase is also called "embodied alignment" or "VLM-to-VLA bridging".
 
 VLM datasets (vision-language connector pretraining):
   - ``llava-pretrain-558k``    : LLaVA Pretrain 558K curated BLIP captions
@@ -9,6 +10,13 @@ VLM datasets (vision-language connector pretraining):
   - ``blip-laion-cc-sbu-558k`` : BLIP LAION+CC+SBU 558K captions
   - ``recap-datacomp-1b``      : Recap DataComp-1B 1.28B recaptioned pairs
   - ``allava-vflan``           : AllaVA-vFLAN 1.3M task-diverse QA
+
+Embodied-oriented VLM data (spatial / affordance, no action labels):
+  - ``refspatial``             : RefSpatial — spatial referring and reasoning
+  - ``embspatial-bench``       : EmbSpatial-Bench — embodied spatial understanding VQA
+  - ``robo2vlm``               : Robo2VLM — robotic VQA from robot observations
+  - ``robopoint``              : RoboPoint — spatial affordance prediction data
+  - ``vln-r2r``                : R2R — vision-and-language navigation trajectories
 
 VLA datasets (robot domain adaptation):
   - ``droid``       : DROID full Franka corpus (76K diverse demos)
@@ -156,6 +164,68 @@ MID_TRAIN_DATASETS: dict[str, dict[str, Any]] = {
         "paper_reference": "Zhao et al. (2023) ACT",
         "n_episodes_approx": 1_000,
         "data_type": "vla",
+    },
+    # -----------------------------------------------------------------------
+    # Embodied-oriented VLM data (spatial / affordance, no action labels)
+    # Key reference: EmbodiedMidtrain (2026) — proximity-based data engine
+    # -----------------------------------------------------------------------
+    "refspatial": {
+        "hf_path": "RefSpatial/RefSpatial",
+        "subsets": None,
+        "description": (
+            "RefSpatial — spatial referring and reasoning dataset for embodied agents. "
+            "Bridges the VLM→VLA gap by training on spatial grounding without action labels."
+        ),
+        "paper_reference": "RefSpatial (2025)",
+        "n_episodes_approx": 100_000,
+        "data_type": "vlm",
+    },
+    "embspatial-bench": {
+        "hf_path": "EmbSpatial/EmbSpatial-Bench",
+        "subsets": None,
+        "description": (
+            "EmbSpatial-Bench — embodied spatial understanding VQA. "
+            "Tests relative positions, distances, directions in 3D scene context."
+        ),
+        "paper_reference": "EmbSpatial (2024)",
+        "n_episodes_approx": 10_000,
+        "data_type": "vlm",
+    },
+    "robo2vlm": {
+        "hf_path": "Robo2VLM/Robo2VLM",
+        "subsets": None,
+        "description": (
+            "Robo2VLM — robotic visual question answering generated from robot "
+            "observation trajectories. No action labels; aligns VLM priors to "
+            "robot-camera viewpoints and manipulation contexts."
+        ),
+        "paper_reference": "Robo2VLM (2025)",
+        "n_episodes_approx": 500_000,
+        "data_type": "vlm",
+    },
+    "robopoint": {
+        "hf_path": "wentao-yuan/robopoint-data",
+        "subsets": None,
+        "description": (
+            "RoboPoint — spatial affordance prediction: given an image + instruction, "
+            "predict the target 2D point for manipulation. Trains spatial reasoning "
+            "without requiring low-level action labels."
+        ),
+        "paper_reference": "Yuan et al. (2024) RoboPoint",
+        "n_episodes_approx": 600_000,
+        "data_type": "vlm",
+    },
+    "vln-r2r": {
+        "hf_path": "prs-eth/room_across_the_room",
+        "subsets": None,
+        "description": (
+            "R2R (Room-to-Room) — vision-and-language navigation trajectories "
+            "in photorealistic indoor environments. Trajectory-centric supervision "
+            "for spatial grounding and instruction following."
+        ),
+        "paper_reference": "Anderson et al. (2018) R2R",
+        "n_episodes_approx": 22_000,
+        "data_type": "vlm",
     },
 }
 

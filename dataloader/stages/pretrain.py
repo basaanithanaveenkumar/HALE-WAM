@@ -4,12 +4,13 @@ Pre-training uses web-scale video/image data and large open-world robot
 teleoperation corpora to learn generalised visual-motor representations.
 
 VLM datasets (image-text alignment):
-  - ``laion-aesthetics``    : LAION-2B-en aesthetic subset (≥5.0 quality)
-  - ``cc3m``                : Conceptual Captions 3M
-  - ``cc12m``               : Conceptual Captions 12M
-  - ``datacomp-1b``         : DataComp-1B CommonPool
-  - ``wit``                 : Wikipedia Image Text
-  - ``redcaps``             : RedCaps 12M Reddit captions
+  - ``laion-aesthetics``       : LAION-2B-en aesthetic subset (≥5.0 quality)
+  - ``cc3m``                   : Conceptual Captions 3M
+  - ``cc12m``                  : Conceptual Captions 12M
+  - ``datacomp-1b``            : DataComp-1B CommonPool
+  - ``wit``                    : Wikipedia Image Text
+  - ``redcaps``                : RedCaps 12M Reddit captions
+  - ``something-something-v2`` : SSv2 — 220K procedural human-object video clips
 
 VLA datasets (robot teleoperation):
   - ``eo-data-interleave``  : EO-Data1.5M interleaved subsets (web robot QA)
@@ -17,6 +18,15 @@ VLA datasets (robot teleoperation):
   - ``bridge-v2``           : Bridge Data V2 (60K diverse manipulation demos)
   - ``fractal-rt1``         : Google RT-1 training corpus (130K episodes)
   - ``bc-z``                : BC-Z 25K episodes across 100 tasks
+
+Synthetic/simulation datasets:
+  - ``syngrasp-1b``         : SynGrasp-1B — 1B randomised grasp scenes (GraspVLA)
+  - ``robocasa``            : RoboCasa — scalable household manipulation rollouts
+
+Egocentric human video (cross-embodiment bridge):
+  - ``ego4d``               : Ego4D — 3,600 h first-person video from 74 scenarios
+  - ``vitra``               : VITRA — in-the-wild hand videos → (img, instr, action)
+  - ``egovla``              : EgoVLA — large-scale egocentric video for VLA pretraining
 
 Usage::
 
@@ -243,6 +253,85 @@ PRETRAIN_DATASETS: dict[str, dict[str, Any]] = {
         "paper_reference": "BeingBeyond (2024) H-Tac",
         "n_episodes_approx": 50_000,
         "data_type": "vla",
+    },
+    # -----------------------------------------------------------------------
+    # Synthetic / simulation corpora
+    # -----------------------------------------------------------------------
+    "syngrasp-1b": {
+        "hf_path": "GraspVLA/SynGrasp-1B",
+        "subsets": None,
+        "description": (
+            "SynGrasp-1B — 1 billion procedurally-generated grasp scenes with "
+            "randomised objects, lighting, and camera poses (GraspVLA). "
+            "Provides robust geometric pretraining at scale."
+        ),
+        "paper_reference": "GraspVLA (2025) SynGrasp-1B",
+        "n_episodes_approx": 1_000_000_000,
+        "data_type": "vla",
+    },
+    "robocasa": {
+        "hf_path": "lerobot/robocasa",
+        "subsets": None,
+        "description": (
+            "RoboCasa — scalable household manipulation rollouts across diverse "
+            "kitchen/living layouts. Enables generalist policy pretraining."
+        ),
+        "paper_reference": "Nasiriany et al. (2024) RoboCasa",
+        "n_episodes_approx": 100_000,
+        "data_type": "vla",
+    },
+    # -----------------------------------------------------------------------
+    # Egocentric human video (cross-embodiment bridge)
+    # -----------------------------------------------------------------------
+    "ego4d": {
+        "hf_path": "facebook/ego4d",
+        "subsets": None,
+        "description": (
+            "Ego4D — 3,600 hours of first-person video from 931 participants "
+            "across 74 worldwide scenarios. Low-cost VLA pretraining source."
+        ),
+        "paper_reference": "Grauman et al. (2022) Ego4D",
+        "n_episodes_approx": 9_600,
+        "data_type": "vla",
+        "trust_remote_code": True,
+    },
+    "vitra": {
+        "hf_path": "VITRA-Dataset/VITRA",
+        "subsets": None,
+        "description": (
+            "VITRA (ICRA 2026) — converts in-the-wild human hand videos into "
+            "(image, instruction, action) tuples for VLA pretraining. "
+            "Bridges embodiment gap via egocentric hand motion."
+        ),
+        "paper_reference": "VITRA (2026) ICRA",
+        "n_episodes_approx": 500_000,
+        "data_type": "vla",
+    },
+    "egovla": {
+        "hf_path": "EgoVLA/EgoVLA",
+        "subsets": None,
+        "description": (
+            "EgoVLA — large-scale egocentric human video corpus for VLA pretraining. "
+            "Overcomes robot data scarcity via human-to-robot cross-embodiment transfer."
+        ),
+        "paper_reference": "EgoVLA (2025)",
+        "n_episodes_approx": 1_000_000,
+        "data_type": "vla",
+    },
+    # -----------------------------------------------------------------------
+    # Language-vision co-training (backbone preservation)
+    # -----------------------------------------------------------------------
+    "something-something-v2": {
+        "hf_path": "HuggingFaceM4/something-something-v2",
+        "subsets": None,
+        "description": (
+            "Something-Something V2 — 220K crowd-sourced procedural video clips "
+            "showing humans performing fine-grained actions with everyday objects. "
+            "VL co-training for spatial and temporal reasoning preservation."
+        ),
+        "paper_reference": "Goyal et al. (2017) SSv2",
+        "n_episodes_approx": 220_847,
+        "data_type": "vlm",
     },
 }
 

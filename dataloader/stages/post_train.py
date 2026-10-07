@@ -12,7 +12,7 @@ VLM datasets (instruction-following fine-tuning):
   - ``seed-bench``             : SEED-Bench 19K multi-choice VQA
   - ``llava-plus``             : LLaVA-Plus tool-augmented SFT
 
-VLA datasets (robot task fine-tuning):
+VLA datasets (robot task fine-tuning / SFT):
   - ``droid-task``             : DROID task-specific subset (curated per task)
   - ``eo-data-task``           : EO-Data1.5M task-targeted subsets
   - ``airoa-task``             : AIRoA-MoMA task-filtered episodes
@@ -22,6 +22,16 @@ VLA datasets (robot task fine-tuning):
   - ``libero-100``             : LIBERO-100 full 100-task benchmark
   - ``aloha-bimanual``         : ALOHA real bimanual demos (200 eps)
   - ``metaworld-mt50``         : Meta-World MT50 (50 tasks, 2,500 eps)
+
+Preference / DPO-style datasets (winner/loser trajectory pairs):
+  - ``flowpro-pairs``          : FlowPRO rollback preference pairs (local collection)
+  - ``apo-interventions``      : APO human-in-the-loop correction preferences (local)
+
+Offline RL / hindsight relabeling:
+  - ``hindsight-relabeled``    : LfH hindsight relabeled failed rollouts (local)
+
+DAgger / interactive imitation:
+  - ``dagger-corrections``     : Human gated-takeover correction trajectories (local)
 
 Usage::
 
@@ -181,6 +191,70 @@ POST_TRAIN_DATASETS: dict[str, dict[str, Any]] = {
         "n_episodes_approx": 2_500,
         "data_type": "vla",
     },
+    # -----------------------------------------------------------------------
+    # Preference / DPO-style datasets  (winner / loser trajectory pairs)
+    # Require LOCAL collection via robot deployment — hf_path is None.
+    # The registry skips these gracefully when no local_path is configured.
+    # -----------------------------------------------------------------------
+    "flowpro-pairs": {
+        "hf_path": None,
+        "description": (
+            "FlowPRO rollback preference pairs — single operator intervention yields "
+            "(winner, loser) trajectory pair via rollback horizon. "
+            "No separate positive/negative recordings needed. "
+            "Requires local robot deployment to collect."
+        ),
+        "paper_reference": "FlowPRO (2025)",
+        "n_episodes_approx": None,
+        "data_type": "vla",
+        "requires_local_collection": True,
+        "local_path_key": "flowpro_data_root",
+    },
+    "apo-interventions": {
+        "hf_path": None,
+        "description": (
+            "APO (Action Preference Optimisation) — human-in-the-loop intervention "
+            "preference data with adaptive reweighting. Learns from sub-optimal "
+            "correction trajectories. Requires local collection."
+        ),
+        "paper_reference": "APO (2025)",
+        "n_episodes_approx": None,
+        "data_type": "vla",
+        "requires_local_collection": True,
+        "local_path_key": "apo_data_root",
+    },
+    # -----------------------------------------------------------------------
+    # Offline RL / hindsight relabeling
+    # -----------------------------------------------------------------------
+    "hindsight-relabeled": {
+        "hf_path": None,
+        "description": (
+            "LfH (Learning from Hindsight) hindsight-relabeled rollouts — "
+            "failed trajectories are scored against tasks actually achieved and "
+            "reused as positives. Useful when early policies rarely succeed."
+        ),
+        "paper_reference": "LfH (2024)",
+        "n_episodes_approx": None,
+        "data_type": "vla",
+        "requires_local_collection": True,
+        "local_path_key": "hindsight_data_root",
+    },
+    # -----------------------------------------------------------------------
+    # DAgger / interactive imitation
+    # -----------------------------------------------------------------------
+    "dagger-corrections": {
+        "hf_path": None,
+        "description": (
+            "DAgger-style interactive correction trajectories — human operator "
+            "takes over at failure modes, producing corrective demos that "
+            "cover the state distribution induced by the current policy."
+        ),
+        "paper_reference": "Ross et al. (2011) DAgger",
+        "n_episodes_approx": None,
+        "data_type": "vla",
+        "requires_local_collection": True,
+        "local_path_key": "dagger_data_root",
+    },
 }
 
 POST_TRAIN_DATASET_NAMES: tuple[str, ...] = tuple(POST_TRAIN_DATASETS)
@@ -206,6 +280,11 @@ class PostTrainDatasetConfig:
     # Local paths for gated / large datasets
     droid_data_root: str | None = None
     airoa_data_root: str | None = None
+    # Local-collection datasets (preference / DAgger / hindsight)
+    flowpro_data_root: str | None = None
+    apo_data_root: str | None = None
+    hindsight_data_root: str | None = None
+    dagger_data_root: str | None = None
 
 
 class PostTrainDatasetRegistry:
@@ -224,6 +303,25 @@ class PostTrainDatasetRegistry:
                 logger.warning("post-train dataset {!r} not registered — skipping", name)
                 continue
             spec = POST_TRAIN_DATASETS[name]
+
+            # Local-collection datasets require an explicit data root; skip silently
+            # when it has not been configured (not an error — just not collected yet).
+            if spec.get("requires_local_collection"):
+                local_path_key = spec.get("local_path_key", "")
+                local_root = getattr(self.cfg, local_path_key, None)
+                if not local_root:
+                    logger.debug(
+                        "skipping local-collection dataset {!r} — "
+                        "set {} to enable it",
+                        name,
+                        local_path_key,
+                    )
+                    continue
+                # Delegate to a generic local dataset loader
+                datasets.append(_LocalRobotDataset(name=name, spec=spec, data_root=local_root))
+                logger.info("adding local-collection dataset name={} root={}", name, local_root)
+                continue
+
             logger.info("adding post-train dataset name={}", name)
 
             if name == "droid-task" and self.cfg.droid_data_root:
@@ -316,6 +414,55 @@ class _HFRobotDataset(torch.utils.data.Dataset):
                 self._data = list(ds) if cap is None else list(ds.select(range(min(cap, len(ds)))))
         except Exception as exc:
             logger.error("failed to load {} — {}", self.name, exc)
+            self._data = []
+
+    def __len__(self) -> int:
+        self._ensure_loaded()
+        return len(self._data)  # type: ignore[arg-type]
+
+    def __getitem__(self, idx: int) -> dict[str, Any]:
+        self._ensure_loaded()
+        return self._data[idx]  # type: ignore[index]
+
+
+class _LocalRobotDataset(torch.utils.data.Dataset):
+    """Minimal stub for locally-collected preference / DAgger / hindsight datasets.
+
+    Reads LeRobot-format episode files from *data_root*.  Falls back to an
+    empty dataset if the directory does not exist yet (robot not yet deployed).
+    """
+
+    def __init__(self, *, name: str, spec: dict[str, Any], data_root: str) -> None:
+        self.name = name
+        self.spec = spec
+        self.data_root = data_root
+        self._data: list[dict] | None = None
+
+    def _ensure_loaded(self) -> None:
+        if self._data is not None:
+            return
+        import os
+
+        logger.info("loading local dataset {} from {}", self.name, self.data_root)
+        if not os.path.isdir(self.data_root):
+            logger.warning(
+                "local dataset {} root {} does not exist — empty dataset",
+                self.name,
+                self.data_root,
+            )
+            self._data = []
+            return
+        try:
+            import json
+
+            episodes = []
+            for fname in sorted(os.listdir(self.data_root)):
+                if fname.endswith(".json"):
+                    with open(os.path.join(self.data_root, fname)) as fh:
+                        episodes.append(json.load(fh))
+            self._data = episodes
+        except Exception as exc:
+            logger.error("failed to load local dataset {} — {}", self.name, exc)
             self._data = []
 
     def __len__(self) -> int:

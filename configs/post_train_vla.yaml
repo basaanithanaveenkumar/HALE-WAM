@@ -1,13 +1,19 @@
 # ============================================================
 # HALE-WAM  —  Phase 3: VLA Post-Training (task fine-tuning)
 # ============================================================
-# Small, task-specific demonstrations to maximise success rate
-# on the deployment robot platform and task suite.
+# Small, task-specific demonstrations + preference data to maximise
+# success rate on the deployment robot platform and task suite.
 #
-# VLA datasets (10 total):
+# VLA datasets (10 total, SFT):
 #   libero-goal, libero-spatial, libero-object, libero-100,
 #   aloha-bimanual, metaworld-mt50, droid-task, eo-data-task,
-#   airoa-task (local), llava-instruct-665k (grounding)
+#   airoa-task (local)
+#
+# VLA preference / offline-RL datasets (4 total, local-collection):
+#   flowpro-pairs    — FlowPRO rollback preference pairs (winner/loser)
+#   apo-interventions — APO human-in-the-loop correction preferences
+#   hindsight-relabeled — LfH failed rollouts scored + reused as positives
+#   dagger-corrections — DAgger human gated-takeover corrections
 #
 # VLM datasets (7 total, instruction-following SFT):
 #   llava-instruct-665k, textvqa, scienceqa, chartqa,
@@ -33,6 +39,14 @@ data:
       - eo-data-task
       - droid-task
       - airoa-task
+  # Preference / offline-RL datasets (skipped silently if data_root not set)
+  vla_preference_datasets:
+    enabled: true
+    dataset_names:
+      - flowpro-pairs
+      - apo-interventions
+      - hindsight-relabeled
+      - dagger-corrections
   vlm_datasets:
     enabled: true
     dataset_names:
@@ -49,6 +63,11 @@ data:
   max_samples_per_dataset: null # keep all — small datasets
   droid_data_root: null
   airoa_data_root: null
+  # Local-collection preference dataset roots (set after robot deployment)
+  flowpro_data_root: null
+  apo_data_root: null
+  hindsight_data_root: null
+  dagger_data_root: null
   img_size: 224
   action_dim: 7
 

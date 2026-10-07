@@ -1,14 +1,18 @@
 # ============================================================
 # HALE-WAM  —  Phase 2: VLA Mid-Training
 # ============================================================
-# Domain-specific manipulation data for embodiment adaptation.
-# Goal: align pretrained representations to target workspace,
-# object distribution, and contact dynamics.
+# "Embodied alignment" — closes the gap between VLM backbone priors
+# and the structured (image, instruction, action) robot control format.
+# Key reference: EmbodiedMidtrain (2026) proximity-based data engine.
 #
-# VLA datasets (9 total):
+# VLA datasets (9 total, robot domain adaptation):
 #   droid (76K), airoa-moma (local), eo-data-qa (700K), rh20t (110K),
 #   taco-play (3.2K), pusht (300), aloha-sim (1K),
 #   (+ EO-Data interleave 1.5M for context grounding)
+#
+# Embodied VLM datasets (5 total, spatial / affordance, no action labels):
+#   refspatial (100K), embspatial-bench (10K), robo2vlm (500K),
+#   robopoint (600K), vln-r2r (22K)
 #
 # VLM datasets (5 total, connector pretraining):
 #   llava-pretrain-558k, sharegpt4v-pt, blip-laion-cc-sbu-558k,
@@ -34,6 +38,16 @@ data:
       # local datasets (activated when data_root is set)
       - eo-data-qa
       - airoa-moma
+  # Embodied-oriented VLM data — spatial reasoning, affordance, navigation
+  # (no action labels; aligns VLM priors to robot-camera viewpoints)
+  embodied_vlm_datasets:
+    enabled: true
+    dataset_names:
+      - refspatial
+      - embspatial-bench
+      - robo2vlm
+      - robopoint
+      - vln-r2r
   vlm_datasets:
     enabled: true
     dataset_names:
