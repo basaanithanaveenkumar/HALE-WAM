@@ -1,0 +1,22 @@
+# ============================================================
+# HALE-WAM  —  Model variant: Gated cross-attention projector
+# ============================================================
+# Flamingo-style tanh-gated cross-attention: learned latents
+# read ViT patches through depth-n cross-attention layers.
+# gate_init=1.0: images flow through from step 0 (identity start).
+# gate_init=0.0: Flamingo-style — image contribution starts at 0
+#                and learns to grow.
+# ============================================================
+
+inherits: base.yaml
+variant: halo_vla_gated_xattn
+
+model:
+  proj_type: gated_cross_attention
+  gated_xattn_num_latents: 64
+  gated_xattn_hidden_dim: 768
+  gated_xattn_num_layers: 4
+  gated_xattn_num_heads: 12
+  gated_xattn_ffn_mult: 4
+  gated_xattn_dropout: 0.0
+  gated_xattn_gate_init: 0.0    # Flamingo identity start

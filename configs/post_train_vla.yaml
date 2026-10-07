@@ -1,0 +1,97 @@
+# ============================================================
+# HALE-WAM  —  Phase 3: VLA Post-Training (task fine-tuning)
+# ============================================================
+# Small, task-specific demonstrations to maximise success rate
+# on the deployment robot platform and task suite.
+#
+# VLA datasets (10 total):
+#   libero-goal, libero-spatial, libero-object, libero-100,
+#   aloha-bimanual, metaworld-mt50, droid-task, eo-data-task,
+#   airoa-task (local), llava-instruct-665k (grounding)
+#
+# VLM datasets (7 total, instruction-following SFT):
+#   llava-instruct-665k, textvqa, scienceqa, chartqa,
+#   infographics-vqa, seed-bench, llava-plus
+# ============================================================
+
+inherits: base.yaml
+
+# ------------------------------------------------------------------
+# Data
+# ------------------------------------------------------------------
+data:
+  source: stage_post_train
+  vla_datasets:
+    enabled: true
+    dataset_names:
+      - libero-goal
+      - libero-spatial
+      - libero-object
+      - libero-100
+      - aloha-bimanual
+      - metaworld-mt50
+      - eo-data-task
+      - droid-task
+      - airoa-task
+  vlm_datasets:
+    enabled: true
+    dataset_names:
+      - llava-instruct-665k
+      - textvqa
+      - scienceqa
+      - chartqa
+      - infographics-vqa
+      - seed-bench
+      - llava-plus
+  task_filter: null             # set to e.g. "pick_and_place" for single-task fine-tune
+  streaming: false              # materialise in memory (small datasets)
+  prefetch_workers: 2
+  max_samples_per_dataset: null # keep all — small datasets
+  droid_data_root: null
+  airoa_data_root: null
+  img_size: 224
+  action_dim: 7
+
+# ------------------------------------------------------------------
+# Training
+# ------------------------------------------------------------------
+train:
+  backend: vla
+  steps: 10000
+  batch_size: 32
+  lr: 1.0e-5
+  warmup_steps: 100
+  lr_scheduler: cosine
+  weight_decay: 0.01
+  grad_clip: 1.0
+  grad_accum_steps: 1
+  dtype: bfloat16
+  checkpoint_every_n_steps: 500
+  seed: 2
+
+# ------------------------------------------------------------------
+# Model
+# ------------------------------------------------------------------
+model:
+  proj_type: mlp
+  use_moe: true
+  enable_visual_dit: true
+  visual_loss_weight: 8.0
+  gradient_checkpointing: true
+
+# ------------------------------------------------------------------
+# Logging & Eval
+# ------------------------------------------------------------------
+logging:
+  backend: tensorboard
+  tensorboard: true
+  log_every_n_steps: 50
+
+eval:
+  enabled: true
+  every_n_steps: 1000
+  benchmarks:
+    - libero
+    - metaworld
+  max_eval_episodes: 50
+  render_video: true

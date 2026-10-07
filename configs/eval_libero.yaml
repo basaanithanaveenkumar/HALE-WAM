@@ -1,0 +1,35 @@
+# ============================================================
+# HALE-WAM  —  Eval: LIBERO benchmark suite
+# ============================================================
+
+inherits: base.yaml
+
+data:
+  source: stage_post_train
+  vla_datasets:
+    enabled: true
+    dataset_names:
+      - libero-goal
+      - libero-spatial
+      - libero-object
+      - libero-100
+  streaming: false
+  max_samples_per_dataset: null
+
+train:
+  steps: 0                        # eval-only run
+
+eval:
+  enabled: true
+  every_n_epochs: 1
+  benchmarks:
+    - libero
+  max_eval_episodes: 100
+  render_video: true
+
+deploy:
+  enabled: true
+  device: cpu
+  dtype: float32
+  action_chunk_size: 16
+  ode_steps: 24

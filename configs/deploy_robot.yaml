@@ -1,0 +1,37 @@
+# ============================================================
+# HALE-WAM  —  Deployment: On-robot inference
+# ============================================================
+# Minimal, low-latency config for on-robot deployment.
+# Target hardware: NVIDIA Jetson Orin, NUC, or embedded GPU.
+# Real-time control loop at 10–30 Hz.
+# ============================================================
+
+inherits: base.yaml
+
+deploy:
+  enabled: true
+  backend: pytorch
+  device: cuda                  # change to "cpu" for CPU-only boards
+  dtype: float16                # float16 for speed on edge GPUs
+  compile: false                # avoid long JIT warmup on robot boot
+  max_batch_size: 1
+  action_chunk_size: 8          # shorter horizon = lower latency
+  ode_steps: 10                 # fewer ODE steps for real-time control
+  export_path: data/exports
+  robot:
+    control_hz: 20              # target control frequency (Hz)
+    camera_topics:              # ROS2 / realsense topics
+      - /camera/exterior_left/color/image_raw
+      - /camera/exterior_right/color/image_raw
+      - /camera/wrist/color/image_raw
+    state_topic: /robot/joint_states
+    action_topic: /robot/joint_commands
+    warmup_steps: 5             # steps to discard before publishing actions
+
+model:
+  gradient_checkpointing: false
+  enable_visual_dit: false
+  action_chunk_size: 8
+
+train:
+  steps: 0

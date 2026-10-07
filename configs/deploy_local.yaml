@@ -1,0 +1,26 @@
+# ============================================================
+# HALE-WAM  —  Deployment: Local CPU / MPS inference
+# ============================================================
+# Runs inference on a laptop or workstation without a GPU.
+# Suitable for robot debugging and local policy evaluation.
+# ============================================================
+
+inherits: base.yaml
+
+deploy:
+  enabled: true
+  backend: pytorch
+  device: cpu                   # cpu | mps (Apple Silicon)
+  dtype: float32                # float32 for numerical stability on CPU
+  compile: false
+  max_batch_size: 1
+  action_chunk_size: 16
+  ode_steps: 24
+  export_path: data/exports
+
+model:
+  gradient_checkpointing: false # not needed at inference
+  enable_visual_dit: false      # skip world-model heads at inference
+
+train:
+  steps: 0                      # inference-only

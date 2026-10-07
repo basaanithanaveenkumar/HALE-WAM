@@ -1,0 +1,95 @@
+# ============================================================
+# HALE-WAM  —  Phase 1: VLA Pre-training
+# ============================================================
+# Large-scale cross-embodiment pretraining on the full VLA corpus.
+# Goal: learn generalised visual-motor representations transferable
+# across embodiments, viewpoints, and task families.
+#
+# VLA datasets (12 total):
+#   Core:      open-x-embodiment (~2M), bridge-v2 (60K),
+#              fractal-rt1 (130K), bc-z (25K),
+#              droid-v1 (76K), libero-pretrain (5K)
+#   Packs:     openEAI-dataset (3M), lerobot-community-v3 (5M),
+#              robogene (500K)
+#   Human/tac: being-h0 (100K), agibot-world (200K), h-tac-ttp (50K)
+#
+# VLM datasets (6 total, for joint visual grounding):
+#   laion-aesthetics (600M), cc3m (3.3M), cc12m (12M),
+#   datacomp-1b (1.28B), wit (37.6M), redcaps (12M)
+# ============================================================
+
+inherits: base.yaml
+
+# ------------------------------------------------------------------
+# Data
+# ------------------------------------------------------------------
+data:
+  source: stage_pretrain
+  # VLA robot teleoperation streams
+  vla_datasets:
+    enabled: true
+    dataset_names:
+      - open-x-embodiment
+      - bridge-v2
+      - fractal-rt1
+      - bc-z
+      - droid-v1
+      - libero-pretrain
+      - openEAI-dataset
+      - lerobot-community-v3
+      - robogene
+      - being-h0
+      - agibot-world
+      - h-tac-ttp
+  # VLM image-text streams (visual grounding)
+  vlm_datasets:
+    enabled: true
+    dataset_names:
+      - laion-aesthetics
+      - cc3m
+      - cc12m
+      - datacomp-1b
+      - wit
+      - redcaps
+  streaming: true
+  prefetch_workers: 8
+  max_samples_per_dataset: null     # stream full corpora
+  img_size: 224
+  action_dim: 7
+
+# ------------------------------------------------------------------
+# Training
+# ------------------------------------------------------------------
+train:
+  backend: vla
+  steps: 200000
+  batch_size: 128
+  lr: 1.0e-4
+  warmup_steps: 5000
+  lr_scheduler: cosine
+  weight_decay: 0.01
+  grad_clip: 1.0
+  grad_accum_steps: 2
+  dtype: bfloat16
+  checkpoint_every_n_steps: 5000
+  seed: 0
+
+# ------------------------------------------------------------------
+# Model
+# ------------------------------------------------------------------
+model:
+  proj_type: mlp
+  use_moe: true
+  enable_visual_dit: false        # disable DiT during early pretrain
+  gradient_checkpointing: true
+
+# ------------------------------------------------------------------
+# Logging & Eval
+# ------------------------------------------------------------------
+logging:
+  backend: tensorboard
+  tensorboard: true
+  log_every_n_steps: 200
+
+eval:
+  enabled: false                  # no benchmark eval during pretrain

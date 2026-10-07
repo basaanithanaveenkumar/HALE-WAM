@@ -1,0 +1,53 @@
+# ============================================================
+# HALE-WAM  —  VLM Pre-training (visual grounding stage)
+# ============================================================
+# Trains the vision encoder + projector on large image-text corpora
+# before any robot data is introduced. Freezes the LLM backbone.
+#
+# Datasets (6): laion-aesthetics-v2-5plus, cc3m, cc12m,
+#               datacomp-1b, wit, redcaps
+# ============================================================
+
+inherits: base.yaml
+
+data:
+  source: stage_pretrain
+  vla_datasets:
+    enabled: false
+  vlm_datasets:
+    enabled: true
+    dataset_names:
+      - laion-aesthetics
+      - cc3m
+      - cc12m
+      - datacomp-1b
+      - wit
+      - redcaps
+  streaming: true
+  prefetch_workers: 8
+  max_samples_per_dataset: null
+
+train:
+  backend: vlm
+  steps: 100000
+  batch_size: 256
+  lr: 2.0e-4
+  warmup_steps: 2000
+  lr_scheduler: cosine
+  weight_decay: 0.01
+  grad_clip: 1.0
+  dtype: bfloat16
+  checkpoint_every_n_steps: 5000
+
+model:
+  proj_type: mlp
+  enable_visual_dit: false
+  gradient_checkpointing: true
+
+logging:
+  backend: tensorboard
+  tensorboard: true
+  log_every_n_steps: 200
+
+eval:
+  enabled: false

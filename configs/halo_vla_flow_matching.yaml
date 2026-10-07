@@ -1,0 +1,29 @@
+# ============================================================
+# HALE-WAM  —  Model variant: Flow-matching action decoder
+# ============================================================
+# Replaces the MLP action head with a continuous normalising flow
+# (ODE-based). Learns a velocity field that maps Gaussian noise
+# to the action distribution. Better for multi-modal policies
+# (e.g. pick from several valid grasps).
+# ============================================================
+
+inherits: base.yaml
+variant: halo_vla_flow_matching
+
+model:
+  flow_hidden_dim: 1024
+  flow_time_embed_dim: 128
+  flow_num_ode_steps: 24          # Euler steps at train time
+  action_chunk_size: 16
+
+train:
+  backend: vla
+  steps: 50000
+  batch_size: 32
+  lr: 5.0e-5
+  warmup_steps: 500
+  grad_clip: 1.0
+
+deploy:
+  ode_steps: 50                   # more steps at inference for quality
+  action_chunk_size: 16

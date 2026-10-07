@@ -1,0 +1,36 @@
+# ============================================================
+# HALE-WAM  —  Overfit / smoke-test config
+# ============================================================
+# Fast smoke test: trains on a single repeated sample.
+# Use to verify the forward/backward pass runs end-to-end.
+# ============================================================
+
+inherits: base.yaml
+variant: halo_vla_mlp
+
+data:
+  source: overfit
+  overfit_text: "Pick up the red cube and place it in the box."
+  n_overfit_copies: 16
+
+train:
+  steps: 500
+  batch_size: 2
+  lr: 1.0e-4
+  warmup_steps: 10
+  grad_accum_steps: 1
+  checkpoint_every_n_steps: 500
+
+model:
+  enable_visual_dit: false        # skip DiT for fast overfit
+  gradient_checkpointing: false   # faster on small batch
+
+logging:
+  backend: noop
+  tensorboard: false
+
+experiment:
+  enabled: false
+
+eval:
+  enabled: false

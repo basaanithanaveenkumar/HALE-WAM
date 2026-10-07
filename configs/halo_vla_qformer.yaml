@@ -1,0 +1,20 @@
+# ============================================================
+# HALE-WAM  —  Model variant: Q-Former projector
+# ============================================================
+# Replaces the default MLP projector with a BLIP-2-style Q-Former
+# that compresses ViT patches into a fixed set of learned queries.
+# Reduces token count (32 tokens vs 196) at the cost of info loss.
+# ============================================================
+
+inherits: base.yaml
+variant: halo_vla_qformer
+
+model:
+  proj_type: qformer
+  qformer_num_queries: 32
+  qformer_hidden_dim: 768
+  qformer_num_layers: 4
+  qformer_num_heads: 12
+  qformer_cross_attention_freq: 2
+  qformer_ffn_mult: 4
+  qformer_dropout: 0.1

@@ -1,0 +1,196 @@
+# ============================================================
+# HALE-WAM  —  Base configuration
+# All other configs inherit from this file via `inherits: base.yaml`.
+# Override any key at the inheriting level; arrays are fully replaced.
+# ============================================================
+
+variant: halo_vla_mlp
+
+# ------------------------------------------------------------------
+# Model
+# ------------------------------------------------------------------
+model:
+  architecture: halo_vla        # halo_vla | gwm_vla
+
+  # Vocabulary / tokenizer
+  vocab_size: 49156             # cosmo2-tokenizer (49152) + 4 special tokens
+  image_token_id: 49152
+  action_token_id: 49153
+  state_token_id: 49154
+  world_video_token_id: 49155
+
+  # Shared embedding
+  emb_dim: 512
+  emb_factor_dim: 128           # ALBERT-style factored embedding
+
+  # Vision encoder (ViT)
+  img_size: 224
+  patch_size: 16
+  in_chans: 3
+  vit_num_layers: 6
+  vit_num_heads: 16
+  vit_mlp_dim: 512
+  vit_drop: 0.0
+
+  # Decoder transformer
+  dec_num_layers: 8
+  dec_num_heads: 16
+  dec_mlp_dim: 512
+  dec_drop: 0.0
+  max_position_embeddings: 2000
+
+  # MoE (DeepseekMoE inside each TransformerBlock)
+  use_moe: true
+  moe_hid_scale: 1.2
+  moe_num_routed_experts: 6
+  moe_top_k: 2
+  moe_num_shared_experts: 2
+
+  # Vision projector: mlp | qformer | gated_cross_attention
+  proj_type: mlp
+  proj_vision_dim: null         # null → emb_dim
+  proj_llm_dim: null            # null → emb_dim
+
+  # Q-Former (proj_type=qformer)
+  qformer_num_queries: 32
+  qformer_hidden_dim: null
+  qformer_num_layers: 2
+  qformer_num_heads: 8
+  qformer_cross_attention_freq: 1
+  qformer_ffn_mult: 4
+  qformer_dropout: 0.0
+
+  # Gated cross-attention (proj_type=gated_cross_attention)
+  gated_xattn_num_latents: 32
+  gated_xattn_hidden_dim: null
+  gated_xattn_num_layers: 2
+  gated_xattn_num_heads: 8
+  gated_xattn_ffn_mult: 4
+  gated_xattn_dropout: 0.0
+  gated_xattn_gate_init: 1.0
+
+  # Action decoder (MLP head)
+  action_dim: 7                 # 6-DOF + gripper
+  action_hidden_dims: [512, 256]
+  action_chunk_size: 16
+  action_dropout: 0.1
+  action_use_layernorm: true
+
+  # State encoder
+  state_dim: 32
+  state_hidden_dims: [256, 512]
+  state_dropout: 0.1
+  state_use_layernorm: true
+
+  # Flow matching action decoder
+  flow_hidden_dim: 1024
+  flow_time_embed_dim: 128
+  flow_num_ode_steps: 24
+
+  # DiT visual prediction heads
+  enable_visual_dit: true
+  visual_loss_weight: 8.0
+  num_visual_predict_frames: 5
+  dit_patch_size: 8
+  dit_hidden_size: 512
+  dit_depth: 8
+  dit_num_heads: 8
+  dit_mlp_ratio: 4.0
+  dit_time_freq_dim: 512
+  dit_num_sample_steps: 75
+
+  gradient_checkpointing: true
+
+# ------------------------------------------------------------------
+# Training
+# ------------------------------------------------------------------
+train:
+  backend: vla                  # vla | vlm
+  steps: 1000
+  batch_size: 8
+  lr: 1.0e-4
+  warmup_steps: 100
+  lr_scheduler: cosine          # cosine | linear | constant
+  weight_decay: 0.01
+  grad_clip: 1.0
+  grad_accum_steps: 1
+  dtype: bfloat16               # float32 | float16 | bfloat16
+  resume: false
+  checkpoint_dir: data/checkpoints
+  checkpoint_every_n_steps: 500
+  checkpoint_every_epoch: false
+  keep_last_n_checkpoints: 3
+  seed: 42
+
+# ------------------------------------------------------------------
+# Data
+# ------------------------------------------------------------------
+data:
+  source: overfit               # overfit | stage_pretrain | stage_mid_train |
+                                #          stage_post_train | hf_dataset
+  overfit_text: "Pick up the red cube and place it in the box."
+  n_overfit_copies: 16
+  train_split: train
+  val_split: validation
+  img_size: 224
+  max_seq_len: 77
+  max_action_len: 64
+  action_dim: 7
+  streaming: true
+  prefetch_workers: 4
+  max_samples_per_dataset: null
+  # Local dataset paths (optional; triggers real loading when set)
+  droid_data_root: null
+  airoa_data_root: null
+
+# ------------------------------------------------------------------
+# Logging
+# ------------------------------------------------------------------
+logging:
+  backend: noop                 # noop | tensorboard | wandb
+  tensorboard: false
+  wandb:
+    project: hale-wam
+    entity: null
+    tags: []
+  log_every_n_steps: 50
+
+# ------------------------------------------------------------------
+# Experiment tracking
+# ------------------------------------------------------------------
+experiment:
+  enabled: true
+  root: data/experiments
+
+# ------------------------------------------------------------------
+# Evaluation
+# ------------------------------------------------------------------
+eval:
+  enabled: true
+  every_n_epochs: 1
+  every_n_steps: null
+  benchmarks: []                # e.g. [libero, metaworld, droid_task]
+  max_eval_episodes: 50
+  render_video: false
+
+# ------------------------------------------------------------------
+# Visualisation
+# ------------------------------------------------------------------
+viz:
+  enabled: false
+  save_dir: data/viz
+  every_n_steps: 500
+
+# ------------------------------------------------------------------
+# Deployment (inference / export)
+# ------------------------------------------------------------------
+deploy:
+  enabled: false
+  backend: pytorch              # pytorch | onnx | tensorrt | openvino
+  device: cpu                   # cpu | cuda | mps
+  dtype: float32
+  compile: false                # torch.compile
+  max_batch_size: 1
+  action_chunk_size: 16
+  ode_steps: 24                 # flow-matching inference steps
+  export_path: data/exports

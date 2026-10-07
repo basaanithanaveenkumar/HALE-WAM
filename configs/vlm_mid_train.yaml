@@ -1,0 +1,52 @@
+# ============================================================
+# HALE-WAM  —  VLM Mid-Training (connector pretraining)
+# ============================================================
+# Trains the vision-language connector on curated, instruction-rich
+# datasets before instruction-following SFT. LLM backbone unfrozen.
+#
+# Datasets (5): llava-pretrain-558k, sharegpt4v-pt,
+#               blip-laion-cc-sbu-558k, recap-datacomp-1b, allava-vflan
+# ============================================================
+
+inherits: base.yaml
+
+data:
+  source: stage_mid_train
+  vla_datasets:
+    enabled: false
+  vlm_datasets:
+    enabled: true
+    dataset_names:
+      - llava-pretrain-558k
+      - sharegpt4v-pt
+      - blip-laion-cc-sbu-558k
+      - recap-datacomp-1b
+      - allava-vflan
+  streaming: true
+  prefetch_workers: 4
+  max_samples_per_dataset: 500000
+
+train:
+  backend: vlm
+  steps: 50000
+  batch_size: 128
+  lr: 1.0e-4
+  warmup_steps: 1000
+  lr_scheduler: cosine
+  weight_decay: 0.01
+  grad_clip: 1.0
+  dtype: bfloat16
+  checkpoint_every_n_steps: 2000
+
+model:
+  proj_type: mlp
+  enable_visual_dit: false
+  gradient_checkpointing: true
+
+logging:
+  backend: tensorboard
+  tensorboard: true
+  log_every_n_steps: 100
+
+eval:
+  enabled: false

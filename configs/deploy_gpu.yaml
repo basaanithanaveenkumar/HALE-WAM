@@ -1,0 +1,27 @@
+# ============================================================
+# HALE-WAM  —  Deployment: GPU inference (CUDA)
+# ============================================================
+# High-throughput inference on a CUDA GPU.
+# Enables torch.compile for best throughput on A100/H100.
+# ============================================================
+
+inherits: base.yaml
+
+deploy:
+  enabled: true
+  backend: pytorch
+  device: cuda
+  dtype: bfloat16
+  compile: true                 # torch.compile (requires PyTorch >= 2.0)
+  compile_mode: reduce-overhead # reduce-overhead | max-autotune | default
+  max_batch_size: 8
+  action_chunk_size: 16
+  ode_steps: 50                 # more Euler steps for production quality
+  export_path: data/exports
+
+model:
+  gradient_checkpointing: false
+  enable_visual_dit: false
+
+train:
+  steps: 0

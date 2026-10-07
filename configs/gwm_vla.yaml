@@ -1,0 +1,37 @@
+# ============================================================
+# HALE-WAM  —  Model variant: GWM-VLA (Geometry-aware World Model)
+# ============================================================
+# Adds explicit multi-view geometry encoding and a world-model
+# prediction loss alongside the policy head.
+# num_views: number of camera views fed simultaneously.
+# target_view: camera whose pose is predicted (default: wrist cam).
+# ============================================================
+
+inherits: base.yaml
+variant: gwm_vla
+
+model:
+  architecture: gwm_vla
+  gwm:
+    geometry_backend: local       # local | nerfstudio
+    num_views: 3                  # exterior-left, exterior-right, wrist
+    target_view: wrist
+    freeze_geometry_encoder: false
+    embed_dim: 256
+    action_horizon: 4
+    action_dim: 7
+    proprio_dim: 8
+    world_loss_weight: 0.1
+    instruction_vocab_size: 512
+
+train:
+  backend: vla
+  steps: 30000
+  batch_size: 16
+  lr: 1.0e-4
+  warmup_steps: 500
+  grad_clip: 1.0
+  dtype: bfloat16
+
+data:
+  img_size: 256                   # slightly higher res for multi-view geometry

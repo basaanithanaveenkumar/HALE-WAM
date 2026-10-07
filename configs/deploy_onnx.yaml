@@ -1,0 +1,35 @@
+# ============================================================
+# HALE-WAM  —  Deployment: ONNX export
+# ============================================================
+# Exports the policy to ONNX for cross-platform inference
+# (ROS2 nodes, NVIDIA Jetson, embedded systems).
+# Runs the full pipeline: load checkpoint → trace → export.
+# ============================================================
+
+inherits: base.yaml
+
+deploy:
+  enabled: true
+  backend: onnx
+  device: cpu
+  dtype: float32
+  compile: false
+  max_batch_size: 1
+  action_chunk_size: 16
+  ode_steps: 24
+  export_path: data/exports
+  onnx:
+    opset_version: 18
+    dynamic_axes:
+      images: [0]               # batch dim dynamic
+      states: [0]
+    simplify: true              # run onnx-simplifier after export
+    verify_outputs: true        # compare PyTorch vs ONNX outputs
+    atol: 1.0e-4
+
+model:
+  gradient_checkpointing: false
+  enable_visual_dit: false
+
+train:
+  steps: 0
