@@ -89,6 +89,11 @@ class TinyHaloVLM(nn.Module):
         pred = self.action_head(action_hiddens.mean(1, keepdim=True)).expand_as(actions)
         return ((pred - actions) ** 2 * action_mask[..., None]).mean()
 
+    def sample_actions(self, action_hiddens, num_steps=None):
+        """``(B, n, 16)`` -> ``(B, 1, 5, ACTION_DIM)`` deterministic "chunks" for the evaluator."""
+        pred = self.action_head(action_hiddens.mean(1))
+        return pred[:, None, None, :].expand(-1, 1, 5, -1)
+
     def compute_visual_prediction_loss(self, images, image_mask, visual_context_emb, **_kwargs):
         recon = self.visual_head(visual_context_emb[:, 0]).view(images.shape[0], 3, 8, 8)
         loss = F.mse_loss(recon, images[:, -1])

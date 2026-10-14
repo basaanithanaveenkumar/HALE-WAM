@@ -7,15 +7,18 @@
 * :class:`RayCliOptions`, :class:`WebDatasetCliOptions` - ``--ray*`` / ``--webdataset*`` flags of
   ``scripts/train.py`` mapped onto HaleBlocks' ``RayConfig`` / ``WebDatasetConfig``.
 * :func:`launch_train_on_ray` - run ``train(args)`` on Ray Train workers.
+* :class:`VLAEvaluator`, :func:`split_validation` - held-out losses and action metrics.
 
 Ray and WebDataset come from HaleBlocks and are optional (``pip install -e '.[distributed]'``);
 nothing here imports them unless the corresponding flag is used.
 """
 
 from training.ddp_session import DDPSession
+from training.evaluator import VLAEvaluator
 from training.ray_cli import RayCliOptions
 from training.ray_launch import launch_train_on_ray
 from training.training_step import HaloVLATrainingStep, StepOutput
+from training.validation_split import split_validation
 from training.webdataset_cli import WebDatasetCliOptions
 
 __all__ = [
@@ -23,6 +26,8 @@ __all__ = [
     "HaloVLATrainingStep",
     "RayCliOptions",
     "StepOutput",
+    "VLAEvaluator",
     "WebDatasetCliOptions",
     "launch_train_on_ray",
+    "split_validation",
 ]

@@ -19,7 +19,7 @@ from typing import Optional
 import torch
 from torch import Tensor
 
-from Halo_VLA.metrics.base import RoboticsMetricBase
+from .base import RoboticsMetricBase
 
 
 # ─── helpers ────────────────────────────────────────────────────────────────
@@ -248,12 +248,12 @@ class TrajectorySmoothnessMetric(RoboticsMetricBase):
             return  # need at least 3 timesteps for second-order diff
 
         # Second-order finite difference: Δ²a[t] = a[t+2] - 2*a[t+1] + a[t]
-        jerk_pred = pred[:, 2:] - 2 * pred[:, 1:-1] + pred[:, :-1]  # [B, T-2, D]
+        jerk_pred = pred[:, 2:] - 2 * pred[:, 1:-1] + pred[:, :-2]  # [B, T-2, D]
         self._pred_jerk_sum += float((jerk_pred ** 2).mean().item()) * pred.shape[0]
         self._n += pred.shape[0]
 
         if target is not None:
-            jerk_tgt = target[:, 2:] - 2 * target[:, 1:-1] + target[:, :-1]
+            jerk_tgt = target[:, 2:] - 2 * target[:, 1:-1] + target[:, :-2]
             self._tgt_jerk_sum += float((jerk_tgt ** 2).mean().item()) * target.shape[0]
             self._has_target = True
 

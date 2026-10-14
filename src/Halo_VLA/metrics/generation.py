@@ -22,7 +22,7 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 
-from Halo_VLA.metrics.base import RoboticsMetricBase
+from .base import RoboticsMetricBase
 
 
 # ─── PSNRMetric ───────────────────────────────────────────────────────────────

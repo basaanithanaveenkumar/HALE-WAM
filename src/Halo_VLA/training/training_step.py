@@ -45,6 +45,8 @@ class StepOutput:
     act: torch.Tensor
     vis: torch.Tensor
     vis_sub: dict[str, torch.Tensor] = field(default_factory=dict)
+    action_hiddens: torch.Tensor | None = None
+    """Decoder states at ``<halo_action>`` positions (evaluation samples actions from them)."""
 
 
 class HaloVLATrainingStep(nn.Module):
@@ -112,4 +114,5 @@ class HaloVLATrainingStep(nn.Module):
             temporal_weight=self.temporal_weight,
         )
         total = lang + self.action_loss_weight * act + self.visual_loss_weight * vis
-        return StepOutput(total=total, lang=lang, act=act, vis=vis, vis_sub=vis_sub)
+        return StepOutput(total=total, lang=lang, act=act, vis=vis, vis_sub=vis_sub,
+                          action_hiddens=action_hiddens)

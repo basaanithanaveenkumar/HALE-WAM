@@ -63,6 +63,8 @@ docs = [
 ray = ["hale-blocks[ray]"]
 webdataset = ["hale-blocks[webdataset]"]
 distributed = ["hale-blocks[ray,webdataset]"]
+# Pretrained LLM decoder (--llm_backbone): registry, LoRA (transformers + peft) from HaleBlocks.
+finetune = ["hale-blocks[finetune]"]
 
 [project.urls]
 Homepage = "https://github.com/yourusername/halo-vla"

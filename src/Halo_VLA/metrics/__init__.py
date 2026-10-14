@@ -48,9 +48,9 @@ Example
     print(sr.compute())
 """
 
-from Halo_VLA.metrics.base import RoboticsMetricBase
+from .base import RoboticsMetricBase
 
-from Halo_VLA.metrics.action import (
+from .action import (
     ActionL1Metric,
     ActionMSEMetric,
     ActionChunkAccuracyMetric,
@@ -58,13 +58,13 @@ from Halo_VLA.metrics.action import (
     ActionNormalisedError,
 )
 
-from Halo_VLA.metrics.generation import (
+from .generation import (
     PSNRMetric,
     SSIMMetric,
     FVDProxyMetric,
 )
 
-from Halo_VLA.metrics.policy import (
+from .policy import (
     SuccessRateMetric,
     TaskCompletionMetric,
     GoalReachingMetric,

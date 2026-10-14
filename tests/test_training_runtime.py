@@ -118,3 +118,21 @@ def test_resolve_entry_accepts_script_path_and_module() -> None:
     assert resolve_entry("tests.training_support:train_tiny").__name__ == "train_tiny"
     with pytest.raises(ValueError):
         resolve_entry("no_function_given")
+
+
+def test_validation_split_runs_the_evaluator_each_epoch(tmp_path: Path, monkeypatch) -> None:
+    module = load_train_script()
+    calls: list[dict] = []
+    original = module.VLAEvaluator.run
+
+    def recording_run(self, *args, **kwargs):
+        result = original(self, *args, **kwargs)
+        calls.append(result)
+        return result
+
+    monkeypatch.setattr(module.VLAEvaluator, "run", recording_run)
+    module.train(tiny_args(module, tmp_path, "--val_fraction", "0.25"))
+    assert len(calls) == 2  # one validation per epoch
+    assert {"val/loss_total", "val/action_l1", "val/action_mse"} <= set(calls[-1])
+    ckpt = torch.load(tmp_path / "halo_vla_epoch2.pt", weights_only=False)
+    assert ckpt["global_step"] == 12  # 12 of 16 samples train: 6 batches x 2 epochs

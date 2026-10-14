@@ -41,8 +41,10 @@ from training import (
     DDPSession,
     HaloVLATrainingStep,
     RayCliOptions,
+    VLAEvaluator,
     WebDatasetCliOptions,
     launch_train_on_ray,
+    split_validation,
 )
 from utils import log_module_parameters
 from scripts.visualize import (
@@ -660,10 +662,31 @@ def train(args):
     if args.visual_loss_weight is not None:
         config.visual_loss_weight = args.visual_loss_weight
     visual_loss_weight = config.visual_loss_weight
+    # Vision encoder: built-in ViT, SigLIP / CLIP, or a HaleBlocks backbone (--vision_encoder).
+    config.vision_encoder = args.vision_encoder
+    config.vision_model_id = args.vision_model_id
+    config.vision_backbone = args.vision_backbone
+    config.vision_freeze = args.vision_freeze
+    config.vision_freeze_up_to_stage = args.vision_freeze_up_to_stage
+    config.vision_pretrained_path = args.vision_pretrained_path
+    # Optional pretrained, fine-tunable LLM in place of the built-in decoder (--llm_backbone).
+    config.llm_backbone = args.llm_backbone
+    config.llm_model_id = args.llm_model_id
+    config.llm_checkpoint = args.llm_checkpoint
+    config.llm_finetune = args.llm_finetune
+    config.llm_lora_r, config.llm_lora_alpha = args.llm_lora_r, args.llm_lora_alpha
+    config.llm_lora_dropout = args.llm_lora_dropout
+    config.llm_lora_train_embeddings = not args.llm_freeze_embeddings
+    config.llm_dtype = args.llm_dtype
+    config.llm_gradient_checkpointing = args.llm_gradient_checkpointing
 
     # ---- Model ----
     model = HaloVLM(config=config).to(device)
     log_module_parameters(model, model_name="HaloVLM", logger_fn=logger)
+    # With a pretrained LLM its tokenizer (plus the VLA special tokens) defines every token id,
+    # so the dataloaders must use it; None keeps the datasets' default cosmo2 tokenizer.
+    language = getattr(model, "language", None)
+    llm_tokenizer = language.tokenizer if language is not None else None
 
     # ---- Dataloader ----
     if args.dataset == "eo":
@@ -679,6 +702,7 @@ def train(args):
             num_predict_frames=args.num_predict_frames,
             shuffle=True,
             max_samples=args.max_samples,
+            tokenizer=llm_tokenizer,
         )
     elif args.dataset == "droid":
         if not args.droid_data_root:
@@ -698,6 +722,7 @@ def train(args):
             frame_stride=args.moma_frame_stride,
             shuffle=True,
             max_samples=args.max_samples,
+            tokenizer=llm_tokenizer,
         )
     else:
         if not args.moma_data_root:
@@ -718,9 +743,17 @@ def train(args):
             camera=args.moma_camera,
             shuffle=True,
             max_samples=args.max_samples,
+            tokenizer=llm_tokenizer,
         )
     # ---- Grab tokenizer from dataset for debug decoding (before any dataset swap) ----
     tokenizer = train_loader.dataset.tokenizer
+
+    # ---- Optional held-out validation split (fixed permutation: same on every rank / resume) ----
+    val_loader = None
+    if args.val_fraction > 0:
+        train_loader, val_loader = split_validation(train_loader, args.val_fraction, seed=args.val_seed)
+        logger.info("validation split: {} train / {} val samples", len(train_loader.dataset), len(val_loader.dataset))
+    evaluator = VLAEvaluator(max_batches=args.eval_max_batches, flow_steps=args.eval_flow_steps)
 
     # ---- Optional WebDataset: write shards once (rank 0), then stream them on every rank ----
     train_loader = WebDatasetCliOptions.prepare_loader(train_loader, args)
@@ -729,7 +762,11 @@ def train(args):
     logger.info("Dataset size: {}  |  Batches per rank: {}", len(train_loader.dataset), len(train_loader))
 
     # ---- Optimizer & scheduler ----
-    optimizer = AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    # Only trainable parameters: frozen encoders / LLM weights get no optimizer state.
+    trainable = [p for p in model.parameters() if p.requires_grad]
+    logger.info("trainable parameters: {:,} / {:,}", sum(p.numel() for p in trainable),
+                sum(p.numel() for p in model.parameters()))
+    optimizer = AdamW(trainable, lr=args.lr, weight_decay=args.weight_decay)
     scheduler = CosineAnnealingLR(optimizer, T_max=max(1, args.epochs * len(train_loader)))
     scaler = GradScaler(device.type, enabled=amp_enabled)
 
@@ -753,7 +790,12 @@ def train(args):
         with torch.serialization.safe_globals([HaloVLMConfig]):
             ckpt = torch.load(ckpt_path, map_location=device, weights_only=True)
         model.load_state_dict(ckpt["model_state_dict"])
-        optimizer.load_state_dict(ckpt["optimizer_state_dict"])
+        try:
+            optimizer.load_state_dict(ckpt["optimizer_state_dict"])
+        except ValueError as exc:
+            # Checkpoints from before the trainable-only optimizer hold state for every
+            # parameter; keep the weights and restart the optimizer moments.
+            logger.warning("optimizer state not restored ({}); continuing with fresh moments", exc)
         scheduler.load_state_dict(ckpt["scheduler_state_dict"])
         if "scaler_state_dict" in ckpt:
             scaler.load_state_dict(ckpt["scaler_state_dict"])
@@ -877,7 +919,7 @@ def train(args):
                 # Gradient clipping (must unscale before clipping)
                 if args.grad_clip > 0:
                     scaler.unscale_(optimizer)
-                    nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
+                    nn.utils.clip_grad_norm_(trainable, args.grad_clip)
 
                 scaler.step(optimizer)
                 scaler.update()
@@ -951,6 +993,19 @@ def train(args):
             tb_writer.add_scalar("epoch_avg/visual_dit", avg_vis, epoch)
             tb_writer.add_scalar("epoch_avg/total", avg_total, epoch)
 
+        # Validation (rank 0, unwrapped step: a DDP forward would wait for the other ranks)
+        eval_metrics: dict[str, float] = {}
+        if val_loader is not None and epoch % args.eval_every == 0:
+            if session.is_main:
+                plain_step = getattr(train_step, "module", train_step)
+                eval_metrics = evaluator.run(plain_step, val_loader, device, amp=amp_enabled)
+                logger.info("=== Epoch {} validation | {} ===", epoch,
+                            "  ".join(f"{k.removeprefix('val/')}={v:.4f}" for k, v in eval_metrics.items()))
+                if tb_writer is not None:
+                    for k, v in eval_metrics.items():
+                        tb_writer.add_scalar(k, v, epoch)
+            session.barrier()
+
         # Save checkpoint — atomic (write to .tmp then rename) so a disk-full
         # or crash never leaves a corrupted file.  Prune old checkpoints after.
         # Only rank 0 writes; `model` is the unwrapped HaloVLM, so keys carry no DDP prefix.
@@ -989,7 +1044,8 @@ def train(args):
             session.barrier()  # the checkpoint is fully written before Ray copies it
             reporter.report(
                 {"epoch": epoch, "global_step": global_step, "loss/total": avg_total,
-                 "loss/lang": avg_lang, "loss/action_flow": avg_act, "loss/visual_dit": avg_vis},
+                 "loss/lang": avg_lang, "loss/action_flow": avg_act, "loss/visual_dit": avg_vis,
+                 **eval_metrics},
                 checkpoint_dir=ckpt_dir if save_now else None,
             )
 
@@ -1162,6 +1218,43 @@ def parse_args():
                     help="Only visualise samples with >= N frames")
     p.add_argument("--vis_fps_future_frames", type=int, default=2,
                     help="FPS for the future-frame prediction window in training GIFs (lower = slower)")
+
+    # Vision encoder (mirrors Hale-VLM's vision.encoder)
+    vis = p.add_argument_group("Vision encoder")
+    vis.add_argument("--vision_encoder", default="vit", choices=("vit", "siglip", "clip", "local"),
+                     help="vit: built-in ViT; siglip/clip: pretrained Hub tower; local: hale_core.nn.vision backbone")
+    vis.add_argument("--vision_model_id", default=None, help="siglip/clip repo (default: *-base-patch16-224)")
+    vis.add_argument("--vision_backbone", default="dino_vit_small", help="backbone name for --vision_encoder local")
+    vis.add_argument("--vision_freeze", default=None, action=argparse.BooleanOptionalAction,
+                     help="freeze the encoder (default: frozen for pretrained encoders, trained for vit)")
+    vis.add_argument("--vision_freeze_up_to_stage", type=int, default=-1, help="local: freeze stages 0..N")
+    vis.add_argument("--vision_pretrained_path", default=None, help="local: backbone checkpoint")
+
+    # Validation (mirrors Hale-VLM's evaluator): held-out losses + action metrics
+    val = p.add_argument_group("Validation")
+    val.add_argument("--val_fraction", type=float, default=0.0,
+                     help="hold out this share of the training samples for validation (0 = off)")
+    val.add_argument("--val_seed", type=int, default=0, help="seed of the held-out permutation")
+    val.add_argument("--eval_every", type=int, default=1, help="validate every N epochs")
+    val.add_argument("--eval_max_batches", type=int, default=None, help="cap validation batches")
+    val.add_argument("--eval_flow_steps", type=int, default=None, help="Euler steps for action sampling")
+
+    # Language backbone (optional; needs HaleBlocks' finetune extra: transformers + peft)
+    llm = p.add_argument_group("LLM backbone (optional, replaces the built-in decoder)")
+    llm.add_argument("--llm_backbone", default=None,
+                     help="registered fine-tunable LLM (hale_core.nn.llm.list_llm_backbones()), e.g. "
+                          "smollm2-360m, qwen2.5-1.5b, qwen3-1.7b, llama3.2-1b, phi4-mini, hale-autoregressive")
+    llm.add_argument("--llm_model_id", default=None, help="override the registered Hub repo / local path")
+    llm.add_argument("--llm_checkpoint", default=None, help="HaloDiffusionLLM .pt for hale-* backbones")
+    llm.add_argument("--llm_finetune", default="lora", choices=("lora", "full", "frozen"))
+    llm.add_argument("--llm_lora_r", type=int, default=16)
+    llm.add_argument("--llm_lora_alpha", type=int, default=32)
+    llm.add_argument("--llm_lora_dropout", type=float, default=0.05)
+    llm.add_argument("--llm_freeze_embeddings", action="store_true",
+                     help="keep token embeddings / LM head frozen (default: trained, so the VLA's new "
+                          "special tokens are learned)")
+    llm.add_argument("--llm_dtype", default="bfloat16", choices=("float32", "float16", "bfloat16"))
+    llm.add_argument("--llm_gradient_checkpointing", action="store_true")
 
     # Distributed launch and data format (both optional; need HaleBlocks extras)
     RayCliOptions.add_arguments(p)

@@ -24,7 +24,7 @@ from typing import List
 import torch
 from torch import Tensor
 
-from Halo_VLA.metrics.base import RoboticsMetricBase
+from .base import RoboticsMetricBase
 
 
 # ─── SuccessRateMetric ───────────────────────────────────────────────────────

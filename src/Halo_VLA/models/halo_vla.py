@@ -1,8 +1,9 @@
 import logging
 
 from config import HaloVLMConfig
-from models.vit import VisTransformer
+from models.vision_encoders import build_vision_encoder
 from models.transformer import DecoderTransformer
+from models.language_decoder import PretrainedLanguageDecoder
 from models.lm_head import LMHead
 from models.image_proj import build_image_projector
 from models.state_encoder import StateEncoder
@@ -63,17 +64,17 @@ class HaloVLM(nn.Module):
         self.config = config
         network_config = config
 
-        self.vis_enc = VisTransformer(
-            img_size=network_config.img_size,
-            p_size=network_config.patch_size,
-            in_chans=network_config.in_chans,
-            emb_dim=network_config.emb_dim,
-            num_layers=network_config.vit_num_layers,
-            num_heads=network_config.vit_num_heads,
-            mlp_dim=network_config.vit_mlp_dim,
-            drop_fact=network_config.vit_drop,
-        )
-        self.decoder_transformer = DecoderTransformer(
+        # Vision encoder (built-in ViT, SigLIP / CLIP, or a HaleBlocks backbone). Its token width
+        # feeds the image projector and its token count the language-loss offsets.
+        self.vis_enc, vision = build_vision_encoder(network_config)
+        if network_config.vision_encoder != "vit":
+            network_config.proj_vision_dim = vision.output_dim
+        network_config.vision_num_tokens = vision.num_tokens
+        # Language decoder: a registered pretrained LLM (config.llm_backbone), or the built-in one.
+        # The pretrained path is built first: it rewrites the special-token ids / vocab size in
+        # ``config`` from the LLM's tokenizer, which every other component then reads.
+        self.language = PretrainedLanguageDecoder(network_config) if network_config.uses_pretrained_llm else None
+        self.decoder_transformer = None if self.language is not None else DecoderTransformer(
             num_layers=network_config.dec_num_layers,
             emb_dim=network_config.emb_dim,
             num_heads=network_config.dec_num_heads,
@@ -86,9 +87,10 @@ class HaloVLM(nn.Module):
             moe_num_shared_experts=network_config.moe_num_shared_experts,
             gradient_checkpointing=getattr(network_config, "gradient_checkpointing", True),
         )
-        self.token_emb = nn.Embedding(network_config.vocab_size, network_config.emb_dim)
-        self.pos_embed = nn.Embedding(network_config.max_position_embeddings, network_config.emb_dim)
-        self.lm_head = LMHead(hidden_size=network_config.emb_dim, vocab_size=network_config.vocab_size)
+        if self.language is None:
+            self.token_emb = nn.Embedding(network_config.vocab_size, network_config.emb_dim)
+            self.pos_embed = nn.Embedding(network_config.max_position_embeddings, network_config.emb_dim)
+            self.lm_head = LMHead(hidden_size=network_config.emb_dim, vocab_size=network_config.vocab_size)
         self.image_projector = build_image_projector(network_config)
         self.state_encoder = StateEncoder(config=network_config)
 
@@ -235,7 +237,13 @@ class HaloVLM(nn.Module):
             (input_ids != image_token_id)
             & (input_ids != state_token_id)
         )
-        text_embeds = self.token_emb(input_ids)                # [B, seq_len, emb_dim]
+        if self.language is not None:
+            # LLM space: text from the LLM's embeddings; images / states projected into it.
+            text_embeds = self.language.embed_text(input_ids).to(img_proj.dtype)  # [B, seq_len, H]
+            img_proj = self.language.project_in(img_proj)
+            state_embeds = self.language.project_in(state_embeds)
+        else:
+            text_embeds = self.token_emb(input_ids)            # [B, seq_len, emb_dim]
         text_embeds = text_embeds * special_mask.unsqueeze(-1)  # zero out placeholders
 
         # ------------------------------------------------------------------ #
@@ -261,9 +269,10 @@ class HaloVLM(nn.Module):
         # 6. POSITIONAL EMBEDDINGS — add learned positions over the full
         #    combined sequence.
         # ------------------------------------------------------------------ #
-        total_len = combined_embeds.size(1)
-        pos_emb = self.pos_embed(torch.arange(total_len, device=device)).unsqueeze(0)
-        combined_embeds = combined_embeds + pos_emb
+        if self.language is None:  # a pretrained LLM adds its own (rotary / learned) positions
+            total_len = combined_embeds.size(1)
+            pos_emb = self.pos_embed(torch.arange(total_len, device=device)).unsqueeze(0)
+            combined_embeds = combined_embeds + pos_emb
 
         # ------------------------------------------------------------------ #
         # 7. DECODER TRANSFORMER — causal self-attention + MoE FFN.
@@ -273,7 +282,11 @@ class HaloVLM(nn.Module):
         img_pad = torch.ones(B, num_prepended, device=device, dtype=attention_mask.dtype)
         pad_mask_full = torch.cat([img_pad, attention_mask], dim=1)  # [B, total_len]
 
-        transformer_out = self.decoder_transformer(combined_embeds, pad_mask=pad_mask_full)
+        if self.language is not None:
+            # logits from the LLM's head; hidden states mapped back to emb_dim for the heads below.
+            logits, transformer_out = self.language(combined_embeds, pad_mask_full)
+        else:
+            transformer_out = self.decoder_transformer(combined_embeds, pad_mask=pad_mask_full)
 
         # --- Visual DiT conditioning: same **positions** as prepended image patches,
         #     but **after** transformer blocks (and final LN), **before** lm_head.
@@ -290,7 +303,8 @@ class HaloVLM(nn.Module):
         # 8. LANGUAGE HEAD — project every position to vocab logits.
         #    logits → [B, total_len, vocab_size]
         # ------------------------------------------------------------------ #
-        logits = self.lm_head(transformer_out)
+        if self.language is None:
+            logits = self.lm_head(transformer_out)
 
         # ------------------------------------------------------------------ #
         # 9. ACTION HIDDEN STATES — find <halo_action> token positions in the

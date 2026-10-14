@@ -14,6 +14,10 @@ DATA_ARGUMENTS = (
     "dataset", "subset", "moma_data_root", "droid_data_root", "moma_camera", "droid_camera",
     "moma_num_frames", "moma_frame_stride", "moma_max_action_len", "max_seq_len", "action_dim",
     "state_dim", "action_chunk_size", "num_predict_frames", "max_samples",
+    # the LLM backbone's tokenizer defines the token ids stored in the shards
+    "llm_backbone", "llm_model_id", "llm_checkpoint",
+    # the validation split removes samples from the training shards
+    "val_fraction", "val_seed",
 )
 
 

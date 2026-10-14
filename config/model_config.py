@@ -43,6 +43,18 @@ class HaloVLMConfig:
     vit_mlp_dim: int = 512
     vit_drop: float = 0.0
 
+    # Vision encoder selection (mirrors Hale-VLM's vision.encoder):
+    #   "vit"    the built-in VisTransformer above (trained from scratch; default)
+    #   "siglip" / "clip"  pretrained Hub towers (vision_model_id; img_size must match)
+    #   "local"  any hale_core.nn.vision backbone by name (vision_backbone)
+    vision_encoder: str = "vit"
+    vision_model_id: str | None = None          # siglip/clip repo (default: base-patch16-224)
+    vision_backbone: str = "dino_vit_small"     # for vision_encoder="local"
+    vision_freeze: bool | None = None           # None: frozen for pretrained encoders, trained for "vit"
+    vision_freeze_up_to_stage: int = -1         # "local": freeze stages 0..N, fine-tune the rest
+    vision_pretrained_path: str | None = None   # "local": checkpoint for the backbone
+    vision_num_tokens: int | None = None        # set by the encoder when the model is built
+
     # Decoder transformer
     dec_num_layers: int = 8
     dec_num_heads: int = 16
@@ -58,6 +70,25 @@ class HaloVLMConfig:
 
     # Positional embeddings
     max_position_embeddings: int = 2000
+
+    # Language backbone. None keeps the built-in decoder above (token_emb + DecoderTransformer +
+    # lm_head, cosmo2 tokenizer). Any name from hale_core.nn.llm.list_llm_backbones() - e.g.
+    # "smollm2-360m", "qwen2.5-1.5b", "qwen3-1.7b", "llama3.2-1b", "phi4-mini", or
+    # "hale-autoregressive" with llm_checkpoint - replaces it with that pretrained causal LM,
+    # fine-tuned with LoRA / full / frozen. Its tokenizer then defines every token id.
+    llm_backbone: str | None = None
+    llm_model_id: str | None = None          # override the registered Hub repo / local path
+    llm_checkpoint: str | None = None        # HaloDiffusionLLM .pt for hale-* backbones
+    llm_finetune: str = "lora"               # lora | full | frozen
+    llm_lora_r: int = 16
+    llm_lora_alpha: int = 32
+    llm_lora_dropout: float = 0.05
+    llm_lora_target_modules: list[str] | None = None
+    # The VLA's special tokens (<image>, <halo_action>, <state>, <halo_world_video>) are new to
+    # a pretrained vocabulary; their embeddings must be learned, so train embeddings by default.
+    llm_lora_train_embeddings: bool = True
+    llm_dtype: str = "bfloat16"
+    llm_gradient_checkpointing: bool = False
 
     # Image projector (vision encoder -> decoder token space)
     proj_vision_dim: int | None = None   # defaults to emb_dim
@@ -149,6 +180,40 @@ class HaloVLMConfig:
         valid = ("mlp", "qformer", "gated_cross_attention")
         if self.proj_type not in valid:
             raise ValueError(f"proj_type must be one of {valid}, got {self.proj_type!r}")
+        if self.vision_encoder not in ("vit", "siglip", "clip", "local"):
+            raise ValueError(f"vision_encoder must be vit, siglip, clip or local, got {self.vision_encoder!r}")
+        if self.llm_finetune not in ("lora", "full", "frozen"):
+            raise ValueError(f"llm_finetune must be lora, full or frozen, got {self.llm_finetune!r}")
+
+    @property
+    def resolved_vision_freeze(self) -> bool:
+        """Freeze pretrained towers by default; train the from-scratch ViT by default."""
+        if self.vision_freeze is not None:
+            return self.vision_freeze
+        return self.vision_encoder != "vit"
+
+    @property
+    def uses_pretrained_llm(self) -> bool:
+        """True when a registered LLM replaces the built-in decoder."""
+        return self.llm_backbone is not None
+
+    def llm_backbone_config(self):
+        """HaleBlocks ``LLMBackboneConfig`` for the ``llm_*`` fields (imports HaleBlocks lazily)."""
+        try:
+            from hale_core.config.sections.llm_backbone import LLMBackboneConfig, LoRASettings
+        except ImportError as exc:  # pragma: no cover - depends on the environment
+            raise ImportError("llm_backbone needs HaleBlocks: pip install -e '.[finetune]'") from exc
+        return LLMBackboneConfig(
+            name=self.llm_backbone,
+            model_id=self.llm_model_id,
+            checkpoint=self.llm_checkpoint,
+            finetune=self.llm_finetune,
+            lora=LoRASettings(r=self.llm_lora_r, alpha=self.llm_lora_alpha, dropout=self.llm_lora_dropout,
+                              target_modules=self.llm_lora_target_modules,
+                              train_embeddings=self.llm_lora_train_embeddings),
+            dtype=self.llm_dtype,
+            gradient_checkpointing=self.llm_gradient_checkpointing,
+        )
 
     @property
     def num_image_tokens_per_image(self) -> int:
@@ -157,4 +222,6 @@ class HaloVLMConfig:
             return self.qformer_num_queries
         if self.proj_type == "gated_cross_attention":
             return self.gated_xattn_num_latents
+        if self.vision_num_tokens is not None:  # measured from the configured encoder
+            return self.vision_num_tokens
         return (self.img_size // self.patch_size) ** 2
