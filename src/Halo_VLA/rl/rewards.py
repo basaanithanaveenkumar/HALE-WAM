@@ -50,7 +50,9 @@ def negative_distance_reward(
         actions: [B, A] sampled actions.
         target:  [A] or [B, A] goal action(s).
         squared: if True use squared-L2 (smooth); else L2 norm.
-        offset:  constant added to every reward.
+        offset:  constant added to every reward.  Adding a large constant is a
+                 handy way to demonstrate that a *baseline* removes precisely
+                 this offset and slashes the gradient variance.
 
     Returns:
         reward: [B].

@@ -35,11 +35,13 @@ from rl.dpo import compute_dpo_loss
 from rl.grpo import compute_grpo_loss, group_relative_advantage
 from rl.policy import GaussianActionPolicy
 from rl.preference import build_preference_pairs, sample_preference_pairs
+from rl.reinforce import compute_reinforce_loss
 from rl.rewards import (
     RewardFunction,
     WorldModelImaginationReward,
     negative_distance_reward,
 )
+from rl.value_baseline import ValueBaseline
 
 __all__ = [
     # shared
@@ -47,6 +49,9 @@ __all__ = [
     "RewardFunction",
     "negative_distance_reward",
     "WorldModelImaginationReward",
+    # REINFORCE + baseline
+    "ValueBaseline",
+    "compute_reinforce_loss",
     # GRPO
     "compute_grpo_loss",
     "group_relative_advantage",
