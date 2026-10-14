@@ -4,11 +4,17 @@ Simple training script for Halo-VLA.
 Usage:
     python scripts/train.py
     python scripts/train.py --epochs 10 --batch_size 4 --lr 1e-4
+
+Distributed (same script, same losses - see src/Halo_VLA/training/):
+    torchrun --nproc_per_node 4 scripts/train.py ...          # DDP on one node
+    python scripts/train.py --ray --ray_num_workers 8 --ray_use_gpu ...   # Ray Train (needs hale-blocks[ray])
+    python scripts/train.py --webdataset --webdataset_root /fast/shards ...   # any dataset -> WebDataset shards
 """
 
 import argparse
 import sys
 import time
+from contextlib import nullcontext
 from datetime import datetime
 from pathlib import Path
 
@@ -31,6 +37,13 @@ from models.halo_vla import HaloVLM
 from dataloader.eo_dataset import build_eo_dataloader
 from dataloader.airoa_moma_dataset import build_airoa_moma_dataloader
 from dataloader.droid_dataset import build_droid_dataloader
+from training import (
+    DDPSession,
+    HaloVLATrainingStep,
+    RayCliOptions,
+    WebDatasetCliOptions,
+    launch_train_on_ray,
+)
 from utils import log_module_parameters
 from scripts.visualize import (
     unnormalise_image,
@@ -69,33 +82,6 @@ import numpy as np
 # ---------------------------------------------------------------------------
 # Loss helpers
 # ---------------------------------------------------------------------------
-def compute_language_loss(logits, labels, num_prepended):
-    """
-    Cross-entropy loss on the text portion of the sequence.
-
-    Args:
-        logits:        [B, total_len, vocab_size]
-        labels:        [B, seq_len]       (−100 for masked positions)
-        num_prepended: int — number of image-patch tokens prepended
-    """
-    # The logits for text tokens start after the prepended image patches.
-    # Shift by 1 for next-token prediction: predict token t+1 from position t.
-    text_logits = logits[:, num_prepended:-1, :]  # [B, seq_len-1, V]
-    target = labels[:, 1:]                         # [B, seq_len-1]
-
-    # Truncate to the shorter of the two (in case of length mismatch)
-    min_len = min(text_logits.size(1), target.size(1))
-    text_logits = text_logits[:, :min_len, :]
-    target = target[:, :min_len]
-
-    loss = F.cross_entropy(
-        text_logits.reshape(-1, text_logits.size(-1)),
-        target.reshape(-1),
-        ignore_index=-100,
-    )
-    return loss
-
-
 def compute_action_loss(action_preds, action_targets, action_mask):
     """
     MSE loss between predicted and ground-truth actions.
@@ -639,9 +625,26 @@ def generate_training_visualization(
 # ---------------------------------------------------------------------------
 # Training loop
 # ---------------------------------------------------------------------------
+def _latest_ray_checkpoint() -> Path | None:
+    """Newest ``halo_vla_epoch*.pt`` in the checkpoint Ray restored this worker from, if any."""
+    from hale_core.distributed import RayReporter  # lazy: HaleBlocks is only needed with --ray
+
+    restored = RayReporter.latest_checkpoint_dir()
+    if restored is None:
+        return None
+    ckpts = sorted(Path(restored).glob("halo_vla_epoch*.pt"),
+                   key=lambda p: int(p.stem.replace("halo_vla_epoch", "")))
+    return ckpts[-1] if ckpts else None
+
+
 def train(args):
-    device = torch.device(args.device)
-    logger.info("Device: {}", device)
+    # ---- Distributed session: single process, torchrun or a Ray Train worker ----
+    session = DDPSession.start(args.device)
+    device = session.device
+    amp_enabled = device.type == "cuda"  # fp16 autocast + loss scaling only exist on CUDA
+    if not session.is_main:
+        logger.remove()  # only rank 0 prints; every rank still trains
+    logger.info("Device: {}  |  rank {}/{}", device, session.rank, session.world_size)
 
     # ---- Config ----
     config = HaloVLMConfig(
@@ -716,15 +719,19 @@ def train(args):
             shuffle=True,
             max_samples=args.max_samples,
         )
-    logger.info("Dataset size: {}  |  Batches: {}", len(train_loader.dataset), len(train_loader))
-
-    # ---- Grab tokenizer from dataset for debug decoding ----
+    # ---- Grab tokenizer from dataset for debug decoding (before any dataset swap) ----
     tokenizer = train_loader.dataset.tokenizer
+
+    # ---- Optional WebDataset: write shards once (rank 0), then stream them on every rank ----
+    train_loader = WebDatasetCliOptions.prepare_loader(train_loader, args)
+    # ---- Each rank reads a disjoint shard of a map-style dataset (no-op single-process) ----
+    train_loader = session.shard_loader(train_loader, shuffle=True)
+    logger.info("Dataset size: {}  |  Batches per rank: {}", len(train_loader.dataset), len(train_loader))
 
     # ---- Optimizer & scheduler ----
     optimizer = AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = CosineAnnealingLR(optimizer, T_max=max(1, args.epochs * len(train_loader)))
-    scaler = GradScaler("cuda")
+    scaler = GradScaler(device.type, enabled=amp_enabled)
 
     # ---- Checkpoint dir ----
     ckpt_dir = Path(args.ckpt_dir)
@@ -733,6 +740,11 @@ def train(args):
     # ---- Resume from checkpoint ----
     start_epoch = 1
     global_step = 0
+    if args.ray and not args.resume:
+        # After a worker failure Ray restarts the group with the last reported checkpoint.
+        restored = _latest_ray_checkpoint()
+        if restored is not None:
+            args.resume = str(restored)
     if args.resume:
         ckpt_path = Path(args.resume)
         if not ckpt_path.exists():
@@ -752,9 +764,29 @@ def train(args):
             ckpt.get("epoch"), global_step, start_epoch,
         )
 
-    # ---- TensorBoard ----
+    # ---- Model forward + all three losses as one module, DDP-wrapped when distributed ----
+    # (the action-flow and DiT losses use parameters outside HaloVLM.forward; wrapping the whole
+    # step lets DDP see them, and find_unused_parameters covers batches without future frames)
+    train_step = session.wrap(
+        HaloVLATrainingStep(
+            model,
+            action_loss_weight=args.action_loss_weight,
+            visual_loss_weight=visual_loss_weight,
+            perceptual_weight=args.perceptual_weight,
+            ssim_weight=args.ssim_weight,
+            temporal_weight=args.temporal_weight,
+        ),
+        find_unused_parameters=True,
+    )
+    reporter = None
+    if args.ray:
+        from hale_core.distributed import RayReporter  # lazy: HaleBlocks is only needed with --ray
+
+        reporter = RayReporter()
+
+    # ---- TensorBoard (rank 0 only) ----
     tb_writer = None
-    if args.tensorboard_dir:
+    if args.tensorboard_dir and session.is_main:
         if SummaryWriter is None:
             logger.warning(
                 "tensorboard package missing; install with: pip install tensorboard"
@@ -779,6 +811,7 @@ def train(args):
     )
 
     for epoch in range(start_epoch, args.epochs + 1):
+        session.set_epoch(train_loader, epoch)  # new DistributedSampler shuffle every epoch
         epoch_lang_loss = 0.0
         epoch_act_loss = 0.0
         epoch_vis_loss = 0.0
@@ -789,16 +822,14 @@ def train(args):
         optimizer.zero_grad()   # reset once before accumulation window begins
 
         for step, batch in enumerate(train_loader, 1):
-            images = batch["images"].to(device)              # [B, N, 3, H, W]
-            input_ids = batch["input_ids"].to(device)        # [B, seq_len]
-            attention_mask = batch["attention_mask"].to(device)
-            labels = batch["labels"].to(device)              # [B, seq_len]
-            actions = batch["actions"].to(device)            # [B, T, action_dim]
-            action_mask = batch["action_mask"].to(device)    # [B, T]
-            states = batch["states"].to(device)              # [B, S, state_dim]
+            # Every tensor of the collated batch to this rank's device (strings etc. stay as is).
+            batch = {k: v.to(device) if torch.is_tensor(v) else v for k, v in batch.items()}
+            images = batch["images"]                         # [B, N, 3, H, W]
+            input_ids = batch["input_ids"]                   # [B, seq_len]
+            attention_mask = batch["attention_mask"]
 
             # Debug: decode and print input_ids for the first sample in the batch
-            if step == 1 and epoch == 1:
+            if step == 1 and epoch == 1 and session.is_main:
                 ids_cpu = input_ids[0].cpu()
                 mask_cpu = attention_mask[0].cpu()
                 total_tokens = ids_cpu.size(0)
@@ -818,42 +849,21 @@ def train(args):
                     pad_id, pad_id_count, decoded_text,
                 )
 
-            # --- Mixed precision forward pass ---
-            with autocast("cuda"):
-                logits, action_hiddens, visual_context_emb, world_video_query_hiddens = model(
-                    images=images,
-                    input_ids=input_ids,
-                    attention_mask=attention_mask,
-                    states=states,
-                    image_mask=batch.get("image_mask"),
-                )
+            is_last_batch = (step == len(train_loader))
+            will_step = step % accum_steps == 0 or is_last_batch
+            # DDP: skip the gradient all-reduce on accumulation micro-steps; sync on the last one.
+            sync = train_step.no_sync() if session.distributed and not will_step else nullcontext()
 
-                num_images = (input_ids == config.image_token_id).sum(dim=1).max().item()
-                num_patches = config.num_image_tokens_per_image
-                num_prepended = num_images * num_patches
+            # --- Mixed precision forward pass: model + language / action-flow / visual losses ---
+            with sync:
+                with autocast(device.type, enabled=amp_enabled):
+                    out = train_step(batch)
+                lang_loss, act_loss, vis_loss = out.lang, out.act, out.vis
+                vis_subloss, total_loss = out.vis_sub, out.total
 
-                lang_loss = compute_language_loss(logits, labels, num_prepended)
-                act_loss = model.compute_flow_loss(action_hiddens, actions, action_mask)
-                future_frames = batch.get("future_frames")
-                if future_frames is not None:
-                    future_frames = future_frames.to(device)
-                vis_loss, vis_subloss = model.compute_visual_prediction_loss(
-                    images, batch.get("image_mask"), visual_context_emb,
-                    world_video_query_hiddens=world_video_query_hiddens,
-                    future_frames=future_frames,
-                    perceptual_weight=args.perceptual_weight,
-                    ssim_weight=args.ssim_weight,
-                    temporal_weight=args.temporal_weight,
-                )
-                total_loss = (
-                    lang_loss
-                    + args.action_loss_weight * act_loss
-                    + visual_loss_weight * vis_loss
-                )
-
-            # --- Backward: scale loss so that accumulated gradients equal the
-            #     average over the full effective batch, not the sum.
-            scaler.scale(total_loss / accum_steps).backward()
+                # --- Backward: scale loss so that accumulated gradients equal the
+                #     average over the full effective batch, not the sum.
+                scaler.scale(total_loss / accum_steps).backward()
 
             # Track per-micro-step stats (unscaled loss so epoch avg stays readable)
             n_micro += 1
@@ -863,8 +873,7 @@ def train(args):
             epoch_total_loss += total_loss.item()
 
             # --- Optimizer step: only every accum_steps micro-steps (or at epoch end) ---
-            is_last_batch = (step == len(train_loader))
-            if step % accum_steps == 0 or is_last_batch:
+            if will_step:
                 # Gradient clipping (must unscale before clipping)
                 if args.grad_clip > 0:
                     scaler.unscale_(optimizer)
@@ -877,8 +886,8 @@ def train(args):
 
                 global_step += 1
 
-                # Logging (keyed to optimizer steps via global_step)
-                if global_step % args.log_every == 0:
+                # Logging (keyed to optimizer steps via global_step; rank 0's loader logs)
+                if global_step % args.log_every == 0 and session.is_main:
                     lr = optimizer.param_groups[0]["lr"]
                     cfm  = vis_subloss.get("loss_rgb_cfm",        vis_loss).item()
                     perc = vis_subloss.get("loss_rgb_perceptual",  torch.tensor(0.0)).item()
@@ -913,8 +922,8 @@ def train(args):
                             "train/input_frames", grid, global_step, dataformats="NCHW"
                         )
 
-                # Visualisation GIFs
-                if args.vis_every > 0 and global_step % args.vis_every == 0:
+                # Visualisation GIFs (rank 0 only; uses the unwrapped model, no collectives)
+                if args.vis_every > 0 and global_step % args.vis_every == 0 and session.is_main:
                     generate_training_visualization(
                         model=model, batch=batch, tokenizer=tokenizer, config=config,
                         device=device, output_dir=ckpt_dir, global_step=global_step,
@@ -924,24 +933,29 @@ def train(args):
 
 
 
-        # End of epoch summary
+        # End of epoch summary (averaged over all ranks; every rank must take part)
         n = max(n_micro, 1)
         elapsed = time.time() - t0
+        avg_lang = session.mean(epoch_lang_loss / n)
+        avg_act = session.mean(epoch_act_loss / n)
+        avg_vis = session.mean(epoch_vis_loss / n)
+        avg_total = session.mean(epoch_total_loss / n)
         logger.info(
             "=== Epoch {} done in {:.1f}s  micro-steps={}  opt-steps={}  | avg lang={:.4f}  act={:.4f}  vis={:.4f}  total={:.4f} ===",
-            epoch, elapsed, n_micro, global_step,
-            epoch_lang_loss / n, epoch_act_loss / n, epoch_vis_loss / n, epoch_total_loss / n,
+            epoch, elapsed, n_micro, global_step, avg_lang, avg_act, avg_vis, avg_total,
         )
 
         if tb_writer is not None:
-            tb_writer.add_scalar("epoch_avg/lang", epoch_lang_loss / n, epoch)
-            tb_writer.add_scalar("epoch_avg/action_flow", epoch_act_loss / n, epoch)
-            tb_writer.add_scalar("epoch_avg/visual_dit", epoch_vis_loss / n, epoch)
-            tb_writer.add_scalar("epoch_avg/total", epoch_total_loss / n, epoch)
+            tb_writer.add_scalar("epoch_avg/lang", avg_lang, epoch)
+            tb_writer.add_scalar("epoch_avg/action_flow", avg_act, epoch)
+            tb_writer.add_scalar("epoch_avg/visual_dit", avg_vis, epoch)
+            tb_writer.add_scalar("epoch_avg/total", avg_total, epoch)
 
         # Save checkpoint — atomic (write to .tmp then rename) so a disk-full
         # or crash never leaves a corrupted file.  Prune old checkpoints after.
-        if epoch % args.save_every == 0 or epoch == args.epochs:
+        # Only rank 0 writes; `model` is the unwrapped HaloVLM, so keys carry no DDP prefix.
+        save_now = epoch % args.save_every == 0 or epoch == args.epochs
+        if save_now and session.is_main:
             ckpt_path = ckpt_dir / f"halo_vla_epoch{epoch}.pt"
             tmp_path  = ckpt_dir / f".tmp_epoch{epoch}.pt"
             torch.save(
@@ -969,11 +983,23 @@ def train(args):
                     old.unlink()
                     logger.info("Removed old checkpoint {}", old)
 
+        if reporter is not None:
+            # Ray Train: every rank reports; rank 0 attaches the checkpoint directory, which Ray
+            # persists under --ray_storage_path and restores from after a worker failure.
+            session.barrier()  # the checkpoint is fully written before Ray copies it
+            reporter.report(
+                {"epoch": epoch, "global_step": global_step, "loss/total": avg_total,
+                 "loss/lang": avg_lang, "loss/action_flow": avg_act, "loss/visual_dit": avg_vis},
+                checkpoint_dir=ckpt_dir if save_now else None,
+            )
+
     logger.info("Training complete.")
     if tb_writer is not None:
         tb_writer.flush()
         tb_writer.close()
         logger.info("TensorBoard writer closed.")
+    session.barrier()
+    session.close()
 
 
 # ---------------------------------------------------------------------------
@@ -985,7 +1011,7 @@ def parse_args():
     # Data
     p.add_argument(
         "--dataset",
-        choices=("eo", "moma"),
+        choices=("eo", "moma", "droid"),
         default="eo",
         help="eo: EO-Data1.5M; moma: local AIRoA MoMa clone; droid: lerobot/droid_100 clone",
     )
@@ -1137,8 +1163,23 @@ def parse_args():
     p.add_argument("--vis_fps_future_frames", type=int, default=2,
                     help="FPS for the future-frame prediction window in training GIFs (lower = slower)")
 
+    # Distributed launch and data format (both optional; need HaleBlocks extras)
+    RayCliOptions.add_arguments(p)
+    WebDatasetCliOptions.add_arguments(p)
+
     return p.parse_args()
 
 
+def main() -> None:
+    """Train locally / under torchrun, or launch the same ``train`` on Ray Train with ``--ray``."""
+    args = parse_args()
+    if args.ray:
+        # Workers import this file and call its train(); nothing of this process is pickled.
+        result = launch_train_on_ray(f"{Path(__file__).resolve()}:train", args)
+        logger.info("Ray run finished: metrics={} checkpoint={}", result.metrics, result.checkpoint_path)
+    else:
+        train(args)
+
+
 if __name__ == "__main__":
-    train(parse_args())
+    main()
