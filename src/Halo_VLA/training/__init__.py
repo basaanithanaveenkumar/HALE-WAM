@@ -14,6 +14,7 @@ nothing here imports them unless the corresponding flag is used.
 """
 
 from training.ddp_session import DDPSession
+from training.dual_system_step import DualSystemTrainingStep
 from training.evaluator import VLAEvaluator
 from training.ray_cli import RayCliOptions
 from training.ray_launch import launch_train_on_ray
@@ -23,6 +24,7 @@ from training.webdataset_cli import WebDatasetCliOptions
 
 __all__ = [
     "DDPSession",
+    "DualSystemTrainingStep",
     "HaloVLATrainingStep",
     "RayCliOptions",
     "StepOutput",

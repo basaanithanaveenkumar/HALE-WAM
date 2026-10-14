@@ -90,6 +90,12 @@ class HaloVLMConfig:
     llm_dtype: str = "bfloat16"
     llm_gradient_checkpointing: bool = False
 
+    # Dual-system VLA (src/Halo_VLA/dual_system, docs/dual_system.md): "none" keeps the
+    # single-system Halo-VLA. A preset - basic, lcb, dp_vla, hirt, robodual, dexvla, openhelix -
+    # or "custom" turns this model into System 2 and adds a fast System 1 policy fed by a latent.
+    dual_system: str = "none"
+    dual_system_options: dict | None = None   # overrides, e.g. {"latent": "pooled", "async_steps": 4}
+
     # Image projector (vision encoder -> decoder token space)
     proj_vision_dim: int | None = None   # defaults to emb_dim
     proj_llm_dim: int | None = None      # defaults to emb_dim

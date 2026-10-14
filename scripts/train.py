@@ -39,6 +39,7 @@ from dataloader.airoa_moma_dataset import build_airoa_moma_dataloader
 from dataloader.droid_dataset import build_droid_dataloader
 from training import (
     DDPSession,
+    DualSystemTrainingStep,
     HaloVLATrainingStep,
     RayCliOptions,
     VLAEvaluator,
@@ -46,6 +47,8 @@ from training import (
     launch_train_on_ray,
     split_validation,
 )
+from dual_system import PRESETS as DUAL_PRESETS, DualSystemVLA, resolve_dual_system_config
+from dual_system.config import parse_overrides
 from utils import log_module_parameters
 from scripts.visualize import (
     unnormalise_image,
@@ -679,10 +682,21 @@ def train(args):
     config.llm_lora_train_embeddings = not args.llm_freeze_embeddings
     config.llm_dtype = args.llm_dtype
     config.llm_gradient_checkpointing = args.llm_gradient_checkpointing
+    # Dual-system VLA (--dual_system): HaloVLM becomes System 2 of a slow/fast pair.
+    config.dual_system = args.dual_system
+    config.dual_system_options = parse_overrides(args.dual_system_option) or None
 
     # ---- Model ----
     model = HaloVLM(config=config).to(device)
     log_module_parameters(model, model_name="HaloVLM", logger_fn=logger)
+    dual_config = resolve_dual_system_config(config.dual_system, config.dual_system_options)
+    dual = DualSystemVLA(model, dual_config).to(device) if dual_config is not None else None
+    network = dual if dual is not None else model   # what is optimised and checkpointed
+    if dual is not None:
+        logger.info("dual-system VLA: {} ({})", dual_config.name, dual_config.notes or "custom")
+        if args.vis_every > 0:
+            logger.warning("training GIFs use Halo-VLA's own action / video heads; disabled for --dual_system")
+            args.vis_every = 0
     # With a pretrained LLM its tokenizer (plus the VLA special tokens) defines every token id,
     # so the dataloaders must use it; None keeps the datasets' default cosmo2 tokenizer.
     language = getattr(model, "language", None)
@@ -763,9 +777,10 @@ def train(args):
 
     # ---- Optimizer & scheduler ----
     # Only trainable parameters: frozen encoders / LLM weights get no optimizer state.
-    trainable = [p for p in model.parameters() if p.requires_grad]
+    trainable = (dual.optimizer_parameters() if dual is not None
+                 else [p for p in model.parameters() if p.requires_grad])
     logger.info("trainable parameters: {:,} / {:,}", sum(p.numel() for p in trainable),
-                sum(p.numel() for p in model.parameters()))
+                sum(p.numel() for p in network.parameters()))
     optimizer = AdamW(trainable, lr=args.lr, weight_decay=args.weight_decay)
     scheduler = CosineAnnealingLR(optimizer, T_max=max(1, args.epochs * len(train_loader)))
     scaler = GradScaler(device.type, enabled=amp_enabled)
@@ -789,7 +804,7 @@ def train(args):
         logger.info("Resuming from checkpoint: {}", ckpt_path)
         with torch.serialization.safe_globals([HaloVLMConfig]):
             ckpt = torch.load(ckpt_path, map_location=device, weights_only=True)
-        model.load_state_dict(ckpt["model_state_dict"])
+        network.load_state_dict(ckpt["model_state_dict"])
         try:
             optimizer.load_state_dict(ckpt["optimizer_state_dict"])
         except ValueError as exc:
@@ -809,8 +824,10 @@ def train(args):
     # ---- Model forward + all three losses as one module, DDP-wrapped when distributed ----
     # (the action-flow and DiT losses use parameters outside HaloVLM.forward; wrapping the whole
     # step lets DDP see them, and find_unused_parameters covers batches without future frames)
+    if dual is not None:
+        dual.set_training_step(global_step)  # OpenHelix pre-alignment stage after a resume
     train_step = session.wrap(
-        HaloVLATrainingStep(
+        DualSystemTrainingStep(dual) if dual is not None else HaloVLATrainingStep(
             model,
             action_loss_weight=args.action_loss_weight,
             visual_loss_weight=visual_loss_weight,
@@ -920,6 +937,8 @@ def train(args):
                 if args.grad_clip > 0:
                     scaler.unscale_(optimizer)
                     nn.utils.clip_grad_norm_(trainable, args.grad_clip)
+                if dual is not None:
+                    dual.mask_frozen_gradients()   # pre-alignment: System 1 does not move yet
 
                 scaler.step(optimizer)
                 scaler.update()
@@ -927,6 +946,8 @@ def train(args):
                 optimizer.zero_grad()
 
                 global_step += 1
+                if dual is not None:
+                    dual.set_training_step(global_step)
 
                 # Logging (keyed to optimizer steps via global_step; rank 0's loader logs)
                 if global_step % args.log_every == 0 and session.is_main:
@@ -1017,7 +1038,7 @@ def train(args):
                 {
                     "epoch": epoch,
                     "global_step": global_step,
-                    "model_state_dict": model.state_dict(),
+                    "model_state_dict": network.state_dict(),
                     "optimizer_state_dict": optimizer.state_dict(),
                     "scheduler_state_dict": scheduler.state_dict(),
                     "scaler_state_dict": scaler.state_dict(),
@@ -1238,6 +1259,15 @@ def parse_args():
     val.add_argument("--eval_every", type=int, default=1, help="validate every N epochs")
     val.add_argument("--eval_max_batches", type=int, default=None, help="cap validation batches")
     val.add_argument("--eval_flow_steps", type=int, default=None, help="Euler steps for action sampling")
+
+    # Dual-system VLA (src/Halo_VLA/dual_system, docs/dual_system.md)
+    ds = p.add_argument_group("Dual-system VLA")
+    ds.add_argument("--dual_system", default="none", choices=("none", "custom", *sorted(DUAL_PRESETS)),
+                    help="none: single-system Halo-VLA; a preset / custom: HaloVLM becomes System 2 of a "
+                         "slow/fast dual system")
+    ds.add_argument("--dual_system_option", action="append", default=[], metavar="KEY=VALUE",
+                    help="override a dual-system setting, e.g. latent=pooled, policy=diffusion, async_steps=4 "
+                         "(repeatable)")
 
     # Language backbone (optional; needs HaleBlocks' finetune extra: transformers + peft)
     llm = p.add_argument_group("LLM backbone (optional, replaces the built-in decoder)")

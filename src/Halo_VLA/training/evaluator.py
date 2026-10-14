@@ -87,9 +87,12 @@ class VLAEvaluator:
 
     def _score_actions(self, model, action_hiddens, batch: dict, metrics: list) -> None:
         """Sample action chunks and update the metrics on the valid (unpadded) timesteps."""
-        if action_hiddens is None:
+        if hasattr(model, "predict_actions"):  # dual-system VLA: System 2 -> latent -> System 1
+            preds = model.predict_actions(batch).unsqueeze(1)
+        elif action_hiddens is None:
             return
-        preds = model.sample_actions(action_hiddens.float(), num_steps=self.flow_steps)  # [B, n, chunk, D]
+        else:
+            preds = model.sample_actions(action_hiddens.float(), num_steps=self.flow_steps)  # [B, n, chunk, D]
         b = preds.shape[0]
         preds = preds.reshape(b, -1, preds.shape[-1])  # [B, n * chunk, D]
         target = batch["actions"].float()

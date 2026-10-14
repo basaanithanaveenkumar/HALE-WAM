@@ -329,6 +329,10 @@ Detailed developer documentation lives in [`docs/`](docs/):
 | [`docs/architecture.md`](docs/architecture.md) | Mermaid architecture diagrams (system, flow head, DiT conditioning, sampler, training step) |
 | [`docs/configuration.md`](docs/configuration.md) | Every `HaloVLMConfig` field and training flag |
 | [`docs/world_model.md`](docs/world_model.md) | Full technical write-up of the DiT world model — per-frame conditioning, CFG, Heun solver, auxiliary losses, and bug fixes |
+| [`docs/dual_system.md`](docs/dual_system.md) | Dual-system VLA from first principles (slow System 2 → latent → fast System 1) and the LCB / DP-VLA / HiRT / RoboDual / DexVLA / OpenHelix variants, each with a Mermaid diagram; `--dual_system none\|basic\|…\|custom` · notebook: [`notebooks/dual_system/`](notebooks/dual_system/dual_system_from_first_principles.ipynb) |
+| [`docs/llm_backbone.md`](docs/llm_backbone.md) | Pretrained, LoRA-finetunable LLM decoders (`--llm_backbone`) |
+| [`docs/vision_encoders_and_validation.md`](docs/vision_encoders_and_validation.md) | SigLIP / CLIP / HaleBlocks vision encoders, validation metrics, trainable-only optimisation |
+| [`docs/distributed.md`](docs/distributed.md) | torchrun, Ray Train and WebDataset training |
 | [`docs/blog/`](docs/blog/README.md) | Blog posts, including *Teaching a robot policy to imagine* |
 
 ### Paper, project page and skills

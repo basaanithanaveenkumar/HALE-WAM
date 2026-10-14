@@ -138,53 +138,17 @@ class HaloVLM(nn.Module):
             pooled_frames.append(proj.mean(dim=1))
         return torch.stack(pooled_frames, dim=1).mean(dim=1)
 
-    def forward(self, images, input_ids, attention_mask, states, image_mask=None):
+    def _embed_inputs(self, images, input_ids, states):
+        """Steps 1-5 of :meth:`forward`: the decoder's input embeddings before positions.
+
+        Returns ``(combined_embeds [B, N_img*P + L, W], num_prepended, N_img)`` where ``W`` is the
+        decoder width (``emb_dim``, or the pretrained LLM's hidden size).
         """
-        Forward pass with interleaved multi-image, state-injection, and
-        action-decoding support.
-
-        The input_ids sequence contains four kinds of special tokens:
-          • <image>  (image_token_id)  — replaced by ViT patch embeddings
-          • <state>  (state_token_id)  — replaced by StateEncoder output
-          • <halo_action> (action_token_id) — used *after* the transformer to
-            extract hidden states for the flow matching action decoder
-          • <halo_world_video> (world_video_token_id) — used *after* the transformer
-            to extract hidden states for conditioning the DiT video predictor
-
-        Args:
-            images:         [B, N_img, 3, H, W]  — N_img images per sample.
-            input_ids:      [B, seq_len]          — token ids with <image>, <state>,
-                            <halo_action>, and <halo_world_video> placeholders.
-            attention_mask: [B, seq_len]          — 1 for real tokens, 0 pad.
-            states:         [B, N_state, state_dim] — proprioceptive states,
-                            one per <state> token.
-            image_mask:     [B, N_img] optional — 1 for real image slots (padding 0).
-                            Used when pooling **past** frames for DiT conditioning from
-                            decoder states at image-patch positions (same order as ``images``).
-
-        Returns:
-            logits:                    [B, total_len, vocab_size] — next-token logits.
-            action_hiddens:            [B, n_action_tokens, emb_dim]
-                                       — transformer hidden states at <halo_action>
-                                       positions; conditioning for the flow decoder.
-                                       None if no <halo_action> tokens are present.
-            visual_context_emb:        [B, emb_dim] or None — pooled decoder hidden
-                                       states at image-patch positions (post-transformer,
-                                       pre-lm_head); past-frame mean for DiT conditioning.
-                                       None if visual DiT is disabled.
-            world_video_query_hiddens: [B, n_world_video_tokens, emb_dim] or None
-                                       — transformer hidden states at <halo_world_video>
-                                       positions; used as query conditioning for the DiT
-                                       video predictor. None if no such tokens present.
-        """
-
         B = input_ids.size(0)
         device = input_ids.device
         network_config = self.config
-        image_token_id = network_config.image_token_id          # e.g. 151665
-        state_token_id = network_config.state_token_id          # e.g. 151667
-        action_token_id = network_config.action_token_id        # e.g. 151666
-        world_video_token_id = network_config.world_video_token_id  # e.g. 151668
+        image_token_id = network_config.image_token_id
+        state_token_id = network_config.state_token_id
 
         # ------------------------------------------------------------------ #
         # 1. IMAGES — count <image> tokens, encode each image through ViT,
@@ -264,6 +228,129 @@ class HaloVLM(nn.Module):
         #    combined_embeds → [B, N_img*num_patches + seq_len, emb_dim]
         # ------------------------------------------------------------------ #
         combined_embeds = torch.cat([img_proj, text_embeds], dim=1)
+        return combined_embeds, num_prepended, N_img
+
+    # ------------------------------------------------------------------ #
+    # Sequence encoding for the dual-system VLA (System 2)
+    # ------------------------------------------------------------------ #
+    @property
+    def layer_width(self) -> int:
+        """Width of the decoder's hidden states (``emb_dim`` or the LLM's hidden size)."""
+        return self.language.hidden_size if self.language is not None else self.config.emb_dim
+
+    def decoder_layers(self) -> nn.ModuleList:
+        """The decoder's transformer blocks (built-in or pretrained LLM), in order."""
+        if self.language is None:
+            return self.decoder_transformer.layers
+        candidates = [m for n, m in self.language.llm.named_modules()
+                      if isinstance(m, nn.ModuleList) and n.endswith("layers") and len(m) > 0]
+        if not candidates:
+            raise RuntimeError("could not locate the LLM backbone's decoder layers")
+        return max(candidates, key=len)
+
+    def encode_sequence(self, images, input_ids, attention_mask, states, *,
+                        extra_embeds=None, capture_layer=None):
+        """Run the vision-language decoder and return its hidden states (no task heads).
+
+        Args:
+            images, input_ids, attention_mask, states: as for :meth:`forward`.
+            extra_embeds: optional ``(B, K, emb_dim)`` embeddings appended after the text
+                (e.g. learnable ``<ACT>`` queries); being last, they attend to everything.
+            capture_layer: optional decoder-layer index whose output is also returned.
+
+        Returns:
+            dict with ``hidden`` ``(B, T, emb_dim)`` final states, ``mask`` ``(B, T)`` (1 = real),
+            ``logits`` ``(B, T, V)``, ``num_prefix`` (image tokens before the text),
+            ``text_len``, ``num_extra``, ``input_embeds`` (decoder inputs before positions) and
+            ``layer_hidden`` ``(B, T, layer_width)`` when ``capture_layer`` is set.
+        """
+        B, device = input_ids.size(0), input_ids.device
+        combined, num_prefix, _ = self._embed_inputs(images, input_ids, states)
+        mask = torch.cat([torch.ones(B, num_prefix, device=device, dtype=attention_mask.dtype),
+                          attention_mask], dim=1)
+        num_extra = 0
+        if extra_embeds is not None:
+            extra = self.language.project_in(extra_embeds) if self.language is not None else extra_embeds
+            combined = torch.cat([combined, extra.to(combined.dtype)], dim=1)
+            mask = torch.cat([mask, torch.ones(B, extra.size(1), device=device, dtype=mask.dtype)], dim=1)
+            num_extra = extra.size(1)
+        input_embeds = combined
+        if self.language is None:
+            positions = torch.arange(combined.size(1), device=device)
+            combined = combined + self.pos_embed(positions).unsqueeze(0)
+
+        captured = {}
+        handle = None
+        if capture_layer is not None:
+            def grab(_module, _inputs, output):
+                captured["h"] = output[0] if isinstance(output, tuple) else output
+            handle = self.decoder_layers()[capture_layer].register_forward_hook(grab)
+        try:
+            if self.language is not None:
+                logits, hidden = self.language(combined, mask)
+            else:
+                hidden = self.decoder_transformer(combined, pad_mask=mask)
+                logits = self.lm_head(hidden)
+        finally:
+            if handle is not None:
+                handle.remove()
+        return {
+            "hidden": hidden, "mask": mask, "logits": logits, "num_prefix": num_prefix,
+            "text_len": input_ids.size(1), "num_extra": num_extra, "input_embeds": input_embeds,
+            "layer_hidden": captured.get("h"),
+        }
+
+    def forward(self, images, input_ids, attention_mask, states, image_mask=None):
+        """
+        Forward pass with interleaved multi-image, state-injection, and
+        action-decoding support.
+
+        The input_ids sequence contains four kinds of special tokens:
+          • <image>  (image_token_id)  — replaced by ViT patch embeddings
+          • <state>  (state_token_id)  — replaced by StateEncoder output
+          • <halo_action> (action_token_id) — used *after* the transformer to
+            extract hidden states for the flow matching action decoder
+          • <halo_world_video> (world_video_token_id) — used *after* the transformer
+            to extract hidden states for conditioning the DiT video predictor
+
+        Args:
+            images:         [B, N_img, 3, H, W]  — N_img images per sample.
+            input_ids:      [B, seq_len]          — token ids with <image>, <state>,
+                            <halo_action>, and <halo_world_video> placeholders.
+            attention_mask: [B, seq_len]          — 1 for real tokens, 0 pad.
+            states:         [B, N_state, state_dim] — proprioceptive states,
+                            one per <state> token.
+            image_mask:     [B, N_img] optional — 1 for real image slots (padding 0).
+                            Used when pooling **past** frames for DiT conditioning from
+                            decoder states at image-patch positions (same order as ``images``).
+
+        Returns:
+            logits:                    [B, total_len, vocab_size] — next-token logits.
+            action_hiddens:            [B, n_action_tokens, emb_dim]
+                                       — transformer hidden states at <halo_action>
+                                       positions; conditioning for the flow decoder.
+                                       None if no <halo_action> tokens are present.
+            visual_context_emb:        [B, emb_dim] or None — pooled decoder hidden
+                                       states at image-patch positions (post-transformer,
+                                       pre-lm_head); past-frame mean for DiT conditioning.
+                                       None if visual DiT is disabled.
+            world_video_query_hiddens: [B, n_world_video_tokens, emb_dim] or None
+                                       — transformer hidden states at <halo_world_video>
+                                       positions; used as query conditioning for the DiT
+                                       video predictor. None if no such tokens present.
+        """
+
+        B = input_ids.size(0)
+        device = input_ids.device
+        network_config = self.config
+        image_token_id = network_config.image_token_id          # e.g. 151665
+        state_token_id = network_config.state_token_id          # e.g. 151667
+        action_token_id = network_config.action_token_id        # e.g. 151666
+        world_video_token_id = network_config.world_video_token_id  # e.g. 151668
+
+        # Steps 1-5 (images, states, text, state injection, concatenation): shared with
+        # encode_sequence(), which the dual-system VLA uses.
+        combined_embeds, num_prepended, N_img = self._embed_inputs(images, input_ids, states)
 
         # ------------------------------------------------------------------ #
         # 6. POSITIONAL EMBEDDINGS — add learned positions over the full
