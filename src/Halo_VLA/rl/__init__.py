@@ -31,7 +31,9 @@ Shared: :mod:`rl.policy` (Gaussian actor head) and :mod:`rl.rewards`
 (pluggable reward functions, analytic and world-model based).
 """
 
+from rl.actor_critic import Actor, Critic, lambda_return
 from rl.dpo import compute_dpo_loss
+from rl.dreamer import actor_critic_loss, imagine, world_model_loss
 from rl.grpo import compute_grpo_loss, group_relative_advantage
 from rl.policy import GaussianActionPolicy
 from rl.preference import build_preference_pairs, sample_preference_pairs
@@ -41,6 +43,7 @@ from rl.rewards import (
     WorldModelImaginationReward,
     negative_distance_reward,
 )
+from rl.rssm import RSSM
 from rl.value_baseline import ValueBaseline
 
 __all__ = [
@@ -59,4 +62,12 @@ __all__ = [
     "build_preference_pairs",
     "sample_preference_pairs",
     "compute_dpo_loss",
+    # Dreamer
+    "RSSM",
+    "Actor",
+    "Critic",
+    "lambda_return",
+    "world_model_loss",
+    "imagine",
+    "actor_critic_loss",
 ]
