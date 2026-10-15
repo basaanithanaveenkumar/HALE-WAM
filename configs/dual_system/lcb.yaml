@@ -1,0 +1,8 @@
+# Dual-system VLA preset `lcb`: LCB (arXiv:2405.04798): <ACT> latent + alignment loss, diffusion actor.
+# Diagram and recipe: docs/dual_system.md. Any preset field can be overridden below.
+inherits: ../base.yaml
+variant: halo_vla_dual_lcb
+
+model:
+  dual_system:
+    preset: lcb

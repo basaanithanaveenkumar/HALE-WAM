@@ -73,8 +73,9 @@ class HaloVLMConfig:
 
     # Language backbone. None keeps the built-in decoder above (token_emb + DecoderTransformer +
     # lm_head, cosmo2 tokenizer). Any name from hale_core.nn.llm.list_llm_backbones() - e.g.
-    # "smollm2-360m", "qwen2.5-1.5b", "qwen3-1.7b", "llama3.2-1b", "phi4-mini", or
-    # "hale-autoregressive" with llm_checkpoint - replaces it with that pretrained causal LM,
+    # "smollm2-360m", "qwen3-1.7b", "smollm3-3b", or the text tower of a natively multimodal model
+    # ("qwen3.5-4b-base", "gemma4-e4b", "ministral3-3b", "cosmos-reason2-2b", "lfm2.5-vl-1.6b"),
+    # or "hale-autoregressive" with llm_checkpoint - replaces it with that pretrained causal LM,
     # fine-tuned with LoRA / full / frozen. Its tokenizer then defines every token id.
     llm_backbone: str | None = None
     llm_model_id: str | None = None          # override the registered Hub repo / local path
@@ -89,6 +90,7 @@ class HaloVLMConfig:
     llm_lora_train_embeddings: bool = True
     llm_dtype: str = "bfloat16"
     llm_gradient_checkpointing: bool = False
+    llm_attn_implementation: str | None = "sdpa"   # Gemma 2/3/4: "eager" (logit soft-capping)
 
     # Dual-system VLA (src/Halo_VLA/dual_system, docs/dual_system.md): "none" keeps the
     # single-system Halo-VLA. A preset - basic, lcb, dp_vla, hirt, robodual, dexvla, openhelix -
@@ -218,6 +220,7 @@ class HaloVLMConfig:
                               target_modules=self.llm_lora_target_modules,
                               train_embeddings=self.llm_lora_train_embeddings),
             dtype=self.llm_dtype,
+            attn_implementation=self.llm_attn_implementation,
             gradient_checkpointing=self.llm_gradient_checkpointing,
         )
 

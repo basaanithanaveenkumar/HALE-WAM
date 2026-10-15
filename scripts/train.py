@@ -33,6 +33,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src" / "Halo_VLA"))
 
 from config import HaloVLMConfig
+from config.overrides import apply_model_overrides, parse_model_options
 from models.halo_vla import HaloVLM
 from dataloader.eo_dataset import build_eo_dataloader
 from dataloader.airoa_moma_dataset import build_airoa_moma_dataloader
@@ -685,6 +686,12 @@ def train(args):
     # Dual-system VLA (--dual_system): HaloVLM becomes System 2 of a slow/fast pair.
     config.dual_system = args.dual_system
     config.dual_system_options = parse_overrides(args.dual_system_option) or None
+    config.llm_attn_implementation = args.llm_attn_implementation
+    # Architecture fields without a flag: from the YAML (--config) and --model_option KEY=VALUE.
+    model_overrides = {**getattr(args, "model_overrides", {}), **parse_model_options(args.model_option)}
+    if model_overrides:
+        apply_model_overrides(config, model_overrides)
+        logger.info("HaloVLMConfig overrides: {}", model_overrides)
 
     # ---- Model ----
     model = HaloVLM(config=config).to(device)
@@ -788,6 +795,11 @@ def train(args):
     # ---- Checkpoint dir ----
     ckpt_dir = Path(args.ckpt_dir)
     ckpt_dir.mkdir(parents=True, exist_ok=True)
+    if args.config and session.is_main:
+        # Provenance: the YAML as resolved (inheritance applied), plus the final command line.
+        from config.run_config import save_resolved_config
+
+        save_resolved_config(args.config, ckpt_dir / "run_config.yaml", argv=getattr(args, "argv", None))
 
     # ---- Resume from checkpoint ----
     start_epoch = 1
@@ -1082,8 +1094,14 @@ def train(args):
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
-def parse_args():
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """The CLI; with ``--config run.yaml`` the YAML supplies the defaults and flags still win."""
     p = argparse.ArgumentParser(description="Train Halo-VLA")
+    p.add_argument("--config", default=None, metavar="YAML",
+                   help="Hale-VLM-style run config (configs/*.yaml, `inherits:` supported); command-line "
+                        "flags override its values")
+    p.add_argument("--model_option", action="append", default=[], metavar="KEY=VALUE",
+                   help="set any HaloVLMConfig field, e.g. emb_dim=256, use_moe=false (repeatable)")
 
     # Data
     p.add_argument(
@@ -1273,7 +1291,8 @@ def parse_args():
     llm = p.add_argument_group("LLM backbone (optional, replaces the built-in decoder)")
     llm.add_argument("--llm_backbone", default=None,
                      help="registered fine-tunable LLM (hale_core.nn.llm.list_llm_backbones()), e.g. "
-                          "smollm2-360m, qwen2.5-1.5b, qwen3-1.7b, llama3.2-1b, phi4-mini, hale-autoregressive")
+                          "smollm2-360m, qwen3-1.7b, smollm3-3b, qwen3.5-4b-base, gemma4-e4b, ministral3-3b, "
+                          "cosmos-reason2-2b, lfm2.5-vl-1.6b, hale-autoregressive")
     llm.add_argument("--llm_model_id", default=None, help="override the registered Hub repo / local path")
     llm.add_argument("--llm_checkpoint", default=None, help="HaloDiffusionLLM .pt for hale-* backbones")
     llm.add_argument("--llm_finetune", default="lora", choices=("lora", "full", "frozen"))
@@ -1285,12 +1304,22 @@ def parse_args():
                           "special tokens are learned)")
     llm.add_argument("--llm_dtype", default="bfloat16", choices=("float32", "float16", "bfloat16"))
     llm.add_argument("--llm_gradient_checkpointing", action="store_true")
+    llm.add_argument("--llm_attn_implementation", default="sdpa",
+                     help="sdpa / eager / flash_attention_2 (Gemma: eager)")
 
     # Distributed launch and data format (both optional; need HaleBlocks extras)
     RayCliOptions.add_arguments(p)
     WebDatasetCliOptions.add_arguments(p)
 
-    return p.parse_args()
+    known, _ = p.parse_known_args(argv)
+    if known.config:
+        from config.run_config import load_vla_config  # lazy: needs HaleBlocks (pydantic schemas)
+
+        run = load_vla_config(known.config)
+        p.set_defaults(**run.train_arguments(), model_overrides=run.model_overrides(), run_variant=run.variant)
+    args = p.parse_args(argv)
+    args.argv = list(sys.argv[1:] if argv is None else argv)  # recorded next to the checkpoints
+    return args
 
 
 def main() -> None:

@@ -1,0 +1,179 @@
+# ============================================================
+# Halo-VLA  -  base run config (schema: config/run_config.py::VLARunConfig)
+#
+#   python scripts/train.py --config configs/base.yaml [--flag value ...]
+#
+# Same layout as Hale-VLM (model.vision / model.llm sections, `inherits:`). Every value below is
+# the default; inheriting configs override only what they change. Command-line flags still win.
+# Field reference: docs/configuration.md.
+# ============================================================
+
+variant: halo_vla
+device: null                      # null = cuda if available, else cpu
+
+model:
+  emb_dim: 512                    # width of the vision / action / video spaces
+  emb_factor_dim: 128             # ALBERT-style factored token embedding (built-in decoder)
+  max_position_embeddings: 2000
+  gradient_checkpointing: true
+
+  decoder:                        # built-in decoder (ignored when llm.backbone is set)
+    num_layers: 8
+    num_heads: 16
+    mlp_dim: 512
+    dropout: 0.0
+  moe:                            # DeepSeekMoE feed-forwards of the built-in decoder
+    enabled: true
+    hid_scale: 1.2
+    num_routed_experts: 6
+    top_k: 2
+    num_shared_experts: 2
+
+  vision:
+    encoder: vit                  # vit | siglip | clip | local
+    model_id: null                # siglip / clip repo (default *-base-patch16-224)
+    image_size: 224
+    freeze_encoder: null          # null: frozen for pretrained encoders, trained for vit
+    projector_type: mlp           # mlp | qformer | gated_cross_attention
+    projector_vision_dim: null
+    projector_llm_dim: null
+    vit:
+      patch_size: 16
+      num_layers: 6
+      num_heads: 16
+      mlp_dim: 512
+      dropout: 0.0
+    qformer:
+      num_queries: 32
+      hidden_dim: null
+      num_layers: 2
+      num_heads: 8
+      cross_attention_freq: 1
+      ffn_mult: 4
+      dropout: 0.0
+    gated_cross_attention:
+      num_latents: 32
+      hidden_dim: null
+      num_layers: 2
+      num_heads: 8
+      ffn_mult: 4
+      dropout: 0.0
+      gate_init: 1.0
+    local_backbone:
+      backbone_name: dino_vit_small
+      freeze_up_to_stage: -1
+      pretrained_path: null
+
+  llm:
+    backbone: null                # null = built-in decoder; or any HaleBlocks backbone, e.g.
+                                  # qwen3.5-4b-base, gemma4-e4b, ministral3-3b, cosmos-reason2-2b,
+                                  # lfm2.5-vl-1.6b, smolvlm2-500m, smollm3-3b, qwen3-1.7b, ...
+    model_id: null
+    checkpoint: null              # HaloDiffusionLLM .pt for hale-* backbones
+    dtype: bfloat16
+    use_lora: true                # use_lora > freeze_llm > full fine-tuning (as in Hale-VLM)
+    freeze_llm: true
+    lora_r: 16
+    lora_alpha: 32
+    lora_dropout: 0.05
+    lora_target_modules: null     # null = the backbone's registered targets
+    lora_train_embeddings: true   # learn <image> / <halo_action> / <state> / <halo_world_video>
+    gradient_checkpointing: false
+    attn_implementation: sdpa     # Gemma: eager
+
+  action:
+    action_dim: 32
+    state_dim: 32
+    chunk_size: 16
+    hidden_dims: [512, 256]
+    dropout: 0.1
+    use_layernorm: true
+    state_hidden_dims: [256, 512]
+    state_dropout: 0.1
+    flow:
+      hidden_dim: 1024
+      time_embed_dim: 128
+      num_ode_steps: 24
+
+  world_model:                    # DiT future-frame predictor (docs/world_model.md)
+    enabled: true
+    loss_weight: null             # null = 8.0 (HaloVLMConfig.visual_loss_weight)
+    num_predict_frames: 5
+    perceptual_weight: 0.1
+    ssim_weight: 0.4
+    temporal_weight: 0.2
+    dit:
+      patch_size: 8
+      hidden_size: 512
+      depth: 8
+      num_heads: 8
+      mlp_ratio: 4.0
+      num_sample_steps: 75
+
+  dual_system:                    # docs/dual_system.md; configs/dual_system/*.yaml
+    preset: none                  # none | basic | lcb | dp_vla | hirt | robodual | dexvla | openhelix | custom
+
+train:
+  epochs: 5
+  batch_size: 1
+  lr: 1.0e-4
+  weight_decay: 0.01
+  grad_clip: 1.0
+  grad_accum_steps: 1
+  action_loss_weight: 1.0
+  resume: null                    # checkpoint .pt
+  checkpoint:
+    dir: checkpoints
+    every_n_steps: 100
+    keep_last: 3                  # 0 = keep all
+  ray:                            # docs/distributed.md
+    enabled: false
+    address: null
+    num_workers: 1
+    use_gpu: false
+    cpus_per_worker: null
+    storage_path: ray_results
+    max_failures: 0
+
+data:
+  dataset: eo                     # eo | moma | droid
+  subset: interleave-temporal     # EO-Data1.5M subset
+  num_workers: 4
+  max_seq_len: 256
+  max_samples: 2000               # null = the whole dataset
+  droid:
+    data_root: null
+    camera: observation.images.exterior_image_1_left
+  moma:
+    data_root: null
+    camera: head
+    num_frames: 5
+    frame_stride: 25
+    max_action_len: 256
+    num_workers: 0
+  webdataset:
+    enabled: false
+    root: data/webdataset
+    samples_per_shard: 256
+    convert_workers: 0
+    shuffle_buffer: 1000
+    overwrite: false
+
+eval:
+  val_fraction: 0.0               # hold out this share of the training samples (0 = off)
+  val_seed: 0
+  every_n_epochs: 1
+  max_batches: null
+  flow_steps: null
+
+logging:
+  log_every: 10
+  tensorboard_dir: runs           # "" disables TensorBoard
+  tb_run_name: ""
+  tb_image_every: 0
+
+viz:
+  every_n_steps: 10               # training GIFs; 0 = off
+  max_videos: 4
+  min_frames: 3
+  fps_future_frames: 2

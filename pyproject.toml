@@ -65,6 +65,8 @@ webdataset = ["hale-blocks[webdataset]"]
 distributed = ["hale-blocks[ray,webdataset]"]
 # Pretrained LLM decoder (--llm_backbone): registry, LoRA (transformers + peft) from HaleBlocks.
 finetune = ["hale-blocks[finetune]"]
+# YAML run configs (scripts/train.py --config): HaleBlocks' pydantic schemas + YAML loader.
+config = ["hale-blocks"]
 
 [project.urls]
 Homepage = "https://github.com/yourusername/halo-vla"

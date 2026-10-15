@@ -1,0 +1,8 @@
+# Dual-system VLA preset `robodual`: RoboDual (arXiv:2410.08001): action + task latents, DiT diffusion, Perceiver-resampled obs.
+# Diagram and recipe: docs/dual_system.md. Any preset field can be overridden below.
+inherits: ../base.yaml
+variant: halo_vla_dual_robodual
+
+model:
+  dual_system:
+    preset: robodual

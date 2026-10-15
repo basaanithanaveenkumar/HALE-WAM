@@ -146,3 +146,47 @@ def test_built_in_decoder_is_unchanged_without_llm_backbone() -> None:
     model = HaloVLM(cfg)
     assert model.language is None and model.decoder_transformer is not None
     assert cfg.image_token_id == 49152 and model.token_emb.num_embeddings == cfg.vocab_size
+
+
+def tiny_gemma4_text():
+    """Gemma 4 text decoder with per-layer embeddings (the "E" models), vocabulary of 43 tokens."""
+    cfg = transformers.AutoConfig.for_model(
+        "gemma4_text", vocab_size=43, vocab_size_per_layer_input=43, hidden_size=16, hidden_size_per_layer_input=4,
+        intermediate_size=32, num_hidden_layers=2, num_attention_heads=4, num_key_value_heads=2, head_dim=8,
+        global_head_dim=8, num_kv_shared_layers=0, layer_types=["sliding_attention", "full_attention"],
+        sliding_window=16, max_position_embeddings=512, pad_token_id=0, bos_token_id=1, eos_token_id=2,
+        rope_parameters={"full_attention": {"partial_rotary_factor": 0.25, "rope_theta": 1e6, "rope_type": "proportional"},
+                         "sliding_attention": {"rope_theta": 1e4, "rope_type": "default"}},
+    )
+    torch.manual_seed(0)
+    return transformers.AutoModelForCausalLM.from_config(cfg)
+
+
+def test_gemma4_text_tower_gets_token_ids_for_its_per_layer_embeddings() -> None:
+    """Image / state embeddings are spliced in, so Gemma 4 needs the ids passed alongside them."""
+    import hale_core.nn.llm.hf_text_tower as text_tower
+
+    with patch.object(text_tower, "load_text_tower", side_effect=lambda *a, **k: tiny_gemma4_text()), \
+         patch.object(transformers.AutoTokenizer, "from_pretrained", side_effect=lambda *a, **k: tiny_tokenizer()):
+        cfg = small_config(llm_backbone="gemma4-e2b", llm_finetune="lora", llm_lora_r=4, llm_lora_alpha=8)
+        model = HaloVLM(cfg).train()
+    assert model.language.llm.per_layer_vocab == 43
+    seen = {}
+    forward = model.language.llm.forward
+
+    def spy(**kwargs):
+        seen.update(kwargs)
+        return forward(**kwargs)
+
+    model.language.llm.forward = spy
+    batch = batch_for(cfg)
+    out = model(images=batch["images"], input_ids=batch["input_ids"], attention_mask=batch["attention_mask"],
+                states=batch["states"])
+    token_ids = seen["token_ids"]
+    num_prefix = token_ids.size(1) - batch["input_ids"].size(1)
+    assert token_ids.shape == seen["inputs_embeds"].shape[:2] and num_prefix > 0
+    assert token_ids[:, :num_prefix].eq(cfg.image_token_id).all()
+    assert torch.equal(token_ids[:, num_prefix:], batch["input_ids"])
+    loss = out[0].float().logsumexp(-1).mean()  # any scalar of the LLM logits
+    loss.backward()
+    assert any(p.grad is not None for n, p in model.named_parameters() if "lora_B" in n)

@@ -1,0 +1,15 @@
+# Gemma 4 E4B text tower (Apache 2.0). Halo-VLA passes token ids with the spliced image / state
+# embeddings, which Gemma's per-layer embeddings need. No linear-attention layers: drop-in for
+# pi0-style experts that read per-layer KV caches.
+inherits: ../base.yaml
+variant: halo_vla_gemma4_e4b
+
+model:
+  vision:
+    encoder: siglip
+    projector_type: qformer
+  llm:
+    backbone: gemma4-e4b
+    attn_implementation: eager    # Gemma: logit soft-capping
+    use_lora: true
+    gradient_checkpointing: true

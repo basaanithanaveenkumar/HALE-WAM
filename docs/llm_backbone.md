@@ -2,9 +2,20 @@
 
 By default Halo-VLA uses its own small decoder (`token_emb` + `DecoderTransformer` + `lm_head`,
 512-d, cosmo2 tokenizer). `--llm_backbone <name>` replaces it with any fine-tunable LLM from
-HaleBlocks' registry: SmolLM2, Qwen2.5, Qwen3, Llama 3.x, Gemma 2/3, Phi-3.5/4-mini, Mistral 7B,
-DeepSeek-R1-Distill, or a HaloDiffusionLLM causal checkpoint. It is fine-tuned with LoRA, fully, or
-kept frozen. The full list and the selection rule are in HaleBlocks `docs/llm_backbones.md`.
+HaleBlocks' registry. That covers SmolLM2/3, Qwen2.5/3, Llama 3.x, Gemma 2/3, Phi-3.5/4-mini(-reasoning),
+Mistral 7B, Granite 4.2, DeepSeek-R1-Distill and HaloDiffusionLLM causal checkpoints. It also covers the
+**text towers of natively multimodal 2026 models**, the usual VLA backbones: Qwen3.5 0.8B/2B/4B (base +
+instruct), Gemma 4 E2B/E4B, Ministral 3 3B/8B, Cosmos-Reason2-2B (GR00T N1.7's backbone),
+LFM2.5-VL 450M/1.6B/3B and SmolVLM2. The backbone is fine-tuned with LoRA, fully, or kept frozen. The
+full list, the selection rule and per-goal picks are in HaleBlocks `docs/llm_backbones.md`.
+
+For a multimodal checkpoint only its decoder and LM head are loaded. Halo-VLA's own vision encoder
+(`--vision_encoder`) and projector feed it, so the checkpoint's multimodal pre-training is kept
+without its vision tower. Hybrid decoders are supported: Qwen3.5 linear attention, LFM2.5
+convolutions and Gemma 4 sliding windows. For Gemma 4, `HaloVLM` passes each position's token id
+(the image token for image slots) alongside the spliced embeddings, which Gemma's per-layer
+embeddings need. Examples: `configs/examples/llm_qwen3_5_4b_base.yaml`,
+`configs/examples/llm_gemma4_e4b.yaml`, `configs/examples/llm_cosmos_reason2_2b.yaml`.
 Install with `uv sync --extra finetune`.
 
 ```bash

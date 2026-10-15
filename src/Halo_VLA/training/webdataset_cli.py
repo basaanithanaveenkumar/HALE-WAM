@@ -63,6 +63,14 @@ class WebDatasetCliOptions:
     def fingerprint(args: argparse.Namespace) -> str:
         """Hash of the arguments that change the dataset's samples."""
         spec = {name: getattr(args, name, None) for name in DATA_ARGUMENTS}
+        # Image size can come from the YAML / --model_option instead of a flag (only added when
+        # set, so shards written before these options existed keep their fingerprint).
+        from config.overrides import parse_model_options
+
+        overrides = {**(getattr(args, "model_overrides", None) or {}),
+                     **parse_model_options(getattr(args, "model_option", None))}
+        if overrides.get("img_size") is not None:
+            spec["img_size"] = overrides["img_size"]
         return hashlib.sha256(json.dumps(spec, sort_keys=True, default=str).encode()).hexdigest()
 
     @classmethod

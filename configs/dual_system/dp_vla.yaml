@@ -1,0 +1,8 @@
+# Dual-system VLA preset `dp_vla`: DP-VLA (CoRL 2024): frozen System 2, all last-layer states, regression policy.
+# Diagram and recipe: docs/dual_system.md. Any preset field can be overridden below.
+inherits: ../base.yaml
+variant: halo_vla_dual_dp_vla
+
+model:
+  dual_system:
+    preset: dp_vla

@@ -1,0 +1,8 @@
+# Dual-system VLA preset `basic`: first-principles dual system: one <ACT> latent, flow-matching System 1.
+# Diagram and recipe: docs/dual_system.md. Any preset field can be overridden below.
+inherits: ../base.yaml
+variant: halo_vla_dual_basic
+
+model:
+  dual_system:
+    preset: basic

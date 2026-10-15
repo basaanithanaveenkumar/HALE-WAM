@@ -1,0 +1,19 @@
+# Qwen3.5-4B-Base text tower as Halo-VLA's decoder (survey pick: most capability at <= 5B).
+# Only the decoder + LM head of the multimodal checkpoint are loaded; SigLIP + Q-Former feed it.
+# Hybrid decoder (Gated DeltaNet : full attention = 3 : 1); LoRA reaches both layer types.
+# Install flash-linear-attention + causal-conv1d for fast linear-attention kernels.
+inherits: ../base.yaml
+variant: halo_vla_qwen3_5_4b
+
+model:
+  vision:
+    encoder: siglip
+    projector_type: qformer
+    qformer: {num_queries: 32}
+  llm:
+    backbone: qwen3.5-4b-base
+    dtype: bfloat16
+    use_lora: true
+    lora_r: 16
+    lora_alpha: 32
+    gradient_checkpointing: true

@@ -176,6 +176,17 @@ uv pip install -e .          # recommended
 
 ## Training
 
+### From a YAML run config (Hale-VLM style)
+
+```bash
+python scripts/train.py --config configs/overfit.yaml                       # smoke test
+python scripts/train.py --config configs/dual_system/openhelix.yaml         # dual-system VLA
+python scripts/train.py --config configs/examples/llm_qwen3_5_4b_base.yaml  # Qwen3.5 decoder, LoRA
+```
+
+Every key is validated, and command-line flags override the YAML. Schema, sections and the
+shipped configs are described in [`docs/configuration.md`](docs/configuration.md).
+
 ### Overfit on a single clip (sanity check)
 
 ```bash

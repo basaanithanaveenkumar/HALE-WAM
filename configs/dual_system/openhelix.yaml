@@ -1,0 +1,10 @@
+# Dual-system VLA preset `openhelix`: OpenHelix (arXiv:2505.03912): prompt-tuned <ACT>, auxiliary head, two-stage pre-alignment.
+# Diagram and recipe: docs/dual_system.md. Any preset field can be overridden below.
+inherits: ../base.yaml
+variant: halo_vla_dual_openhelix
+
+model:
+  dual_system:
+    preset: openhelix
+    prealign_steps: 2000          # stage 1: System 1 held fixed while the prompt + projector align
+    async_steps: 10               # System 1 steps per System 2 update at inference

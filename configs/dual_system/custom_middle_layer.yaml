@@ -1,0 +1,15 @@
+# Custom dual system: a middle decoder layer as the latent (GR00T-N1 style), diffusion System 1,
+# with a Qwen3.5-2B-Base System 2 (its hybrid layers expose hidden states at every depth).
+inherits: ../base.yaml
+variant: halo_vla_dual_custom
+
+model:
+  llm:
+    backbone: qwen3.5-2b-base
+    use_lora: true
+  dual_system:
+    preset: custom
+    latent: middle_layer
+    policy: diffusion
+    system1_dim: 256
+    async_steps: 4

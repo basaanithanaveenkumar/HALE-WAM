@@ -1,36 +1,35 @@
 # ============================================================
-# HALE-WAM  —  Overfit / smoke-test config
+# Halo-VLA  -  smoke test: a few samples, small model, no DiT / GIFs, CPU-friendly
+#   python scripts/train.py --config configs/overfit.yaml
 # ============================================================
-# Fast smoke test: trains on a single repeated sample.
-# Use to verify the forward/backward pass runs end-to-end.
-# ============================================================
-
 inherits: base.yaml
-variant: halo_vla_mlp
-
-data:
-  source: overfit
-  overfit_text: "Pick up the red cube and place it in the box."
-  n_overfit_copies: 16
-
-train:
-  steps: 500
-  batch_size: 2
-  lr: 1.0e-4
-  warmup_steps: 10
-  grad_accum_steps: 1
-  checkpoint_every_n_steps: 500
+variant: halo_vla_overfit
 
 model:
-  enable_visual_dit: false        # skip DiT for fast overfit
-  gradient_checkpointing: false   # faster on small batch
+  emb_dim: 128
+  gradient_checkpointing: false
+  decoder: {num_layers: 2, num_heads: 4, mlp_dim: 256}
+  moe: {enabled: false}
+  vision:
+    image_size: 112
+    vit: {num_layers: 2, num_heads: 4, mlp_dim: 256}
+  action:
+    flow: {hidden_dim: 256}
+  world_model:
+    enabled: false                # skip the DiT for a fast overfit
+
+train:
+  epochs: 20
+  batch_size: 2
+  lr: 3.0e-4
+  checkpoint: {every_n_steps: 1000, keep_last: 1}
+
+data:
+  max_samples: 16
+  num_workers: 0
 
 logging:
-  backend: noop
-  tensorboard: false
+  tensorboard_dir: ""
 
-experiment:
-  enabled: false
-
-eval:
-  enabled: false
+viz:
+  every_n_steps: 0

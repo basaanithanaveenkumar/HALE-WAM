@@ -238,6 +238,20 @@ class HaloVLM(nn.Module):
         """Width of the decoder's hidden states (``emb_dim`` or the LLM's hidden size)."""
         return self.language.hidden_size if self.language is not None else self.config.emb_dim
 
+    def sequence_token_ids(self, input_ids: torch.Tensor, num_prefix: int, num_extra: int = 0) -> torch.Tensor:
+        """Token ids aligned with the decoder sequence ``[image prefix, text/states, extra]``.
+
+        Image slots carry the image token id and appended queries the pad id. A pretrained LLM
+        whose layers read token identity (Gemma 4's per-layer embeddings) needs them alongside
+        the spliced embeddings.
+        """
+        B = input_ids.size(0)
+        parts = [input_ids.new_full((B, num_prefix), self.config.image_token_id), input_ids]
+        if num_extra:
+            pad = getattr(self.language.tokenizer, "pad_token_id", None) if self.language is not None else None
+            parts.append(input_ids.new_full((B, num_extra), pad or 0))
+        return torch.cat(parts, dim=1)
+
     def decoder_layers(self) -> nn.ModuleList:
         """The decoder's transformer blocks (built-in or pretrained LLM), in order."""
         if self.language is None:
@@ -287,7 +301,7 @@ class HaloVLM(nn.Module):
             handle = self.decoder_layers()[capture_layer].register_forward_hook(grab)
         try:
             if self.language is not None:
-                logits, hidden = self.language(combined, mask)
+                logits, hidden = self.language(combined, mask, self.sequence_token_ids(input_ids, num_prefix, num_extra))
             else:
                 hidden = self.decoder_transformer(combined, pad_mask=mask)
                 logits = self.lm_head(hidden)
@@ -371,7 +385,8 @@ class HaloVLM(nn.Module):
 
         if self.language is not None:
             # logits from the LLM's head; hidden states mapped back to emb_dim for the heads below.
-            logits, transformer_out = self.language(combined_embeds, pad_mask_full)
+            logits, transformer_out = self.language(
+                combined_embeds, pad_mask_full, self.sequence_token_ids(input_ids, num_prepended))
         else:
             transformer_out = self.decoder_transformer(combined_embeds, pad_mask=pad_mask_full)
 

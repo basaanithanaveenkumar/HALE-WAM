@@ -1,0 +1,8 @@
+# Dual-system VLA preset `dexvla`: DexVLA (arXiv:2502.05855): language latent, diffusion expert.
+# Diagram and recipe: docs/dual_system.md. Any preset field can be overridden below.
+inherits: ../base.yaml
+variant: halo_vla_dual_dexvla
+
+model:
+  dual_system:
+    preset: dexvla

@@ -1,0 +1,8 @@
+# Dual-system VLA preset `hirt`: HiRT (arXiv:2410.05273): MAP-pooled latent, delayed System 2 view, regression policy.
+# Diagram and recipe: docs/dual_system.md. Any preset field can be overridden below.
+inherits: ../base.yaml
+variant: halo_vla_dual_hirt
+
+model:
+  dual_system:
+    preset: hirt

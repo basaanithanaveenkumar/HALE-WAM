@@ -1,0 +1,14 @@
+# Cosmos-Reason2-2B text tower (physical reasoning; GR00T N1.7's backbone) for edge / high-Hz control,
+# as System 2 of an OpenHelix-style dual system. Gated: accept the NVIDIA Open Model License, set HF_TOKEN.
+inherits: ../base.yaml
+variant: halo_vla_cosmos_reason2
+
+model:
+  vision:
+    encoder: siglip
+  llm:
+    backbone: cosmos-reason2-2b
+    use_lora: true
+  dual_system:
+    preset: openhelix
+    async_steps: 10

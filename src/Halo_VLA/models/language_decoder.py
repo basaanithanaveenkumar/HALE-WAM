@@ -66,18 +66,23 @@ class PretrainedLanguageDecoder(nn.Module):
         """VLA-space embeddings (images, states) ``(..., emb_dim)`` -> ``(..., hidden_size)``."""
         return self.to_llm(x)
 
-    def forward(self, inputs_embeds: torch.Tensor, attention_mask: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self, inputs_embeds: torch.Tensor, attention_mask: torch.Tensor, token_ids: torch.Tensor | None = None
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """Run the LLM over the spliced sequence.
 
         Args:
             inputs_embeds: ``(B, T, hidden_size)`` image + text/state embeddings.
             attention_mask: ``(B, T)`` 1 = real token.
+            token_ids: ``(B, T)`` ids aligned with ``inputs_embeds`` (image token at image slots).
+                Backbones whose layers read token identity (Gemma 4 per-layer embeddings) need
+                them because the spliced embeddings cannot be mapped back to ids; others ignore them.
 
         Returns:
             ``logits (B, T, V)`` and hidden states mapped back to ``(B, T, emb_dim)``.
         """
         dtype = self.llm.embedding_parameters()[0].dtype  # the LLM's weight dtype (e.g. bfloat16)
-        out = self.llm(inputs_embeds=inputs_embeds.to(dtype), attention_mask=attention_mask)
+        out = self.llm(inputs_embeds=inputs_embeds.to(dtype), attention_mask=attention_mask, token_ids=token_ids)
         hidden = out.hidden_states
         if isinstance(self.from_llm, nn.Linear):
             hidden = hidden.to(self.from_llm.weight.dtype)

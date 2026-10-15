@@ -1,0 +1,23 @@
+# Multi-GPU training on Ray Train from WebDataset shards (docs/distributed.md).
+inherits: ../base.yaml
+variant: halo_vla_ray
+
+train:
+  batch_size: 8
+  ray:
+    enabled: true
+    num_workers: 4
+    use_gpu: true
+    cpus_per_worker: 8
+    storage_path: ray_results
+    max_failures: 2
+
+data:
+  dataset: droid
+  droid: {data_root: /data/droid_100}
+  max_samples: null
+  webdataset:
+    enabled: true
+    root: data/webdataset
+    samples_per_shard: 512
+    shuffle_buffer: 2000
