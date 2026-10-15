@@ -39,20 +39,19 @@ def test_visual_dit_predictor_rgb_only_default():
     cfg.dit_num_heads = 2
     cfg.emb_dim = 64
 
-    predictor = VisualDiTPredictor(cfg)
+    cfg.dit_max_resolution = 32
+    predictor = VisualDiTPredictor(cfg, num_predict_frames=2)
 
-    # Create dummy inputs
-    B, T, C, H, W = 2, 2, 3, 32, 32
-    past_rgb = torch.randn(B, T, C, H, W)
-    future_rgb = torch.randn(B, C, H, W)
+    # Two future RGB frames conditioned on a pooled context embedding.
+    B, F, C, H, W = 2, 2, 3, 32, 32
+    future_rgb = torch.randn(B, F, C, H, W)
     context_emb = torch.randn(B, cfg.emb_dim)
 
-    # By default, compute_losses should only calculate RGB CFM loss
-    losses = predictor.compute_losses(past_rgb, future_rgb, context_emb)
-    assert "loss_rgb_cfm" in losses
-    assert "loss_visual_total" in losses
-    assert "loss_depth_cfm" not in losses
-    assert "loss_flow_cfm" not in losses
+    # RGB is the only modality: the losses are the RGB flow-matching terms, no depth / flow.
+    losses = predictor.compute_loss(future_rgb, context_emb, num_frames=F, perceptual_weight=0.0)
+    assert {"loss_rgb_cfm", "loss_rgb_total"} <= set(losses)
+    assert not any(k.startswith(("loss_depth", "loss_flow")) for k in losses)
+    assert torch.isfinite(losses["loss_rgb_total"]) and losses["loss_rgb_cfm"] > 0
     print("test_visual_dit_predictor_rgb_only_default passed.")
 
 
@@ -70,14 +69,19 @@ def test_halo_vlm_multi_step_prediction_loss():
 
     model = HaloVLM(cfg)
 
-    B, N, C, H, W = 2, 5, 3, 32, 32
+    B, N, C, H, W = 2, 2, 3, 32, 32
     images = torch.randn(B, N, C, H, W)
+    future_frames = torch.randn(B, 3, C, H, W)
     visual_context_emb = torch.randn(B, cfg.emb_dim)
 
-    # With N=5, it should calculate loss over min(3, 4) = 3 future frames
-    loss = model.compute_visual_prediction_loss(images, visual_context_emb=visual_context_emb)
-    assert isinstance(loss, torch.Tensor)
-    assert loss.dim() == 0
+    # Without future frames there is nothing to predict.
+    zero, parts = model.compute_visual_prediction_loss(images, visual_context_emb=visual_context_emb)
+    assert zero.item() == 0.0 and parts == {}
+    # With 3 future frames the loss is a finite scalar over the predicted frames.
+    loss, parts = model.compute_visual_prediction_loss(
+        images, visual_context_emb=visual_context_emb, future_frames=future_frames, perceptual_weight=0.0)
+    assert isinstance(loss, torch.Tensor) and loss.dim() == 0 and torch.isfinite(loss) and loss > 0
+    assert "loss_rgb_cfm" in parts
     print("test_halo_vlm_multi_step_prediction_loss passed.")
 
 

@@ -90,7 +90,7 @@ class HaloVLATrainingStep(nn.Module):
         """``batch``: the collated dict already on the right device (``images``, ``input_ids``,
         ``attention_mask``, ``labels``, ``actions``, ``action_mask``, ``states`` and optionally
         ``image_mask`` / ``future_frames``)."""
-        model, cfg = self.model, self.model.config
+        model = self.model
         images, input_ids = batch["images"], batch["input_ids"]
         logits, action_hiddens, visual_context_emb, world_video_query_hiddens = model(
             images=images,
@@ -99,8 +99,9 @@ class HaloVLATrainingStep(nn.Module):
             states=batch["states"],
             image_mask=batch.get("image_mask"),
         )
-        num_images = (input_ids == cfg.image_token_id).sum(dim=1).max().item()
-        num_prepended = num_images * cfg.num_image_tokens_per_image
+        # Everything before the text (the image patches): read from the shapes, so any prefix
+        # (connector query counts, pretrained encoders' token counts) is handled.
+        num_prepended = logits.size(1) - input_ids.size(1)
         lang = compute_language_loss(logits, batch["labels"], num_prepended)
         act = model.compute_flow_loss(action_hiddens, batch["actions"], batch["action_mask"])
         vis, vis_sub = model.compute_visual_prediction_loss(
