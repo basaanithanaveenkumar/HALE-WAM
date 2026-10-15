@@ -17,6 +17,18 @@ python scripts/train.py ... --dual_system custom \
 HaloVLMConfig(dual_system="hirt", dual_system_options={"async_steps": 8})
 ```
 
+```yaml
+# configs/dual_system/<preset>.yaml, or any run config:
+model:
+  dual_system:
+    preset: openhelix             # none | basic | lcb | dp_vla | hirt | robodual | dexvla | openhelix | custom
+    async_steps: 60               # any DualSystemConfig field overrides the preset
+```
+
+`python scripts/train.py --config configs/dual_system/openhelix.yaml`. Every preset has a
+config, and `configs/dual_system/custom_middle_layer.yaml` builds a custom design with a
+Qwen3.5 System 2.
+
 ## 1. First principles
 
 **The problem.** A large vision-language model reasons well and generalises, but it is slow:
@@ -50,7 +62,7 @@ Three questions then define a design:
 | `System2` | `dual_system/system2.py` | Halo-VLA's VLM trunk (`HaloVLM.encode_sequence`) plus learnable `<ACT>` queries appended after the instruction; training mode frozen / prompt tuning / finetune; optional delayed view (`system2_frame_delay`) |
 | latent extractors | `dual_system/latent.py` | `act_token`, `multi_act`, `last_hidden`, `pooled` (MAP), `language`, `middle_layer` |
 | `LatentBridge` | `dual_system/latent.py` | `linear` / `mlp` projector into System 1, LCB alignment loss, OpenHelix auxiliary action head |
-| `System1Policy` | `dual_system/system1.py` | fast conv encoder of the current frame (+ optional Perceiver resampler), proprioception, action transformer cross-attending to `[latent, observation, proprioception]`; head `regression`, `diffusion` (DDPM + DDIM) or `flow_matching` (rectified flow) |
+| `System1Policy` | `dual_system/system1.py` | fast conv encoder of the current frame (+ optional Perceiver resampler), proprioception, action transformer cross-attending to `[latent, observation, proprioception]`; head `regression`, `diffusion` (DDPM with v-prediction + DDIM) or `flow_matching` (rectified flow) |
 | `DualSystemVLA` | `dual_system/model.py` | assembly, losses, two-stage pre-alignment |
 | `DualSystemController` | `dual_system/controller.py` | two-frequency inference (inline or background-thread System 2) |
 
@@ -301,6 +313,13 @@ flowchart LR
   (`--llm_backbone`, e.g. LoRA-tuned Qwen) for the `finetune` designs.
 
 ## 5. Caveats
+
+* The diffusion head predicts the velocity `v` (Salimans & Ho, 2022) rather than the noise `ε`.
+  Recovering the action from a noise prediction divides by `√ᾱ`, which is about 0.003 at the
+  noisiest level. The first sampling step would then amplify any prediction error about 300×,
+  and sampled actions would come out at ±300 until the network is near-perfect. With `v` the
+  recovery needs no division, whatever the action scale. The published designs instead normalise
+  actions to [-1, 1] and clip.
 
 * This reproduces each design's information flow and training recipe inside one codebase; it does
   not reproduce the papers' models (LLaVA-7B, OpenVLA, 3D Diffuser Actor, …) or their CALVIN

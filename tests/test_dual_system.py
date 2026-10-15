@@ -183,6 +183,34 @@ def test_policy_heads_fit_a_batch(name: str) -> None:
     assert model.predict_actions(b).shape == (2, model.chunk, model.action_dim)
 
 
+@pytest.mark.parametrize("name", ["basic", "dp_vla", "lcb"])
+def test_sampled_actions_stay_on_the_action_scale(name: str) -> None:
+    """Untrained or not, sampling must not blow up (eps-prediction DDIM amplified errors ~300x)."""
+    model = build(name, sample_steps=4).eval()
+    actions = model.predict_actions(batch(model))
+    assert actions.abs().max() < 20, actions.abs().max()
+
+
+def test_diffusion_policy_learns_to_sample_the_target() -> None:
+    model = build("lcb", sample_steps=8).train()
+    b = batch(model)
+    b["actions"] = b["actions"].clamp(-2, 2)
+    opt = torch.optim.AdamW(model.optimizer_parameters(), lr=3e-3)
+    model.eval()
+    torch.manual_seed(1)
+    before = (model.predict_actions(b) - b["actions"][:, :model.chunk]).abs().mean()
+    model.train()
+    for _ in range(150):
+        loss = model(b).policy
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+    model.eval()
+    torch.manual_seed(1)
+    after = (model.predict_actions(b) - b["actions"][:, :model.chunk]).abs().mean()
+    assert after < 0.5 * before, (before, after)
+
+
 # ---------------------------------------------------------------------------- asynchronous control
 def test_controller_runs_system2_every_async_steps() -> None:
     model = build("basic", async_steps=3)

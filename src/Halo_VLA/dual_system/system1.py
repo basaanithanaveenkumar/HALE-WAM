@@ -98,8 +98,12 @@ class System1Policy(nn.Module):
     Heads (``DualSystemConfig.policy``):
 
     * ``regression``: predict the chunk directly, masked L1 (DP-VLA, HiRT / RT-1).
-    * ``diffusion``: DDPM noise prediction with a cosine schedule (Ho et al., 2020; Nichol &
-      Dhariwal, 2021) and DDIM sampling (LCB's 3D Diffuser Actor, RoboDual's DiT, DexVLA).
+    * ``diffusion``: DDPM with a cosine schedule (Ho et al., 2020; Nichol & Dhariwal, 2021) and
+      DDIM sampling (LCB's 3D Diffuser Actor, RoboDual's DiT, DexVLA, OpenHelix). The network
+      predicts the velocity ``v = sqrt(a) eps - sqrt(1 - a) x0`` (Salimans & Ho, 2022) rather
+      than the noise: recovering ``x0 = sqrt(a) x_t - sqrt(1 - a) v`` needs no division by
+      ``sqrt(a)``, so the first, near-pure-noise sampling step cannot amplify the prediction
+      error (with noise prediction it is ~300x at ``a = 1e-5``), whatever the action scale.
     * ``flow_matching``: rectified flow, ``x_t = (1 - t) x_0 + t x_1``, velocity ``x_1 - x_0``
       (Lipman et al., 2023; Liu et al., 2023), Euler sampling (pi0).
 
@@ -157,7 +161,7 @@ class System1Policy(nn.Module):
             k = torch.randint(0, self.alpha_bar.numel(), (b,), device=actions.device)
             ab = self.alpha_bar[k].view(b, 1, 1)
             noisy = ab.sqrt() * actions + (1 - ab).sqrt() * noise
-            target = noise
+            target = ab.sqrt() * noise - (1 - ab).sqrt() * actions  # v-prediction
             pred = self.head(cond, cond_mask, noisy, k)
         else:  # flow matching
             t = torch.rand(b, device=actions.device)
@@ -184,8 +188,9 @@ class System1Policy(nn.Module):
         levels = torch.linspace(self.alpha_bar.numel() - 1, 0, steps, device=cond.device).round().long()
         for i, k in enumerate(levels):
             ab = self.alpha_bar[k]
-            eps = self.head(cond, cond_mask, x, k.expand(b))
-            x0 = (x - (1 - ab).sqrt() * eps) / ab.sqrt()
+            v = self.head(cond, cond_mask, x, k.expand(b))
+            x0 = ab.sqrt() * x - (1 - ab).sqrt() * v
+            eps = (1 - ab).sqrt() * x + ab.sqrt() * v
             ab_prev = self.alpha_bar[levels[i + 1]] if i + 1 < len(levels) else torch.ones((), device=x.device)
             x = ab_prev.sqrt() * x0 + (1 - ab_prev).sqrt() * eps
         return x
