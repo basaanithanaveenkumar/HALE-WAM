@@ -2,6 +2,7 @@ import torch.nn as nn
 
 from models.gated_cross_attention import GatedCrossAttentionProjector
 from models.qformer import QFormer
+from exceptions import HaloVLAConfigError
 
 
 PROJECTOR_TYPES = ("mlp", "qformer", "gated_cross_attention")
@@ -60,5 +61,5 @@ def build_image_projector(config) -> nn.Module:
             dropout=config.gated_xattn_dropout,
             gate_init=config.gated_xattn_gate_init,
         )
-    raise ValueError(f"Unknown proj_type {config.proj_type!r}; expected one of {PROJECTOR_TYPES}")
+    raise HaloVLAConfigError(f"Unknown proj_type {config.proj_type!r}; expected one of {PROJECTOR_TYPES}")
 

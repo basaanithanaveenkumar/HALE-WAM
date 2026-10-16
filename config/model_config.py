@@ -7,6 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from config.tokens import get_vocab_size, get_token_id
+from exceptions import HaloVLAConfigError
 
 
 @dataclass
@@ -187,11 +188,11 @@ class HaloVLMConfig:
     def __post_init__(self) -> None:
         valid = ("mlp", "qformer", "gated_cross_attention")
         if self.proj_type not in valid:
-            raise ValueError(f"proj_type must be one of {valid}, got {self.proj_type!r}")
+            raise HaloVLAConfigError(f"proj_type must be one of {valid}, got {self.proj_type!r}")
         if self.vision_encoder not in ("vit", "siglip", "clip", "local"):
-            raise ValueError(f"vision_encoder must be vit, siglip, clip or local, got {self.vision_encoder!r}")
+            raise HaloVLAConfigError(f"vision_encoder must be vit, siglip, clip or local, got {self.vision_encoder!r}")
         if self.llm_finetune not in ("lora", "full", "frozen"):
-            raise ValueError(f"llm_finetune must be lora, full or frozen, got {self.llm_finetune!r}")
+            raise HaloVLAConfigError(f"llm_finetune must be lora, full or frozen, got {self.llm_finetune!r}")
 
     @property
     def resolved_vision_freeze(self) -> bool:
@@ -210,7 +211,12 @@ class HaloVLMConfig:
         try:
             from hale_core.config.sections.llm_backbone import LLMBackboneConfig, LoRASettings
         except ImportError as exc:  # pragma: no cover - depends on the environment
-            raise ImportError("llm_backbone needs HaleBlocks: pip install -e '.[finetune]'") from exc
+            from hale_core.exceptions import MissingDependencyError
+
+            raise MissingDependencyError(
+                "hale_core.config.sections.llm_backbone",
+                "llm_backbone needs a HaleBlocks with the LLM registry: pip install -e '.[finetune]'",
+            ) from exc
         return LLMBackboneConfig(
             name=self.llm_backbone,
             model_id=self.llm_model_id,

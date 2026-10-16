@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 import torch
 import torch.nn as nn
+from exceptions import HaloVLAConfigError
 
 #: Statistics the VLA datasets normalise images with (``img_mean`` / ``img_std``).
 DATASET_MEAN = (0.485, 0.456, 0.406)
@@ -47,7 +48,7 @@ class HFVisionEncoder(nn.Module):
         self.model = cls.from_pretrained(model_id)
         native = int(self.model.config.image_size)
         if native != img_size:
-            raise ValueError(f"{model_id} expects {native}px images but img_size={img_size}; set img_size={native}")
+            raise HaloVLAConfigError(f"{model_id} expects {native}px images but img_size={img_size}; set img_size={native}")
         try:
             proc = AutoImageProcessor.from_pretrained(model_id)
             mean, std = proc.image_mean, proc.image_std
@@ -100,7 +101,7 @@ def build_vision_encoder(config) -> tuple[nn.Module, VisionEncoderInfo]:
     """
     kind = config.vision_encoder
     if kind not in ENCODER_TYPES:
-        raise ValueError(f"vision_encoder must be one of {ENCODER_TYPES}, got {kind!r}")
+        raise HaloVLAConfigError(f"vision_encoder must be one of {ENCODER_TYPES}, got {kind!r}")
     freeze = config.resolved_vision_freeze
     if kind == "vit":
         from models.vit import VisTransformer

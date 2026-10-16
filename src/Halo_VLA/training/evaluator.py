@@ -10,6 +10,7 @@ from torch.amp import autocast
 
 from metrics import ActionChunkAccuracyMetric, ActionL1Metric, ActionMSEMetric, TrajectorySmoothnessMetric
 from training.training_step import HaloVLATrainingStep
+from exceptions import EvaluationError
 
 
 class VLAEvaluator:
@@ -71,7 +72,7 @@ class VLAEvaluator:
         finally:
             model.train(was_training)
         if batches == 0:
-            raise ValueError("the validation loader produced no batches")
+            raise EvaluationError("the validation loader produced no batches")
         result = {f"val/{k}": v / batches for k, v in sums.items()}
         for metric in metrics:
             for key, value in metric.compute().items():
@@ -82,7 +83,7 @@ class VLAEvaluator:
     def _make_metrics(self, data_dim: int) -> list:
         dim = self.action_dim or data_dim
         if dim != data_dim:
-            raise ValueError(f"evaluator action_dim={dim} but the data has {data_dim}-dim actions")
+            raise EvaluationError(f"evaluator action_dim={dim} but the data has {data_dim}-dim actions")
         return [ActionL1Metric(dim), ActionMSEMetric(dim), ActionChunkAccuracyMetric(), TrajectorySmoothnessMetric()]
 
     def _score_actions(self, model, action_hiddens, batch: dict, metrics: list) -> None:

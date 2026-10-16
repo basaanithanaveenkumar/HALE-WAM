@@ -24,6 +24,7 @@ import torch.nn.functional as F
 from torch.optim import AdamW
 from torch.amp import autocast, GradScaler
 from torch.optim.lr_scheduler import CosineAnnealingLR
+from exceptions import CheckpointNotFoundError, HaloVLAConfigError
 
 # ---------------------------------------------------------------------------
 # Make sure project root is on sys.path so imports work
@@ -451,15 +452,15 @@ def generate_training_visualization(
         if batch.get("actions") is not None:
             try:
                 gt_actions_np = batch["actions"][b].cpu().float().numpy()  # [T, D]
-            except Exception:
-                pass
+            except (IndexError, RuntimeError, TypeError) as exc:  # visualisation is best-effort
+                logger.debug("no ground-truth actions for sample {}: {}", b, exc)
         if act_preds is not None:
             try:
                 # Use only the last chunk (conditioned on the last action token)
                 # so the pred length matches chunk_size, not n_act*chunk_size.
                 pred_actions_np = act_preds[0, -1].cpu().float().numpy()  # [chunk_size, D]
-            except Exception:
-                pass
+            except (IndexError, RuntimeError, TypeError) as exc:  # visualisation is best-effort
+                logger.debug("no predicted action chunk to plot: {}", exc)
 
         # ── correctness heuristic for badge ──────────────────
         def _word_overlap(g: str, p: str) -> float:
@@ -727,7 +728,7 @@ def train(args):
         )
     elif args.dataset == "droid":
         if not args.droid_data_root:
-            raise ValueError("--droid_data_root is required when --dataset droid")
+            raise HaloVLAConfigError("--droid_data_root is required when --dataset droid")
         train_loader = build_droid_dataloader(
             data_root=args.droid_data_root,
             batch_size=args.batch_size,
@@ -747,7 +748,7 @@ def train(args):
         )
     else:
         if not args.moma_data_root:
-            raise ValueError("--moma_data_root is required when --dataset moma")
+            raise HaloVLAConfigError("--moma_data_root is required when --dataset moma")
         moma_workers = args.moma_num_workers
         train_loader = build_airoa_moma_dataloader(
             data_root=args.moma_data_root,
@@ -812,7 +813,7 @@ def train(args):
     if args.resume:
         ckpt_path = Path(args.resume)
         if not ckpt_path.exists():
-            raise FileNotFoundError(f"Checkpoint not found: {ckpt_path}")
+            raise CheckpointNotFoundError(f"Checkpoint not found: {ckpt_path}")
         logger.info("Resuming from checkpoint: {}", ckpt_path)
         with torch.serialization.safe_globals([HaloVLMConfig]):
             ckpt = torch.load(ckpt_path, map_location=device, weights_only=True)

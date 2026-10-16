@@ -7,6 +7,7 @@ import json
 from typing import Any
 
 from config.model_config import HaloVLMConfig
+from exceptions import HaloVLAConfigError
 
 _FIELDS = {f.name: str(f.type) for f in dataclasses.fields(HaloVLMConfig)}
 
@@ -23,7 +24,7 @@ def _parse(kind: str, raw: str) -> Any:
         return json.loads(raw)
     if kind.startswith("bool"):
         if raw.lower() not in ("1", "0", "true", "false", "yes", "no"):
-            raise ValueError(f"expected a boolean, got {raw!r}")
+            raise HaloVLAConfigError(f"expected a boolean, got {raw!r}")
         return raw.lower() in ("1", "true", "yes")
     if kind.startswith("int"):
         return int(raw)
@@ -38,7 +39,7 @@ def parse_model_options(items: list[str] | None) -> dict[str, Any]:
     for item in items or []:
         key, sep, raw = item.partition("=")
         if not sep or key not in _FIELDS:
-            raise ValueError(f"bad model option {item!r}; use KEY=VALUE with KEY a HaloVLMConfig field")
+            raise HaloVLAConfigError(f"bad model option {item!r}; use KEY=VALUE with KEY a HaloVLMConfig field")
         out[key] = _parse(_FIELDS[key], raw)
     return out
 
@@ -47,7 +48,7 @@ def apply_model_overrides(config: HaloVLMConfig, overrides: dict[str, Any]) -> H
     """Set ``overrides`` on ``config`` (lists become tuples for tuple fields) and re-validate it."""
     unknown = set(overrides) - set(_FIELDS)
     if unknown:
-        raise ValueError(f"unknown HaloVLMConfig fields: {sorted(unknown)}")
+        raise HaloVLAConfigError(f"unknown HaloVLMConfig fields: {sorted(unknown)}")
     for key, value in overrides.items():
         if _FIELDS[key].startswith("tuple") and value is not None:
             value = tuple(value)

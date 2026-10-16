@@ -1,3 +1,5 @@
+# Research ideas (scratch notes)
+
 1. implement the velocity field prediction at frame level
 2. predict the future frame prediction
 3. predict the future frame depth prediction

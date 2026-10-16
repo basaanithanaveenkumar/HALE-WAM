@@ -39,7 +39,11 @@ class RayCliOptions:
         try:
             from hale_core.config.sections.ray import RayConfig
         except ImportError as exc:  # pragma: no cover - depends on the environment
-            raise ImportError("--ray needs HaleBlocks with Ray: pip install -e '.[ray]'") from exc
+            from hale_core.exceptions import MissingDependencyError
+
+            raise MissingDependencyError(
+                "hale_core.config.sections.ray", "--ray needs HaleBlocks with Ray: pip install -e '.[ray]'"
+            ) from exc
         resources = {}
         if args.ray_cpus_per_worker is not None:
             resources["CPU"] = args.ray_cpus_per_worker

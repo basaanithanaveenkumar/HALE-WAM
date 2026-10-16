@@ -49,6 +49,7 @@ import torch
 from torch.utils.data import ConcatDataset, DataLoader
 
 from loguru import logger
+from exceptions import DatasetError
 
 # ---------------------------------------------------------------------------
 # Pre-training dataset specs
@@ -406,7 +407,7 @@ class PretrainDatasetRegistry:
                 )
 
         if not datasets:
-            raise RuntimeError("No pretrain datasets available — check dataset_names config.")
+            raise DatasetError("No pretrain datasets available — check dataset_names config.")
 
         combined = ConcatDataset(datasets)
         from dataloader.eo_dataset import eo_collate_fn

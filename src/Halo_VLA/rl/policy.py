@@ -35,6 +35,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 from torch.distributions import Independent, Normal
+from exceptions import ModelInputError
 
 
 class GaussianActionPolicy(nn.Module):
@@ -171,7 +172,7 @@ class GaussianActionPolicy(nn.Module):
             image_mask=to(batch.get("image_mask")),
         )
         if action_hiddens is None:
-            raise ValueError(
+            raise ModelInputError(
                 "No <halo_action> tokens found in batch; cannot build policy "
                 "conditioning. Ensure input_ids contain the action token."
             )

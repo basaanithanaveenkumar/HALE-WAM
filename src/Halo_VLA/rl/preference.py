@@ -16,6 +16,7 @@ from __future__ import annotations
 import torch
 
 from rl.policy import GaussianActionPolicy
+from exceptions import ModelInputError
 
 
 def build_preference_pairs(
@@ -33,7 +34,7 @@ def build_preference_pairs(
         rejected: [B, A] — lowest-reward candidate per state (the "loser").
     """
     if candidate_actions.dim() != 3:
-        raise ValueError("candidate_actions must be [B, K, A]")
+        raise ModelInputError("candidate_actions must be [B, K, A]")
     B = candidate_actions.size(0)
     best = rewards.argmax(dim=1)                       # [B]
     worst = rewards.argmin(dim=1)                      # [B]

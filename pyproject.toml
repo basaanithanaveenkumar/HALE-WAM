@@ -43,6 +43,8 @@ dependencies = [
     "imageio>=2.37.3",
     "imageio-ffmpeg>=0.6.0",
     "nvitop>=1.7.0",
+    # Shared core: config schemas/loader, registries and the HaleCoreError hierarchy.
+    "hale-blocks",
 ]
 
 [project.optional-dependencies]

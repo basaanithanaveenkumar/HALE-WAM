@@ -11,6 +11,7 @@ from typing import Any
 from pydantic import field_validator
 
 from config.sections.base import VLASection
+from exceptions import HaloVLAConfigError
 
 
 class LLMConfig(VLASection):
@@ -52,14 +53,14 @@ class LLMConfig(VLASection):
         from hale_core.nn.llm import is_registered, list_llm_backbones
 
         if not is_registered(name):
-            raise ValueError(f"unknown LLM backbone {name!r}; choose one of {list_llm_backbones()} or 'custom'")
+            raise HaloVLAConfigError(f"unknown LLM backbone {name!r}; choose one of {list_llm_backbones()} or 'custom'")
         return name
 
     @field_validator("dtype")
     @classmethod
     def _known_dtype(cls, dtype: str) -> str:
         if dtype not in ("float32", "float16", "bfloat16"):
-            raise ValueError(f"dtype must be float32, float16 or bfloat16, got {dtype!r}")
+            raise HaloVLAConfigError(f"dtype must be float32, float16 or bfloat16, got {dtype!r}")
         return dtype
 
     @property

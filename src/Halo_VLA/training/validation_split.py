@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import torch
 from torch.utils.data import DataLoader, IterableDataset, Subset
+from exceptions import HaloVLAConfigError
 
 
 def split_validation(loader: DataLoader, fraction: float, seed: int = 0) -> tuple[DataLoader, DataLoader]:
@@ -19,14 +20,14 @@ def split_validation(loader: DataLoader, fraction: float, seed: int = 0) -> tupl
         seed: permutation seed.
     """
     if not 0.0 < fraction < 1.0:
-        raise ValueError(f"val_fraction must be in (0, 1), got {fraction}")
+        raise HaloVLAConfigError(f"val_fraction must be in (0, 1), got {fraction}")
     dataset = loader.dataset
     if isinstance(dataset, IterableDataset):
-        raise ValueError("a validation split needs a map-style dataset (not a stream)")
+        raise HaloVLAConfigError("a validation split needs a map-style dataset (not a stream)")
     n = len(dataset)
     n_val = max(1, int(round(n * fraction)))
     if n_val >= n:
-        raise ValueError(f"val_fraction={fraction} leaves no training samples out of {n}")
+        raise HaloVLAConfigError(f"val_fraction={fraction} leaves no training samples out of {n}")
     order = torch.randperm(n, generator=torch.Generator().manual_seed(seed)).tolist()
     train_set, val_set = Subset(dataset, order[n_val:]), Subset(dataset, order[:n_val])
     common = dict(batch_size=loader.batch_size, num_workers=loader.num_workers, collate_fn=loader.collate_fn,

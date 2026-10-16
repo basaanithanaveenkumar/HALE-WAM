@@ -56,6 +56,7 @@ from loguru import logger
 
 from config.tokens import get_all_custom_tokens, get_token
 from dataloader.eo_dataset import build_image_transform, eo_collate_fn
+from exceptions import DatasetNotFoundError
 
 
 # ---------------------------------------------------------------------------
@@ -145,7 +146,7 @@ class DROIDDataset(Dataset):
         self.split = split
         self.root = Path(config.data_root).expanduser().resolve()
         if not self.root.is_dir():
-            raise FileNotFoundError(f"data_root not found: {self.root}")
+            raise DatasetNotFoundError(f"data_root not found: {self.root}")
 
         self._setup_tokenizer(tokenizer)
         self.img_transform = build_image_transform(
@@ -508,7 +509,9 @@ class DROIDDataset(Dataset):
         try:
             import av
         except ImportError as exc:
-            raise ImportError("PyAV is required: pip install av") from exc
+            from hale_core.exceptions import MissingDependencyError
+
+            raise MissingDependencyError("av", "PyAV decodes DROID videos: pip install av") from exc
         from PIL import Image
 
         blank = torch.zeros(3, self.cfg.img_size, self.cfg.img_size)
@@ -688,8 +691,9 @@ class DROIDDataset(Dataset):
                 try:
                     import pyarrow.parquet as pq
                     T = pq.read_metadata(data_path).num_rows
-                except Exception:
-                    pass
+                except (ImportError, OSError, ValueError) as exc:
+                    # pyarrow missing or unreadable parquet: fall back to the video length below
+                    logger.debug("cannot read row count of {}: {}", data_path, exc)
             if T == 0 and video_path.is_file():
                 T = self._get_video_length(video_path)
             if T == 0:

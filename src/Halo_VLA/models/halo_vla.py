@@ -1,4 +1,4 @@
-import logging
+from loguru import logger
 
 from config import HaloVLMConfig
 from models.vision_encoders import build_vision_encoder
@@ -13,6 +13,7 @@ from models.dit_frame_prediction import VisualDiTPredictor
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from exceptions import ModelInputError, ModelStateError
 
 
 def pool_past_frame_embeddings_for_visual_dit(
@@ -259,7 +260,7 @@ class HaloVLM(nn.Module):
         candidates = [m for n, m in self.language.llm.named_modules()
                       if isinstance(m, nn.ModuleList) and n.endswith("layers") and len(m) > 0]
         if not candidates:
-            raise RuntimeError("could not locate the LLM backbone's decoder layers")
+            raise ModelStateError("could not locate the LLM backbone's decoder layers")
         return max(candidates, key=len)
 
     def encode_sequence(self, images, input_ids, attention_mask, states, *,
@@ -449,7 +450,7 @@ class HaloVLM(nn.Module):
             # These serve as conditioning vectors for the flow decoder.
             action_hiddens = torch.stack(action_hidden_list, dim=0)
         else:
-            logging.warning("action_hiddens is None: No <halo_action> tokens found in input_ids.")
+            logger.warning("action_hiddens is None: no <halo_action> tokens found in input_ids")
 
         # ------------------------------------------------------------------ #
         # 10. WORLD VIDEO QUERY HIDDEN STATES — find <halo_world_video> token
@@ -720,7 +721,7 @@ class HaloVLM(nn.Module):
             return zero, empty
 
         if visual_context_emb is None:
-            raise ValueError(
+            raise ModelInputError(
                 "visual_context_emb is required by compute_visual_prediction_loss."
             )
 

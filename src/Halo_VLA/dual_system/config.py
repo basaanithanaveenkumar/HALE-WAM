@@ -23,6 +23,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, fields, replace
 from typing import Literal
+from exceptions import HaloVLAConfigError
 
 LatentType = Literal["act_token", "multi_act", "last_hidden", "pooled", "language", "middle_layer"]
 System2Training = Literal["frozen", "prompt_tuning", "finetune"]
@@ -97,17 +98,17 @@ class DualSystemConfig:
         checks = (("latent", LATENT_TYPES), ("system2_training", SYSTEM2_TRAINING), ("policy", POLICY_TYPES))
         for attr, allowed in checks:
             if getattr(self, attr) not in allowed:
-                raise ValueError(f"dual_system.{attr} must be one of {allowed}, got {getattr(self, attr)!r}")
+                raise HaloVLAConfigError(f"dual_system.{attr} must be one of {allowed}, got {getattr(self, attr)!r}")
         if self.projector not in ("linear", "mlp"):
-            raise ValueError(f"dual_system.projector must be linear or mlp, got {self.projector!r}")
+            raise HaloVLAConfigError(f"dual_system.projector must be linear or mlp, got {self.projector!r}")
         if self.num_act_tokens < 1 or self.async_steps < 1 or self.system2_frame_delay < 0:
-            raise ValueError("num_act_tokens and async_steps must be >= 1, system2_frame_delay >= 0")
+            raise HaloVLAConfigError("num_act_tokens and async_steps must be >= 1, system2_frame_delay >= 0")
         if self.latent == "act_token":
             self.num_act_tokens = 1
         if self.system2_training == "prompt_tuning" and self.latent not in ("act_token", "multi_act"):
-            raise ValueError("prompt_tuning trains the <ACT> queries: use latent act_token or multi_act")
+            raise HaloVLAConfigError("prompt_tuning trains the <ACT> queries: use latent act_token or multi_act")
         if self.align_weight > 0 and self.latent == "middle_layer":
-            raise ValueError("align_weight needs a latent in the model's embedding space (not middle_layer)")
+            raise HaloVLAConfigError("align_weight needs a latent in the model's embedding space (not middle_layer)")
 
     @property
     def uses_act_queries(self) -> bool:
@@ -157,7 +158,7 @@ def parse_overrides(items: list[str] | None) -> dict:
     for item in items or []:
         key, sep, raw = item.partition("=")
         if not sep or key not in types:
-            raise ValueError(f"bad dual-system option {item!r}; use KEY=VALUE with KEY in {sorted(types)}")
+            raise HaloVLAConfigError(f"bad dual-system option {item!r}; use KEY=VALUE with KEY in {sorted(types)}")
         kind = str(types[key])
         if raw.lower() in ("none", "null"):
             value = None
@@ -181,16 +182,16 @@ def resolve_dual_system_config(name: str | None, overrides: dict | None = None) 
     """
     if name is None or name == NONE:
         if overrides:
-            raise ValueError("dual_system options given but dual_system is 'none'")
+            raise HaloVLAConfigError("dual_system options given but dual_system is 'none'")
         return None
     if name == "custom":
         base = DualSystemConfig()
     elif name in PRESETS:
         base = PRESETS[name]
     else:
-        raise ValueError(f"unknown dual_system {name!r}; choose none, custom or one of {sorted(PRESETS)}")
+        raise HaloVLAConfigError(f"unknown dual_system {name!r}; choose none, custom or one of {sorted(PRESETS)}")
     overrides = dict(overrides or {})
     unknown = set(overrides) - {f.name for f in fields(DualSystemConfig)}
     if unknown:
-        raise ValueError(f"unknown dual_system options: {sorted(unknown)}")
+        raise HaloVLAConfigError(f"unknown dual_system options: {sorted(unknown)}")
     return replace(base, **overrides)

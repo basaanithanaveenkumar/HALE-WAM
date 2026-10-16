@@ -53,8 +53,10 @@ def _import_cv2():
     try:
         import cv2
         return cv2
-    except ImportError:
-        raise ImportError("OpenCV is required: pip install opencv-python")
+    except ImportError as exc:
+        from hale_core.exceptions import MissingDependencyError
+
+        raise MissingDependencyError("cv2", "pip install opencv-python") from exc
 
 
 def _import_matplotlib():

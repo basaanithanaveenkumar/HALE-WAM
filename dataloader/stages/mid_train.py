@@ -44,6 +44,7 @@ import torch
 from torch.utils.data import ConcatDataset, DataLoader
 
 from loguru import logger
+from exceptions import DatasetError
 
 
 # ---------------------------------------------------------------------------
@@ -315,7 +316,7 @@ class MidTrainDatasetRegistry:
                 )
 
         if not datasets:
-            raise RuntimeError(
+            raise DatasetError(
                 "No mid-train datasets available. "
                 "Provide droid_data_root / airoa_data_root for local datasets."
             )

@@ -38,6 +38,7 @@ from loguru import logger
 
 from config.tokens import get_all_custom_tokens
 from dataloader.eo_dataset import build_image_transform, eo_collate_fn
+from exceptions import DatasetNotFoundError
 
 
 @dataclass
@@ -104,7 +105,7 @@ class AiroaMomaDataset(Dataset):
         self.split = split
         self.root = Path(config.data_root).expanduser().resolve()
         if not self.root.is_dir():
-            raise FileNotFoundError(f"data_root is not a directory: {self.root}")
+            raise DatasetNotFoundError(f"data_root is not a directory: {self.root}")
 
         self._setup_tokenizer(tokenizer)
         self.img_transform = build_image_transform(
@@ -781,7 +782,9 @@ def _import_cv2():
         import cv2
         return cv2
     except ImportError as e:
-        raise ImportError("OpenCV required for MoMa video: pip install opencv-python") from e
+        from hale_core.exceptions import MissingDependencyError
+
+        raise MissingDependencyError("cv2", "OpenCV decodes MoMa video: pip install opencv-python") from e
 
 
 def build_airoa_moma_dataloader(

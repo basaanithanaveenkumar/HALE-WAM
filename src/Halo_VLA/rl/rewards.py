@@ -21,6 +21,7 @@ from __future__ import annotations
 from typing import Protocol
 
 import torch
+from exceptions import ModelStateError
 
 
 class RewardFunction(Protocol):
@@ -124,7 +125,7 @@ class WorldModelImaginationReward:
             num_ode_steps=self.num_ode_steps,
         )
         if not preds or "rgb" not in preds:
-            raise RuntimeError("World model produced no RGB prediction.")
+            raise ModelStateError("World model produced no RGB prediction.")
         imagined = preds["rgb"][:, -1]                       # [B, 3, H, W]
 
         goal = self.goal_frame

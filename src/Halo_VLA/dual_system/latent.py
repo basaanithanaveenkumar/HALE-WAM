@@ -11,6 +11,7 @@ import torch
 import torch.nn as nn
 
 from dual_system.config import DualSystemConfig
+from exceptions import HaloVLAConfigError, ModelStateError
 
 
 def _text_slice(enc: dict) -> slice:
@@ -69,7 +70,7 @@ class MiddleLayerLatent(LatentExtractor):
 
     def forward(self, enc):
         if enc["layer_hidden"] is None:
-            raise RuntimeError("middle_layer latent needs System 2 to capture a layer")
+            raise ModelStateError("middle_layer latent needs System 2 to capture a layer")
         return enc["layer_hidden"], enc["mask"]
 
 
@@ -143,7 +144,7 @@ class LatentBridge(nn.Module):
         text_mask = enc["mask"][:, _text_slice(enc)]
         target = self.pool(text, text_mask)
         if target.size(-1) != tokens.size(-1):
-            raise ValueError("alignment needs the latent and the instruction embeddings in the same space")
+            raise HaloVLAConfigError("alignment needs the latent and the instruction embeddings in the same space")
         return 1.0 - nn.functional.cosine_similarity(self.pool(tokens, mask), target.to(tokens.dtype), dim=-1).mean()
 
     def auxiliary_loss(self, tokens, mask, target_flat, target_mask_flat) -> torch.Tensor:

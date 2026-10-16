@@ -49,7 +49,12 @@ class WebDatasetCliOptions:
         try:
             from hale_core.config.sections.webdataset import WebDatasetConfig
         except ImportError as exc:  # pragma: no cover - depends on the environment
-            raise ImportError("--webdataset needs HaleBlocks: pip install -e '.[webdataset]'") from exc
+            from hale_core.exceptions import MissingDependencyError
+
+            raise MissingDependencyError(
+                "hale_core.config.sections.webdataset",
+                "--webdataset needs HaleBlocks: pip install -e '.[webdataset]'",
+            ) from exc
         return WebDatasetConfig(
             enabled=args.webdataset,
             root=args.webdataset_root,
