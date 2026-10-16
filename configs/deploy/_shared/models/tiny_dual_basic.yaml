@@ -1,0 +1,7 @@
+# CI-sized dual-system Halo-VLA, `basic` preset (one <ACT> latent, flow-matching System 1).
+custom_imports: [Halo_VLA.deploy]
+adapter:
+  model: {img_size: 32, patch_size: 16, emb_dim: 64, vit_num_layers: 1, vit_num_heads: 4, vit_mlp_dim: 64, dec_num_layers: 2, dec_num_heads: 4, dec_mlp_dim: 64, use_moe: false, action_dim: 4, state_dim: 3, action_chunk_size: 2, enable_visual_dit: false, flow_hidden_dim: 32, flow_num_ode_steps: 4}
+  dual_system: basic
+  dual_system_options: {system1_dim: 32, system1_layers: 1, system1_heads: 4, sample_steps: 3}
+  max_batch: 2

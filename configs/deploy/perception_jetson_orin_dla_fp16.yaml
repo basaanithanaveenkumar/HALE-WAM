@@ -1,0 +1,6 @@
+# Jetson Orin (JetPack 6, TensorRT 10): perception on DLA core 0 (GPU fallback for unsupported layers). Build ON the robot.
+_base_:
+  - pkg://hale_core.deploy/configs/nvidia/jetson_orin_dla_fp16.yaml
+  - ./_shared/models/halo_vla_flow_matching.yaml
+  - ./_shared/parts/perception.yaml
+name: perception_jetson_orin_dla_fp16

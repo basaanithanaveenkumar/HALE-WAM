@@ -1,0 +1,6 @@
+# Ryzen AI NPU (XDNA2): flow step quantized A16W8 by Quark, ONNX Runtime + Vitis AI EP (host integrates).
+_base_:
+  - pkg://hale_core.deploy/configs/amd/ryzen_ai_npu_a16w8.yaml
+  - ./_shared/models/halo_vla_flow_matching.yaml
+  - ./_shared/parts/action_step.yaml
+name: action_step_ryzen_ai_npu_a16w8

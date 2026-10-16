@@ -1,0 +1,6 @@
+# MacBook: whole single-system policy, 4-bit weights (group 64).
+_base_:
+  - pkg://hale_core.deploy/configs/apple/mlx_int4.yaml
+  - ./_shared/models/halo_vla_flow_matching.yaml
+  - ./_shared/parts/policy.yaml
+name: policy_mlx_int4

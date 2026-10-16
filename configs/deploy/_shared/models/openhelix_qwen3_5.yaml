@@ -1,0 +1,8 @@
+# Dual-system OpenHelix on a Qwen3.5 text tower (prompt-tuned <ACT>, diffusion System 1).
+custom_imports: [Halo_VLA.deploy]
+adapter:
+  model: {llm_backbone: qwen3.5-2b, llm_finetune: lora, enable_visual_dit: false, vision_encoder: siglip}
+  dual_system: openhelix
+  checkpoint: null
+  strict: false
+  max_batch: 1

@@ -67,6 +67,30 @@ distributed = ["hale-blocks[ray,webdataset]"]
 finetune = ["hale-blocks[finetune]"]
 # YAML run configs (scripts/train.py --config): HaleBlocks' pydantic schemas + YAML loader.
 config = ["hale-blocks"]
+# Deployment (hale-wam-deploy, docs/deploy.md): HaleBlocks' hale_core.deploy + ONNX tooling.
+deploy = ["hale-blocks", "onnx>=1.17", "onnxruntime>=1.20", "onnxscript>=0.2", "safetensors>=0.4", "numpy>=1.24"]
+# NVIDIA: TensorRT 10/11, ModelOpt (AutoCast / PTQ / LLM PTQ), Torch-TensorRT. TensorRT-LLM is
+# installed from NVIDIA's wheels / containers (see docs/deploy.md).
+deploy-nvidia = [
+    "halo-vla[deploy]",
+    "tensorrt>=10.0; sys_platform == 'linux'",
+    "nvidia-modelopt[onnx,torch]>=0.30; sys_platform == 'linux'",
+    "torch-tensorrt>=2.5; sys_platform == 'linux'",
+]
+# Apple Silicon: MLX (ATen -> MLX bridge) and mlx-lm for the System-2 LLM.
+deploy-apple = [
+    "halo-vla[deploy]",
+    "mlx>=0.30; sys_platform == 'darwin'",
+    "mlx-lm>=0.30; sys_platform == 'darwin'",
+]
+# AMD: Quark (Ryzen AI NPU quantization); MIGraphX ships with ROCm (python3-migraphx).
+deploy-amd = ["halo-vla[deploy]", "amd-quark"]
+# Qualcomm: AI Hub client (cloud compile / profile on real devices). ExecuTorch + QNN SDK are
+# built from source (ext_pkgs/executorch, QAIRT SDK).
+deploy-qualcomm = ["halo-vla[deploy]", "qai-hub"]
+
+[project.scripts]
+hale-wam-deploy = "Halo_VLA.deploy.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/yourusername/halo-vla"

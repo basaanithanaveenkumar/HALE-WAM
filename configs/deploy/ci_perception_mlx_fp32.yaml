@@ -1,0 +1,7 @@
+# CI (Apple Silicon): tiny single-system perception -> MLX fp32 parity.
+_base_:
+  - pkg://hale_core.deploy/configs/apple/mlx_fp32.yaml
+  - ./_shared/models/tiny_single_system.yaml
+  - ./_shared/parts/perception.yaml
+  - ./_shared/parts/tiny_prompt.yaml
+name: ci_perception_mlx_fp32

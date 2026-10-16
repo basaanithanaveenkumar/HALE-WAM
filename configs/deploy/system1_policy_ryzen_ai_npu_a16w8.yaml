@@ -1,0 +1,7 @@
+# Ryzen AI NPU: dual-system System 1 (A16W8).
+_base_:
+  - pkg://hale_core.deploy/configs/amd/ryzen_ai_npu_a16w8.yaml
+  - ./_shared/models/openhelix_qwen3_5.yaml
+  - ./_shared/parts/system1_policy.yaml
+name: system1_policy_ryzen_ai_npu_a16w8
+adapter: {latent_tokens: 1}

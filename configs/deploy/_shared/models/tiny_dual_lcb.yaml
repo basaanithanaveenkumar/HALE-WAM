@@ -1,0 +1,4 @@
+# CI-sized dual-system Halo-VLA, `lcb` preset (diffusion System 1, DDIM sampling).
+_base_: ./tiny_dual_basic.yaml
+adapter:
+  dual_system: lcb

@@ -1,0 +1,6 @@
+# Hopper / Ada / Blackwell: dual-system System 2 (VLM + <ACT> latent) in FP8 via ModelOpt Q/DQ.
+_base_:
+  - pkg://hale_core.deploy/configs/nvidia/tensorrt_fp8.yaml
+  - ./_shared/models/openhelix_qwen3_5.yaml
+  - ./_shared/parts/system2.yaml
+name: system2_tensorrt_fp8

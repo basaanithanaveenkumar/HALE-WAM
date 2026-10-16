@@ -1,0 +1,7 @@
+# Jetson Orin: the fast System 1 (condition + DDIM unrolled) at control rate; System 2 runs elsewhere/async.
+_base_:
+  - pkg://hale_core.deploy/configs/nvidia/jetson_orin_dla_fp16.yaml
+  - ./_shared/models/openhelix_qwen3_5.yaml
+  - ./_shared/parts/system1_policy.yaml
+name: system1_policy_jetson_orin_fp16
+adapter: {latent_tokens: 1}

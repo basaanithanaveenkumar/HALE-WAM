@@ -1,0 +1,6 @@
+# System 2's LLM (LoRA merged) -> TensorRT-LLM 1.2+ PyTorch-backend bundle, FP8 (data center / Thor).
+_base_:
+  - pkg://hale_core.deploy/configs/nvidia/tensorrt_llm_fp8.yaml
+  - ./_shared/models/openhelix_qwen3_5.yaml
+  - ./_shared/parts/language_model.yaml
+name: language_model_tensorrt_llm_fp8

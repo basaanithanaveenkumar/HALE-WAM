@@ -1,0 +1,6 @@
+# CI (Apple Silicon): tiny single-system action_step -> MLX fp32 parity.
+_base_:
+  - pkg://hale_core.deploy/configs/apple/mlx_fp32.yaml
+  - ./_shared/models/tiny_single_system.yaml
+  - ./_shared/parts/action_step.yaml
+name: ci_action_step_mlx_fp32

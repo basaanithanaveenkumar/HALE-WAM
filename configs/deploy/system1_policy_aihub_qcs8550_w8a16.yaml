@@ -1,0 +1,16 @@
+# Qualcomm QCS8550: dual-system System 1 at control rate on the NPU.
+_base_:
+  - pkg://hale_core.deploy/configs/qualcomm/aihub_qnn_dlc_w8a16.yaml
+  - ./_shared/models/openhelix_qwen3_5.yaml
+  - ./_shared/parts/system1_policy.yaml
+name: system1_policy_aihub_qcs8550_w8a16
+adapter: {latent_tokens: 1}
+pipeline:
+  - type: QAIHubCompileStage
+    device: "QCS8550 (Proxy)"       # robotics SoC proxy device; list devices with `qai-hub list-devices`
+    source: torchscript
+    target_runtime: qnn_dlc
+    quantize_full_type: w8a16
+    compute_unit: npu
+    profile: true
+    validate_on_device: true

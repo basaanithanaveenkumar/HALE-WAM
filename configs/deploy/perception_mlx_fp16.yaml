@@ -1,0 +1,6 @@
+# MacBook / Mac Studio: perception through the ATen -> MLX bridge, FP16.
+_base_:
+  - pkg://hale_core.deploy/configs/apple/mlx_fp16.yaml
+  - ./_shared/models/halo_vla_flow_matching.yaml
+  - ./_shared/parts/perception.yaml
+name: perception_mlx_fp16

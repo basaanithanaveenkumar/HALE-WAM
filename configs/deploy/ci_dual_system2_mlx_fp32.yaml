@@ -1,0 +1,7 @@
+# CI (Apple Silicon): tiny dual-system (basic) system2 -> MLX fp32 parity.
+_base_:
+  - pkg://hale_core.deploy/configs/apple/mlx_fp32.yaml
+  - ./_shared/models/tiny_dual_basic.yaml
+  - ./_shared/parts/system2.yaml
+  - ./_shared/parts/tiny_prompt.yaml
+name: ci_dual_system2_mlx_fp32

@@ -1,0 +1,6 @@
+# AMD GPU: whole single-system policy, FP16 MIGraphX program.
+_base_:
+  - pkg://hale_core.deploy/configs/amd/migraphx_fp16.yaml
+  - ./_shared/models/halo_vla_flow_matching.yaml
+  - ./_shared/parts/policy.yaml
+name: policy_migraphx_fp16

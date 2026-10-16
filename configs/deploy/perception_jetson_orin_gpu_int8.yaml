@@ -1,0 +1,6 @@
+# Jetson Orin GPU, INT8 (ModelOpt Q/DQ, calibrated on template-shaped prompts).
+_base_:
+  - pkg://hale_core.deploy/configs/nvidia/jetson_orin_gpu_int8.yaml
+  - ./_shared/models/halo_vla_flow_matching.yaml
+  - ./_shared/parts/perception.yaml
+name: perception_jetson_orin_gpu_int8

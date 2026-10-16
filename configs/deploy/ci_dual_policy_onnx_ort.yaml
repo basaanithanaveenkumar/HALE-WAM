@@ -1,0 +1,8 @@
+# CI: tiny dual-system (basic) dual_policy -> ONNX -> ONNX Runtime parity.
+_base_:
+  - pkg://hale_core.deploy/configs/_base_/onnx_reference.yaml
+  - ./_shared/models/tiny_dual_basic.yaml
+  - ./_shared/parts/dual_policy.yaml
+  - ./_shared/parts/tiny_prompt.yaml
+name: ci_dual_policy_onnx_ort
+calibration: {type: AdapterCalibrationSource, num_batches: 2}

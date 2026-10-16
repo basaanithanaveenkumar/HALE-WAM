@@ -1,0 +1,7 @@
+# MacBook: dual-system System 1 at control rate, FP16.
+_base_:
+  - pkg://hale_core.deploy/configs/apple/mlx_fp16.yaml
+  - ./_shared/models/openhelix_qwen3_5.yaml
+  - ./_shared/parts/system1_policy.yaml
+name: system1_policy_mlx_fp16
+adapter: {latent_tokens: 1}

@@ -1,0 +1,6 @@
+# System 2's LLM -> INT4-AWQ bundle for Jetson Orin / Thor. On Thor also consider TensorRT-Edge-LLM (ext_pkgs/TensorRT-Edge-LLM).
+_base_:
+  - pkg://hale_core.deploy/configs/nvidia/tensorrt_llm_int4_edge.yaml
+  - ./_shared/models/openhelix_qwen3_5.yaml
+  - ./_shared/parts/language_model.yaml
+name: language_model_tensorrt_llm_int4_edge

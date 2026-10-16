@@ -1,0 +1,15 @@
+# Qualcomm QCS8550 (robotics, Hexagon NPU): perception as QNN DLC, W8A16, compiled/profiled on AI Hub.
+_base_:
+  - pkg://hale_core.deploy/configs/qualcomm/aihub_qnn_dlc_w8a16.yaml
+  - ./_shared/models/halo_vla_flow_matching.yaml
+  - ./_shared/parts/perception.yaml
+name: perception_aihub_qcs8550_w8a16
+pipeline:
+  - type: QAIHubCompileStage
+    device: "QCS8550 (Proxy)"       # robotics SoC proxy device; list devices with `qai-hub list-devices`
+    source: torchscript
+    target_runtime: qnn_dlc
+    quantize_full_type: w8a16
+    compute_unit: npu
+    profile: true
+    validate_on_device: true

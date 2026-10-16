@@ -1,0 +1,11 @@
+# Jetson Orin GPU: flow-matching step (host integrates flow_num_ode_steps steps). Small MLP -> keep it on the GPU next to perception.
+_base_:
+  - pkg://hale_core.deploy/configs/nvidia/tensorrt_fp16.yaml
+  - ./_shared/models/halo_vla_flow_matching.yaml
+  - ./_shared/parts/action_step.yaml
+name: action_step_jetson_orin_fp16
+device: {_delete_: true, vendor: nvidia, family: jetson, chips: Jetson AGX / NX / Nano Orin (JetPack 6), runtime: tensorrt}
+pipeline:
+  - {type: OnnxExportStage, opset: 18}
+  - {type: OnnxSimplifyStage}
+  - {type: TensorRTEngineStage, precision: fp16, strongly_typed: false, workspace_gb: 1.0}

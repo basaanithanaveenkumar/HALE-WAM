@@ -1,0 +1,6 @@
+# Data-center / workstation GPU: whole single-system policy (perception + unrolled sampler), FP16.
+_base_:
+  - pkg://hale_core.deploy/configs/nvidia/tensorrt_fp16.yaml
+  - ./_shared/models/halo_vla_flow_matching.yaml
+  - ./_shared/parts/policy.yaml
+name: policy_tensorrt_fp16

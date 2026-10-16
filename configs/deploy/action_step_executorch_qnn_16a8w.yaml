@@ -1,0 +1,8 @@
+# Local (no cloud) ExecuTorch + QNN HTP delegate, 16a8w. Set soc to your SoC's QcomChipset member.
+_base_:
+  - pkg://hale_core.deploy/configs/qualcomm/executorch_qnn_16a8w.yaml
+  - ./_shared/models/halo_vla_flow_matching.yaml
+  - ./_shared/parts/action_step.yaml
+name: action_step_executorch_qnn_16a8w
+pipeline:
+  - {type: ExecuTorchQNNStage, soc: SM8650, quantization: 16a8w}   # QCS8550 shares the SM8550 HTP generation; pick the matching member

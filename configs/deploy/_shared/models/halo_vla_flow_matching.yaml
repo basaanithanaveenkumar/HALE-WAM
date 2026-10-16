@@ -1,0 +1,10 @@
+# The default single-system Halo-VLA (built-in ViT + MoE decoder + flow-matching action head).
+# Copy the HaloVLMConfig fields you trained with and point `checkpoint` at the training checkpoint
+# (`model_state_dict` is loaded with its original keys).
+custom_imports: [Halo_VLA.deploy]
+adapter:
+  model: {enable_visual_dit: false}    # the video head is not part of the deployed policy
+  dual_system: none
+  checkpoint: null                       # e.g. checkpoints/halo_vla/best.pt
+  strict: false                          # the visual DiT head of the checkpoint is dropped
+  max_batch: 1

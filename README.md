@@ -330,6 +330,20 @@ config = HaloVLMConfig(proj_type="gated_cross_attention", gated_xattn_num_latent
 
 ---
 
+## Deployment
+
+Export trained policies to **NVIDIA** (TensorRT 10/11 on Jetson Orin / Thor and data-center GPUs,
+TensorRT-LLM), **Apple Silicon** (MLX), **AMD** (MIGraphX, Ryzen AI NPU) and **Qualcomm**
+(AI Hub QNN for QCS / Snapdragon, ExecuTorch) with `hale-wam-deploy`. The policy is split into
+the graphs a robot runs (perception / System 2, action-head step, System 1), each validated
+numerically against PyTorch. See [docs/deploy.md](docs/deploy.md); vendor SDK sources are
+vendored as shallow submodules in [`ext_pkgs/`](ext_pkgs/README.md).
+
+```bash
+pip install -e '.[deploy-nvidia]'   # deploy-apple | deploy-amd | deploy-qualcomm
+hale-wam-deploy run configs/deploy/perception_jetson_orin_dla_fp16.yaml --cfg-options adapter.checkpoint=ckpt.pt
+```
+
 ## Documentation
 
 Detailed developer documentation lives in [`docs/`](docs/):
@@ -344,6 +358,7 @@ Detailed developer documentation lives in [`docs/`](docs/):
 | [`docs/llm_backbone.md`](docs/llm_backbone.md) | Pretrained, LoRA-finetunable LLM decoders (`--llm_backbone`) |
 | [`docs/vision_encoders_and_validation.md`](docs/vision_encoders_and_validation.md) | SigLIP / CLIP / HaleBlocks vision encoders, validation metrics, trainable-only optimisation |
 | [`docs/distributed.md`](docs/distributed.md) | torchrun, Ray Train and WebDataset training |
+| [`docs/deploy.md`](docs/deploy.md) | Export to TensorRT / Jetson, MLX, AMD MIGraphX / Ryzen AI, Qualcomm AI Hub / ExecuTorch (`hale-wam-deploy`) |
 | [`docs/blog/`](docs/blog/README.md) | Blog posts, including *Teaching a robot policy to imagine* |
 
 ### Paper, project page and skills

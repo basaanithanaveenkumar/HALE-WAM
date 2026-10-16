@@ -1,0 +1,6 @@
+# System 2's LLM -> mlx-lm 4-bit (mlx_lm.generate / mlx_lm.server).
+_base_:
+  - pkg://hale_core.deploy/configs/apple/mlx_lm_q4.yaml
+  - ./_shared/models/openhelix_qwen3_5.yaml
+  - ./_shared/parts/language_model.yaml
+name: language_model_mlx_lm_q4
