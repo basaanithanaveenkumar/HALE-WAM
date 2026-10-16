@@ -59,6 +59,9 @@ def test_local_backbone_can_be_fine_tuned() -> None:
 
 def test_siglip_encoder_renormalises_and_checks_resolution() -> None:
     transformers = pytest.importorskip("transformers")
+    # AutoImageProcessor is a Pillow-backed dummy without Pillow (a declared dependency): skip
+    # rather than report a missing optional library as a model bug.
+    pytest.importorskip("PIL", reason="transformers.AutoImageProcessor needs Pillow")
     tiny = transformers.SiglipVisionConfig(image_size=32, patch_size=16, hidden_size=32, intermediate_size=64,
                                            num_hidden_layers=1, num_attention_heads=4)
     with patch.object(transformers.SiglipVisionModel, "from_pretrained",

@@ -28,7 +28,11 @@ from dual_system.config import DualSystemConfig, parse_overrides, resolve_dual_s
 from tests.training_support import load_train_script  # noqa: E402
 
 CONFIGS = ROOT / "configs"
-RUN_CONFIGS = sorted(p for p in CONFIGS.rglob("*.yaml") if "roadmap" not in p.parts)
+# Run configs only: configs/deploy/ holds hale_core.deploy pipelines (``_base_`` inheritance, a
+# different schema), which tests/deploy/test_deploy_configs.py covers.
+RUN_CONFIGS = sorted(
+    p for p in CONFIGS.rglob("*.yaml") if "roadmap" not in p.parts and "deploy" not in p.parts
+)
 META = ("config", "model_overrides", "run_variant", "argv")
 
 
