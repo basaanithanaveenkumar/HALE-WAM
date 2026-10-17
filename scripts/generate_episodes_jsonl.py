@@ -2,7 +2,7 @@
 generate_episodes_jsonl.py
 --------------------------
 Scans the airoa-moma local clone and writes a fresh episodes.jsonl that is
-compatible with AiroaMomaDataset in dataloader/airoa_moma_dataset.py.
+compatible with AiroaMomaDataset in dataloader/airoa_moma_dataset/.
 
 The HF dataset uses file-NNN.mp4 naming inside chunk-XXX directories, NOT
 episode_YYYYYY.mp4.  This script resolves the real video paths, reads the

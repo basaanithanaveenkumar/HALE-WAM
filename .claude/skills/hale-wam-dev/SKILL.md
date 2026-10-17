@@ -25,12 +25,12 @@ export PYTHONPATH=.:src/Halo_VLA     # modules import `models.*` and `config`
 | `config/model_config.py` | `HaloVLMConfig`: dims, MoE, flow head, DiT, loss weights |
 | `config/special_tokens.json` | cosmo2 tokenizer (49,152) + `<image>` 49152, `<halo_action>` 49153, `<state>` 49154, `<halo_world_video>` 49155 |
 | `src/Halo_VLA/models/halo_vla.py` | `HaloVLM.forward` → `(logits, action_hiddens, visual_context_emb, world_video_query_hiddens)`; `compute_flow_loss`, `sample_actions`, `compute_visual_prediction_loss`, `predict_visual_future` |
-| `src/Halo_VLA/models/flow_action_decoder.py` | `FlowActionDecoder` velocity MLP + `SinusoidalTimeEmbedding` |
+| `src/Halo_VLA/models/flow_action_decoder/` | `FlowActionDecoder` velocity MLP + `SinusoidalTimeEmbedding` |
 | `src/Halo_VLA/models/dit_frame_prediction.py` | `RGBFramePredictor` (alias `VisualDiTPredictor`): world-action tokens, cross-attention, CFG, Heun sampler, CFM + VGG + SSIM + temporal losses |
-| `src/Halo_VLA/models/DiT.py` | adaLN-Zero `DiT` with gated context fusion |
-| `src/Halo_VLA/models/transformer.py`, `moe.py`, `vit.py` | decoder (MoE, padding mask, grad checkpointing), DeepSeekMoE, dense ViT |
-| `src/Halo_VLA/models/video_vae.py` | `VideoVAE` (not yet wired into training) |
-| `dataloader/eo_dataset.py`, `airoa_moma_dataset.py`, `droid_dataset.py` | EO-Data1.5M, AIRoA MoMa (local clone), DROID (LeRobot format) |
+| `src/Halo_VLA/models/DiT/` | adaLN-Zero `DiT` with gated context fusion |
+| `src/Halo_VLA/models/transformer/`, `moe/`, `vit/` | decoder (MoE, padding mask, grad checkpointing), DeepSeekMoE, dense ViT |
+| `src/Halo_VLA/models/video_vae/` | `VideoVAE` (not yet wired into training) |
+| `dataloader/eo_dataset/`, `airoa_moma_dataset/`, `droid_dataset/` | EO-Data1.5M, AIRoA MoMa (local clone), DROID (LeRobot format) |
 | `scripts/train.py` | joint training: CE + flow + visual losses, AMP, grad accumulation, resume, TensorBoard, GIFs |
 | `scripts/visualize*.py`, `inference.py` | GIF/video rendering and generation |
 | `docs/world_model.md` | deep technical reference for the DiT world model |

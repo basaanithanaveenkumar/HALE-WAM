@@ -505,7 +505,7 @@ t_next = torch.full((BF,), min(t_val + dt, 1.0 - 1e-5), device=x.device)
 
 ### 6 — Mixed batch `future_frames` in `eo_collate_fn`
 
-**Location:** `dataloader/eo_dataset.py`, `eo_collate_fn`
+**Location:** `dataloader/eo_dataset/`, `eo_collate_fn`
 
 **Problem:** The EO dataset only returns `future_frames` for samples that have enough images
 (`n_total > n_predict`). The collate function checked only `batch[0]`; if the first sample
