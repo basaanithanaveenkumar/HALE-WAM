@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import random
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -13,7 +12,8 @@ from exceptions import DatasetNotFoundError
 from loguru import logger
 from torch.utils.data import Dataset
 
-from config.tokens import get_all_custom_tokens, get_token
+from dataloader.droid_dataset.droid_episode_index import DroidEpisodeIndexMixin
+from dataloader.droid_dataset.droid_prompt import DroidPromptMixin
 from dataloader.eo_dataset import build_image_transform
 
 from .droid_config import DROIDConfig
@@ -22,7 +22,7 @@ from .droid_config import DROIDConfig
 # ---------------------------------------------------------------------------
 # Dataset
 # ---------------------------------------------------------------------------
-class DROIDDataset(Dataset):
+class DROIDDataset(DroidPromptMixin, DroidEpisodeIndexMixin, Dataset):
     """
     One item = one temporal window from one DROID episode.
 
@@ -72,197 +72,21 @@ class DROIDDataset(Dataset):
     # Metadata loading
     # ------------------------------------------------------------------
 
-    def _load_meta(self) -> None:
-        """Read meta/info.json, meta/episodes.parquet, meta/tasks.parquet."""
-        meta_dir = self.root / "meta"
 
-        # info.json — fps + feature list
-        info_path = meta_dir / "info.json"
-        if info_path.is_file():
-            with open(info_path) as f:
-                info = json.load(f)
-            self.cfg.fps = float(info.get("fps", self.cfg.fps))
-            # Discover camera keys from info if config key is not explicit
-            cam_keys = info.get("camera_keys", []) or info.get("video_keys", [])
-            if cam_keys and self.cfg.camera not in cam_keys:
-                # Prefer the configured key; fall back to the first available
-                logger.warning(
-                    "Configured camera '{}' not in info.json camera_keys {}; "
-                    "using first available.",
-                    self.cfg.camera,
-                    cam_keys,
-                )
-                self.cfg.camera = cam_keys[0]
-        else:
-            logger.warning("meta/info.json not found — using defaults (fps={}).",
-                           self.cfg.fps)
 
-        # tasks.parquet — task_index → task string
-        self._task_map: Dict[int, str] = self._load_task_map(meta_dir)
-
-        # episodes.parquet — episode_index, length, task_index
-        self._episode_meta: List[Dict[str, Any]] = self._load_episodes_parquet(meta_dir)
-
-    def _load_task_map(self, meta_dir: Path) -> Dict[int, str]:
-        tasks_pq = meta_dir / "tasks.parquet"
-        if not tasks_pq.is_file():
-            return {}
-        try:
-            import pyarrow.parquet as pq
-            table = pq.read_table(tasks_pq)
-            names = table.schema.names
-            idx_col = next(
-                (c for c in ("task_index", "index") if c in names), None
-            )
-            txt_col = next(
-                (c for c in ("task", "task_description", "short_horizon_task")
-                 if c in names),
-                None,
-            )
-            if not idx_col or not txt_col:
-                return {}
-            return {
-                int(table[idx_col][i].as_py()): str(table[txt_col][i].as_py())
-                for i in range(table.num_rows)
-            }
-        except Exception as exc:
-            logger.warning("Could not load tasks.parquet: {}", exc)
-            return {}
-
-    def _load_episodes_parquet(self, meta_dir: Path) -> List[Dict[str, Any]]:
-        eps_pq = meta_dir / "episodes.parquet"
-        if not eps_pq.is_file():
-            logger.warning("meta/episodes.parquet not found — will discover from data/.")
-            return []
-        try:
-            import pyarrow.parquet as pq
-            table = pq.read_table(eps_pq)
-            names = table.schema.names
-            rows = []
-            for i in range(table.num_rows):
-                rec: Dict[str, Any] = {col: table[col][i].as_py() for col in names}
-                if "episode_index" not in rec:
-                    rec["episode_index"] = rec.get("index", i)
-                rows.append(rec)
-            rows.sort(key=lambda r: int(r.get("episode_index", 0)))
-            return rows
-        except Exception as exc:
-            logger.warning("Could not load episodes.parquet: {}", exc)
-            return []
 
     # ------------------------------------------------------------------
     # Episode list construction
     # ------------------------------------------------------------------
 
-    def _build_episode_list(self) -> List[Dict[str, Any]]:
-        """
-        Merge parquet metadata with filesystem discovery.
 
-        Returns list of episode dicts each guaranteed to have:
-          episode_index, length, task (str), data_path (Path), video_path (Path).
-        """
-        rows = list(self._episode_meta)
 
-        # If parquet gave us nothing, scan the data/ directory
-        if not rows:
-            rows = self._scan_data_dir()
 
-        episodes = []
-        for rec in rows:
-            ep_idx = int(rec.get("episode_index", 0))
-
-            data_path = self._data_path(ep_idx)
-            video_path = self._video_path(ep_idx)
-
-            # Resolve task text
-            task_idx = rec.get("task_index")
-            task = self._task_map.get(int(task_idx), "") if task_idx is not None else ""
-            if not task:
-                task = str(rec.get("task", rec.get("short_horizon_task", "robot manipulation")))
-
-            # Prefer parquet-reported length; fall back to zero (probed on first access)
-            length = int(rec.get("length", 0) or 0)
-
-            if not data_path.is_file() and not video_path.is_file():
-                continue  # skip episodes with no data at all
-
-            if length > 0 and length < self.cfg.min_episode_length:
-                continue
-
-            episodes.append({
-                "episode_index": ep_idx,
-                "length": length,
-                "task": task,
-                "data_path": data_path,
-                "video_path": video_path,
-            })
-
-        logger.info("DROIDDataset: {} usable episodes after filtering.", len(episodes))
-        return episodes
-
-    def _scan_data_dir(self) -> List[Dict[str, Any]]:
-        """Fallback: discover episodes by scanning data/chunk-*/ parquet files."""
-        import re
-        data_root = self.root / "data"
-        if not data_root.is_dir():
-            return []
-        rows = []
-        for ep_pq in sorted(data_root.rglob("episode_*.parquet")):
-            m = re.search(r"episode_(\d+)", ep_pq.stem)
-            if not m:
-                continue
-            ep_idx = int(m.group(1))
-            rows.append({"episode_index": ep_idx, "length": 0, "task": ""})
-        return rows
-
-    def _data_path(self, episode_index: int) -> Path:
-        """Path to the per-episode parquet file under data/chunk-XXX/."""
-        chunk = episode_index // self.cfg.episodes_per_chunk
-        return (
-            self.root
-            / "data"
-            / f"chunk-{chunk:03d}"
-            / f"episode_{episode_index:06d}.parquet"
-        )
-
-    def _video_path(self, episode_index: int) -> Path:
-        """Path to the MP4 for the configured camera view."""
-        chunk = episode_index // self.cfg.episodes_per_chunk
-        return (
-            self.root
-            / "videos"
-            / f"chunk-{chunk:03d}"
-            / self.cfg.camera
-            / f"episode_{episode_index:06d}.mp4"
-        )
 
     # ------------------------------------------------------------------
     # Tokenizer
     # ------------------------------------------------------------------
 
-    def _setup_tokenizer(self, tokenizer) -> None:
-        if tokenizer is not None:
-            self.tokenizer = tokenizer
-        else:
-            from transformers import AutoTokenizer
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                self.cfg.tokenizer_name, trust_remote_code=True,
-            )
-        if self.tokenizer.pad_token is None:
-            self.tokenizer.pad_token = self.tokenizer.eos_token
-
-        extra = [
-            tok for tok in get_all_custom_tokens()
-            if tok not in self.tokenizer.get_vocab()
-        ]
-        if extra:
-            self.tokenizer.add_special_tokens({"additional_special_tokens": extra})
-
-        self._image_tok = get_token("image_token")
-        self._action_tok = get_token("action_token")
-        self._state_tok = get_token("state_token")
-        self._world_video_tok = get_token("world_video_token")
-        self.pad_token_id = self.tokenizer.pad_token_id
 
     # ------------------------------------------------------------------
     # Episode data loading
@@ -451,86 +275,8 @@ class DROIDDataset(Dataset):
     # Conversation / tokenisation
     # ------------------------------------------------------------------
 
-    def _build_text(self, task: str, num_images: int) -> Tuple[str, str]:
-        """
-        Build the (user, assistant) string pair for one sample.
 
-        One ``<image>`` token per context frame, one ``<state>`` token,
-        one ``<halo_world_video>`` per future frame, one ``<action>`` token.
-        """
-        img_tags = " ".join([self._image_tok] * num_images)
-        user_body = (
-            f"{img_tags} {self._state_tok} Task: {task}\n"
-            "Predict the robot motion and describe the next action."
-        )
-        wv_tokens = self._world_video_tok * self.cfg.num_predict_frames
-        assistant_body = (
-            f"Executing: {task}\n"
-            f"{wv_tokens}{self._action_tok}"
-        )
-        return user_body, assistant_body
 
-    def _tokenise(
-        self, user_body: str, assistant_body: str
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        from config import HaloVLMConfig
-        model_cfg = HaloVLMConfig()
-        system_msg = f"{self.cfg.system_prefix}{model_cfg.system_prompt}{self.cfg.turn_end}"
-        human_msg = f"{self.cfg.human_prefix}{user_body}{self.cfg.turn_end}"
-        asst_msg = f"{self.cfg.assistant_prefix}{assistant_body}{self.cfg.turn_end}"
-        full_text = system_msg + human_msg + asst_msg
-
-        enc = self.tokenizer(
-            full_text,
-            max_length=self.cfg.max_seq_len,
-            truncation=True,
-            padding=False,
-            return_tensors="pt",
-        )
-        input_ids = enc["input_ids"].squeeze(0)
-        attention_mask = enc["attention_mask"].squeeze(0)
-        labels = input_ids.clone()
-
-        # Mask system + user spans so loss only trains on the assistant reply
-        parts = [system_msg, human_msg, asst_msg]
-        is_asst = [False, False, True]
-        labels = self._mask_non_assistant(full_text, parts, is_asst, labels)
-        labels[attention_mask == 0] = -100
-
-        return input_ids, attention_mask, labels
-
-    def _mask_non_assistant(
-        self,
-        full_text: str,
-        parts: List[str],
-        is_asst: List[bool],
-        labels: torch.Tensor,
-    ) -> torch.Tensor:
-        cursor = 0
-        for part, assistant in zip(parts, is_asst):
-            start = full_text.find(part, cursor)
-            if start == -1:
-                continue
-            end = start + len(part)
-            if not assistant:
-                prefix_ids = self.tokenizer(
-                    full_text[:end],
-                    max_length=self.cfg.max_seq_len,
-                    truncation=True,
-                    add_special_tokens=False,
-                )["input_ids"]
-                start_ids = self.tokenizer(
-                    full_text[:start],
-                    max_length=self.cfg.max_seq_len,
-                    truncation=True,
-                    add_special_tokens=False,
-                )["input_ids"]
-                tok_start = len(start_ids)
-                tok_end = len(prefix_ids)
-                if tok_end <= labels.numel():
-                    labels[tok_start:tok_end] = -100
-            cursor = end
-        return labels
 
     # ------------------------------------------------------------------
     # Window sampling helpers
