@@ -16,6 +16,7 @@ import torch
 import torch.nn as nn
 
 from config import HaloVLMConfig
+from loguru import logger
 
 
 class ActionDecoder(nn.Module):
@@ -85,9 +86,9 @@ if __name__ == "__main__":
         action_use_layernorm=True,
     )
     decoder = ActionDecoder(config=cfg)
-    print(decoder)
+    logger.info("{}", decoder)
 
     x = torch.randn(2, cfg.emb_dim)
     out = decoder(x)
-    print(f"\nInput:  {x.shape}")
-    print(f"Output: {out.shape}  (expected [2, {cfg.action_chunk_size}, {cfg.action_dim}])")
+    logger.info(f"\nInput:  {x.shape}")
+    logger.info(f"Output: {out.shape}  (expected [2, {cfg.action_chunk_size}, {cfg.action_dim}])")

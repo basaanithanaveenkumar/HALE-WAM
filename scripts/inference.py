@@ -229,6 +229,7 @@ def interactive(args):
         f"<|im_start|>system\n{config.system_prompt}<|im_end|>\n"
     )
 
+    # Interactive REPL: the banner and the replies are the command's output, so they go to stdout.
     print("\n=== Halo-VLA Interactive Inference ===")
     print(f"  Checkpoint : {args.checkpoint}")
     print(f"  Images     : {len(img_paths)}")

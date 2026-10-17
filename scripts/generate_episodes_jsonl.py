@@ -23,6 +23,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from loguru import logger
 
 
 def find_video_files(data_root: Path, camera: str) -> dict[int, Path]:
@@ -43,13 +44,13 @@ def find_video_files(data_root: Path, camera: str) -> dict[int, Path]:
     videos_root = data_root / "videos" / f"observation.image.{camera}"
 
     if not videos_root.is_dir():
-        print(f"[WARN] Camera directory not found: {videos_root}", file=sys.stderr)
+        logger.warning(f"Camera directory not found: {videos_root}")
         return {}
 
     ep_to_path: dict[int, Path] = {}
     chunk_dirs = sorted(videos_root.glob("chunk-*"))
     if not chunk_dirs:
-        print(f"[WARN] No chunk-* directories under {videos_root}", file=sys.stderr)
+        logger.warning(f"No chunk-* directories under {videos_root}")
         return {}
 
     for chunk_dir in chunk_dirs:
@@ -73,12 +74,12 @@ def load_parquet_episodes(data_root: Path) -> list[dict]:
     try:
         import pandas as pd
     except ImportError:
-        print("[ERROR] pandas is required: pip install pandas pyarrow", file=sys.stderr)
+        logger.error("pandas is required: pip install pandas pyarrow")
         sys.exit(1)
 
     ep_dir = data_root / "meta" / "episodes"
     if not ep_dir.is_dir():
-        print(f"[WARN] No meta/episodes directory found at {ep_dir}", file=sys.stderr)
+        logger.warning(f"No meta/episodes directory found at {ep_dir}")
         return []
 
     frames = []
@@ -87,7 +88,7 @@ def load_parquet_episodes(data_root: Path) -> list[dict]:
         frames.append(df)
 
     if not frames:
-        print("[WARN] No parquet files found under meta/episodes/", file=sys.stderr)
+        logger.warning("No parquet files found under meta/episodes/")
         return []
 
     import pandas as pd
@@ -110,10 +111,10 @@ def build_jsonl(
 ) -> int:
     """Build and write episodes.jsonl.  Returns number of episodes written."""
     ep_to_path = find_video_files(data_root, camera)
-    print(f"[INFO] Found {len(ep_to_path)} video files for camera='{camera}'")
+    logger.info(f"Found {len(ep_to_path)} video files for camera='{camera}'")
 
     parquet_rows = load_parquet_episodes(data_root)
-    print(f"[INFO] Loaded {len(parquet_rows)} episode rows from parquet metadata")
+    logger.info(f"Loaded {len(parquet_rows)} episode rows from parquet metadata")
 
     # Build a lookup by episode_index from parquet
     parquet_by_idx: dict[int, dict] = {}
@@ -170,7 +171,7 @@ def build_jsonl(
         written += 1
 
     if out_path.exists() and not overwrite:
-        print(f"[WARN] {out_path} already exists; use --overwrite to replace it.")
+        logger.warning(f"{out_path} already exists; use --overwrite to replace it.")
         return 0
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -178,7 +179,7 @@ def build_jsonl(
         for rec in records:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
-    print(f"[INFO] Wrote {written} episodes → {out_path}")
+    logger.info(f"Wrote {written} episodes → {out_path}")
     return written
 
 
@@ -196,14 +197,14 @@ def main() -> None:
 
     data_root = Path(args.data_root).expanduser().resolve()
     if not data_root.is_dir():
-        print(f"[ERROR] data_root not found: {data_root}", file=sys.stderr)
+        logger.error(f"data_root not found: {data_root}")
         sys.exit(1)
 
     out_path = Path(args.out_path) if args.out_path else data_root / "episodes.jsonl"
 
     n = build_jsonl(data_root, args.camera, out_path, overwrite=args.overwrite)
     if n == 0:
-        print("[ERROR] No episodes written — check your data_root and camera argument.")
+        logger.error("No episodes written — check your data_root and camera argument.")
         sys.exit(1)
 
 

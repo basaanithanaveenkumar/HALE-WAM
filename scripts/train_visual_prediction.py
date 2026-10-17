@@ -29,6 +29,7 @@ from models.dit_frame_prediction import VisualDiTPredictor
 
 
 import torch.nn as nn
+from loguru import logger
 
 class FrameContextEncoder(nn.Module):
     """
@@ -116,7 +117,7 @@ def main():
             loss.backward()
             opt.step()
             if step % 10 == 0:
-                print(
+                logger.info(
                     f"step {step}  total={loss.item():.4f}  "
                     f"rgb_cfm={losses.get('loss_rgb_cfm', torch.tensor(0)).item():.4f}  "
                     f"depth_cfm={losses.get('loss_depth_cfm', torch.tensor(0)).item():.4f}  "
@@ -124,7 +125,7 @@ def main():
                 )
             step += 1
 
-    print("Done.")
+    logger.info("visual-prediction training done ({} steps)", step)
 
 
 if __name__ == "__main__":

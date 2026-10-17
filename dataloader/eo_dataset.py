@@ -797,8 +797,6 @@ if __name__ == "__main__":
     parser.add_argument("--num_workers", type=int, default=0)
     args = parser.parse_args()
 
-    pass  # loguru auto-configures
-
     loader = build_eo_dataloader(
         subset=args.subset,
         batch_size=args.batch_size,
@@ -807,15 +805,15 @@ if __name__ == "__main__":
         shuffle=False,
     )
 
-    print(f"\nDataset size: {len(loader.dataset)}")
-    print(f"Batches:      {len(loader)}\n")
+    logger.info(f"\nDataset size: {len(loader.dataset)}")
+    logger.info(f"Batches:      {len(loader)}\n")
 
     batch = next(iter(loader))
 
     for key, val in batch.items():
         if isinstance(val, torch.Tensor):
-            print(f"  {key:20s} → {val.shape}  dtype={val.dtype}")
+            logger.info(f"  {key:20s} → {val.shape}  dtype={val.dtype}")
         else:
-            print(f"  {key:20s} → {type(val).__name__}: {val}")
+            logger.info(f"  {key:20s} → {type(val).__name__}: {val}")
 
-    print("\n✓ Dataloader works correctly.")
+    logger.info("\n✓ Dataloader works correctly.")

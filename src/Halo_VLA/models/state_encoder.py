@@ -17,6 +17,7 @@ import torch
 import torch.nn as nn
 
 from config import HaloVLMConfig
+from loguru import logger
 
 
 class StateEncoder(nn.Module):
@@ -85,9 +86,9 @@ if __name__ == "__main__":
         state_use_layernorm=True,
     )
     encoder = StateEncoder(config=cfg)
-    print(encoder)
+    logger.info("{}", encoder)
 
     x = torch.randn(2, cfg.state_dim)
     out = encoder(x)
-    print(f"\nInput:  {x.shape}  (raw state)")
-    print(f"Output: {out.shape}  (expected [2, {cfg.emb_dim}])")
+    logger.info(f"\nInput:  {x.shape}  (raw state)")
+    logger.info(f"Output: {out.shape}  (expected [2, {cfg.emb_dim}])")

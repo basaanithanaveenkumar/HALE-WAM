@@ -26,6 +26,7 @@ import torch
 import torch.nn as nn
 
 from hale_core.profiling import ModelProfiler
+from loguru import logger
 
 
 # ---------------------------------------------------------------------------
@@ -212,6 +213,7 @@ def main() -> None:
     args = parse_args()
     device = torch.device(args.device)
 
+    # The profile report is this command's output (stdout); progress and file paths go to loguru.
     print(f"\n[profile] HALE-WAM  component={args.component}  device={device}  "
           f"batch={args.batch_size}  emb_dim={args.emb_dim}  n_layers={args.n_layers}")
 
@@ -252,10 +254,10 @@ def main() -> None:
         Path(args.json).parent.mkdir(parents=True, exist_ok=True)
         with open(args.json, "w") as f:
             json.dump(report.to_dict(), f, indent=2)
-        print(f"[profile] JSON → {args.json}")
+        logger.info("profile JSON written to {}", args.json)
 
     if args.trace:
-        print(f"[profile] Chrome trace → {args.trace}")
+        logger.info("Chrome trace written to {}", args.trace)
 
 
 if __name__ == "__main__":
