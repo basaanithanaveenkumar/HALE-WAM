@@ -23,11 +23,7 @@ class System2LatentGraph(nn.Module):
         super().__init__()
         cfg = dual.config
         vlm = dual.system2.model
-        layer = None
-        if cfg.latent == "middle_layer":
-            depth = len(vlm.decoder_layers())
-            layer = cfg.middle_layer if cfg.middle_layer is not None else depth // 2
-        self.encoder = VLMSequenceEncoder(vlm, capture_layer=layer)
+        self.encoder = VLMSequenceEncoder(vlm, capture_layer=dual.system2.capture_layer())
         self.act_queries = dual.system2.act_queries
         self.latent = dual.latent
         self.bridge = dual.bridge
@@ -35,6 +31,17 @@ class System2LatentGraph(nn.Module):
 
     def forward(self, images: torch.Tensor, input_ids: torch.Tensor, attention_mask: torch.Tensor,
                 states: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """Encode the observation and instruction into System 1's latent.
+
+        Args:
+            images: frames ``(B, N, 3, H, W)``.
+            input_ids: instruction tokens ``(B, L)``.
+            attention_mask: their mask ``(B, L)``.
+            states: proprioception ``(B, T, state_dim)``.
+
+        Returns:
+            ``(latent (B, K, system1_dim), latent_mask (B, K))``.
+        """
         n = images.shape[1]
         if self.frame_delay and n > 1:
             index = [max(i - self.frame_delay, 0) for i in range(n)]

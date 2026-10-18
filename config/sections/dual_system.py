@@ -53,7 +53,7 @@ class DualSystemSection(VLASection):
 
     @model_validator(mode="after")
     def _resolves(self) -> DualSystemSection:
-        from dual_system.config import resolve_dual_system_config
+        from dual_system.resolution import resolve_dual_system_config
 
         resolve_dual_system_config(self.preset, self.options() or None)  # raises on bad combinations
         return self

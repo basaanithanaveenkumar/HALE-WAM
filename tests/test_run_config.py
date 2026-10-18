@@ -23,7 +23,8 @@ from config.overrides import apply_model_overrides, parse_model_options  # noqa:
 from config.run_config import VLARunConfig, load_vla_config  # noqa: E402
 from config.sections.base import VLASection  # noqa: E402
 from config.sections.dual_system import DualSystemSection  # noqa: E402
-from dual_system.config import DualSystemConfig, parse_overrides, resolve_dual_system_config  # noqa: E402
+from dual_system.config import DualSystemConfig
+from dual_system.resolution import parse_overrides, resolve_dual_system_config  # noqa: E402
 
 from tests.training_support import load_train_script  # noqa: E402
 

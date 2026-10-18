@@ -22,8 +22,10 @@ class DualSystem1ActionStepAdapter(DualSystem1AdapterBase):
     """
 
     def default_signature(self) -> IOSignature:
+        from dual_system.system1.system1_registry import SYSTEM1_POLICIES  # lazy: import roots are set up by Halo_VLA.deploy
+
         cfg, dual = self.model_config(), self.dual_config()
-        if dual.policy == "regression":
+        if not SYSTEM1_POLICIES.get(dual.policy).has_sampler_step:
             raise ConfigError("regression System 1 has no sampler step; use DualSystem1PolicyAdapter")
         latent = DimSpec.from_config("latent_len", self.latent_dim())
         extra = self.observation_tokens() + 1  # observation tokens + proprioception token

@@ -26,12 +26,10 @@ class DualSystem1AdapterBase(HaloAdapterBase):
     def latent_dim(self) -> int | list[int]:
         if self._latent_tokens is not None:
             return self._latent_tokens
-        dual = self.dual_config()
-        if dual.latent in ("act_token", "pooled"):
-            return 1
-        if dual.latent == "multi_act" and not dual.multi_act_with_language:
-            return dual.num_act_tokens
-        return [1, 16, 512]
+        from dual_system.latent.latent_registry import LATENT_EXTRACTORS  # lazy: import roots are set up by Halo_VLA.deploy
+
+        static = LATENT_EXTRACTORS.get(self.dual_config().latent).static_length(self.dual_config())
+        return static if static is not None else [1, 16, 512]
 
     def observation_tokens(self) -> int:
         dual = self.dual_config()

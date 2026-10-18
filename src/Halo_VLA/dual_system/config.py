@@ -21,8 +21,9 @@ asynchrony            ``async_steps`` (System 1 steps per System 2 step at infer
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, fields, replace
-from typing import Literal
+from dataclasses import dataclass, field
+from typing import Any, Literal
+
 from exceptions import HaloVLAConfigError
 
 LatentType = Literal["act_token", "multi_act", "last_hidden", "pooled", "language", "middle_layer"]
@@ -112,86 +113,26 @@ class DualSystemConfig:
 
     @property
     def uses_act_queries(self) -> bool:
+        """Whether System 2 appends learnable ``<ACT>`` queries to its input."""
         return self.latent in ("act_token", "multi_act")
 
 
-#: The published designs (OpenHelix survey, Table 1) as presets; ``none`` disables the dual system.
-PRESETS: dict[str, DualSystemConfig] = {
-    "basic": DualSystemConfig(
-        name="basic", latent="act_token", system2_training="finetune", policy="flow_matching",
-        notes="first-principles baseline: one <ACT> latent, flow-matching System 1"),
-    "lcb": DualSystemConfig(
-        name="lcb", latent="act_token", system2_training="finetune", policy="diffusion", align_weight=1.0,
-        async_steps=10, notes="LCB (Shentu et al., 2024, arXiv:2405.04798): <ACT> latent, LoRA System 2, "
-        "diffusion actor, CLIP-style alignment, synchronous training / asynchronous testing"),
-    "dp_vla": DualSystemConfig(
-        name="dp_vla", latent="last_hidden", system2_training="frozen", policy="regression",
-        notes="DP-VLA (Han et al., CoRL 2024): frozen System 2, last-layer vision+language states, "
-        "transformer policy trained from scratch"),
-    "hirt": DualSystemConfig(
-        name="hirt", latent="pooled", system2_training="finetune", policy="regression",
-        system2_frame_delay=1, async_steps=4,
-        notes="HiRT (Zhang et al., 2024, arXiv:2410.05273): MAP-pooled last-layer latent, LoRA System 2, "
-        "RT-1-style policy, delayed System 2 view during training"),
-    "robodual": DualSystemConfig(
-        name="robodual", latent="multi_act", num_act_tokens=4, multi_act_with_language=True,
-        system2_training="finetune", policy="diffusion", obs_resampler_tokens=16,
-        notes="RoboDual (Bu et al., 2024, arXiv:2410.08001): action + task latents, DiT policy, "
-        "Perceiver-resampled observations"),
-    "dexvla": DualSystemConfig(
-        name="dexvla", latent="language", system2_training="finetune", policy="diffusion",
-        notes="DexVLA (Wen et al., 2025, arXiv:2502.05855): language latent, LoRA System 2, "
-        "scaled diffusion policy"),
-    "openhelix": DualSystemConfig(
-        name="openhelix", latent="act_token", system2_training="prompt_tuning", policy="diffusion",
-        projector="linear", aux_weight=1.0, prealign_steps=2000, async_steps=10,
-        notes="OpenHelix (Cui et al., 2025, arXiv:2505.03912): frozen MLLM + prompt-tuned <ACT>, "
-        "auxiliary action head, two-stage pre-alignment"),
+#: Names that moved to :mod:`dual_system.presets` / :mod:`dual_system.resolution`; resolved lazily
+#: so that ``from dual_system.config import PRESETS`` keeps working without an import cycle
+#: (those modules import this one).
+_MOVED = {
+    "PRESETS": "dual_system.presets",
+    "DUAL_SYSTEM_PRESETS": "dual_system.presets",
+    "NONE": "dual_system.resolution",
+    "parse_overrides": "dual_system.resolution",
+    "resolve_dual_system_config": "dual_system.resolution",
 }
-NONE = "none"
 
 
-def parse_overrides(items: list[str] | None) -> dict:
-    """``["latent=pooled", "async_steps=4"]`` -> typed overrides for :class:`DualSystemConfig`."""
-    types = {f.name: f.type for f in fields(DualSystemConfig)}
-    out: dict = {}
-    for item in items or []:
-        key, sep, raw = item.partition("=")
-        if not sep or key not in types:
-            raise HaloVLAConfigError(f"bad dual-system option {item!r}; use KEY=VALUE with KEY in {sorted(types)}")
-        kind = str(types[key])
-        if raw.lower() in ("none", "null"):
-            value = None
-        elif "bool" in kind:
-            value = raw.lower() in ("1", "true", "yes")
-        elif "int" in kind:
-            value = int(raw)
-        elif "float" in kind:
-            value = float(raw)
-        else:
-            value = raw
-        out[key] = value
-    return out
+def __getattr__(name: str) -> Any:
+    """Backward-compatible access to the relocated preset and resolution helpers."""
+    if name in _MOVED:
+        import importlib
 
-
-def resolve_dual_system_config(name: str | None, overrides: dict | None = None) -> DualSystemConfig | None:
-    """The preset ``name`` (or ``None`` for ``none``) with ``overrides`` applied.
-
-    ``name="custom"`` starts from the dataclass defaults, so any combination can be built from
-    overrides alone.
-    """
-    if name is None or name == NONE:
-        if overrides:
-            raise HaloVLAConfigError("dual_system options given but dual_system is 'none'")
-        return None
-    if name == "custom":
-        base = DualSystemConfig()
-    elif name in PRESETS:
-        base = PRESETS[name]
-    else:
-        raise HaloVLAConfigError(f"unknown dual_system {name!r}; choose none, custom or one of {sorted(PRESETS)}")
-    overrides = dict(overrides or {})
-    unknown = set(overrides) - {f.name for f in fields(DualSystemConfig)}
-    if unknown:
-        raise HaloVLAConfigError(f"unknown dual_system options: {sorted(unknown)}")
-    return replace(base, **overrides)
+        return getattr(importlib.import_module(_MOVED[name]), name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

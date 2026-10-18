@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import math
-
 import torch
 import torch.nn as nn
 
@@ -12,12 +10,14 @@ from dual_system.config import DualSystemConfig
 from .action_transformer import ActionTransformer
 from .fast_observation_encoder import FastObservationEncoder
 from .perceiver_resampler import PerceiverResampler
+from .system1_registry import SYSTEM1_POLICIES
 
 
 class System1Policy(nn.Module):
     """Fast policy: current frame + proprioception + System 2 latent -> action chunk.
 
-    Heads (``DualSystemConfig.policy``):
+    Pattern: Strategy. The policy kinds (``DualSystemConfig.policy``) are registered in
+    :data:`SYSTEM1_POLICIES` and implemented in ``*_strategy.py``:
 
     * ``regression``: predict the chunk directly, masked L1 (DP-VLA, HiRT / RT-1).
     * ``diffusion``: DDPM with a cosine schedule (Ho et al., 2020; Nichol & Dhariwal, 2021) and
@@ -50,18 +50,34 @@ class System1Policy(nn.Module):
         self.proprio = nn.Sequential(nn.Linear(state_dim, d), nn.GELU(), nn.Linear(d, d))
         self.type_embed = nn.Parameter(torch.zeros(3, d))  # latent / observation / proprioception
         self.head = ActionTransformer(d, config.system1_layers, config.system1_heads, chunk, action_dim)
-        if self.policy == "diffusion":
-            steps = config.diffusion_train_steps
-            s = 0.008  # cosine schedule (Nichol & Dhariwal, 2021)
-            x = torch.linspace(0, steps, steps + 1) / steps
-            alpha_bar = torch.cos((x + s) / (1 + s) * math.pi / 2) ** 2
-            alpha_bar = (alpha_bar / alpha_bar[0]).clamp(1e-5, 1.0)
-            self.register_buffer("alpha_bar", alpha_bar[1:], persistent=False)
+        self.strategy = SYSTEM1_POLICIES.get(config.policy)(config)
+
+    @property
+    def alpha_bar(self) -> torch.Tensor:
+        """Cumulative noise schedule of the diffusion policy.
+
+        Raises:
+            AttributeError: for policies without a diffusion schedule.
+        """
+        try:
+            return self.strategy.alpha_bar
+        except AttributeError as err:
+            raise AttributeError(f"policy {self.policy!r} has no alpha_bar") from err
 
     # ------------------------------------------------------------------ conditioning
     def condition(self, latent: torch.Tensor, latent_mask: torch.Tensor, image: torch.Tensor,
                   state: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """``[latent | observation | proprioception]`` tokens and their mask."""
+        """``[latent | observation | proprioception]`` tokens and their mask.
+
+        Args:
+            latent: projected System 2 latent ``(B, K, D)``.
+            latent_mask: its mask ``(B, K)``.
+            image: current camera frame ``(B, 3, H, W)``.
+            state: proprioception ``(B, state_dim)``.
+
+        Returns:
+            ``(tokens (B, K + N + 1, D), mask)``.
+        """
         obs = self.obs_encoder(image)
         if self.resampler is not None:
             obs = self.resampler(obs)
@@ -71,48 +87,31 @@ class System1Policy(nn.Module):
         return tokens, torch.cat([latent_mask, ones], 1)
 
     # ------------------------------------------------------------------ training
-    def loss(self, cond, cond_mask, actions: torch.Tensor, action_mask: torch.Tensor) -> torch.Tensor:
-        """Policy loss on a ``(B, chunk, action_dim)`` target with ``(B, chunk)`` validity mask."""
-        b = actions.size(0)
+    def loss(self, cond: torch.Tensor, cond_mask: torch.Tensor, actions: torch.Tensor,
+             action_mask: torch.Tensor) -> torch.Tensor:
+        """Policy loss on a ``(B, chunk, action_dim)`` target with ``(B, chunk)`` validity mask.
+
+        Args:
+            cond: conditioning tokens from :meth:`condition`.
+            cond_mask: their mask.
+            actions: target chunk.
+            action_mask: validity of each step.
+
+        Returns:
+            A scalar loss.
+        """
         weight = action_mask.unsqueeze(-1).to(actions.dtype)
-        if self.policy == "regression":
-            pred = self.head(cond, cond_mask)
-            return ((pred - actions).abs() * weight).sum() / (weight.sum() * self.action_dim).clamp_min(1.0)
-        noise = torch.randn_like(actions)
-        if self.policy == "diffusion":
-            k = torch.randint(0, self.alpha_bar.numel(), (b,), device=actions.device)
-            ab = self.alpha_bar[k].view(b, 1, 1)
-            noisy = ab.sqrt() * actions + (1 - ab).sqrt() * noise
-            target = ab.sqrt() * noise - (1 - ab).sqrt() * actions  # v-prediction
-            pred = self.head(cond, cond_mask, noisy, k)
-        else:  # flow matching
-            t = torch.rand(b, device=actions.device)
-            noisy = (1 - t.view(b, 1, 1)) * noise + t.view(b, 1, 1) * actions
-            target = actions - noise
-            pred = self.head(cond, cond_mask, noisy, t * 1000)
-        return (((pred - target) ** 2) * weight).sum() / (weight.sum() * self.action_dim).clamp_min(1.0)
+        return self.strategy.loss(self.head, cond, cond_mask, actions, weight)
 
     # ------------------------------------------------------------------ inference
     @torch.no_grad()
     def sample(self, cond: torch.Tensor, cond_mask: torch.Tensor, steps: int | None = None) -> torch.Tensor:
-        """An action chunk ``(B, chunk, action_dim)``."""
-        if self.policy == "regression":
-            return self.head(cond, cond_mask)
-        steps = steps or self.config.sample_steps
-        b = cond.size(0)
-        x = torch.randn(b, self.chunk, self.action_dim, device=cond.device)
-        if self.policy == "flow_matching":
-            for i in range(steps):
-                t = torch.full((b,), i / steps, device=cond.device)
-                x = x + self.head(cond, cond_mask, x, t * 1000) / steps
-            return x
-        # DDIM (eta = 0) over an evenly spaced subset of the training noise levels
-        levels = torch.linspace(self.alpha_bar.numel() - 1, 0, steps, device=cond.device).round().long()
-        for i, k in enumerate(levels):
-            ab = self.alpha_bar[k]
-            v = self.head(cond, cond_mask, x, k.expand(b))
-            x0 = ab.sqrt() * x - (1 - ab).sqrt() * v
-            eps = (1 - ab).sqrt() * x + ab.sqrt() * v
-            ab_prev = self.alpha_bar[levels[i + 1]] if i + 1 < len(levels) else torch.ones((), device=x.device)
-            x = ab_prev.sqrt() * x0 + (1 - ab_prev).sqrt() * eps
-        return x
+        """An action chunk ``(B, chunk, action_dim)``.
+
+        Args:
+            cond: conditioning tokens from :meth:`condition`.
+            cond_mask: their mask.
+            steps: sampling steps (default ``config.sample_steps``).
+        """
+        return self.strategy.sample(self.head, cond, cond_mask, self.chunk, self.action_dim,
+                                    steps or self.config.sample_steps)

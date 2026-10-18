@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import torch
 import torch.nn as nn
 
 from dual_system.config import DualSystemConfig
+from dual_system.latent.latent_registry import LATENT_EXTRACTORS
 
 
 class System2(nn.Module):
@@ -50,9 +53,18 @@ class System2(nn.Module):
 
     @property
     def frozen(self) -> bool:
+        """Whether System 2's weights receive no gradients (``frozen`` or ``prompt_tuning``)."""
         return self.config.system2_training in ("frozen", "prompt_tuning")
 
+    def capture_layer(self) -> int | None:
+        """Decoder layer whose states the latent needs, or ``None`` when only the last is used."""
+        if not LATENT_EXTRACTORS.get(self.config.latent).needs_layer_capture:
+            return None
+        depth = len(self.model.decoder_layers())
+        return self.config.middle_layer if self.config.middle_layer is not None else depth // 2
+
     def train(self, mode: bool = True) -> System2:
+        """Switch train / eval; a frozen System 2 stays in eval mode."""
         super().train(mode)
         if self.frozen:
             self.model.eval()  # a frozen brain keeps dropout off / norms fixed
@@ -70,14 +82,19 @@ class System2(nn.Module):
         index = (torch.arange(images.size(1), device=images.device) - delay).clamp_min(0)
         return images[:, index]
 
-    def forward(self, batch: dict) -> dict:
-        """Encode ``batch`` (images, input_ids, attention_mask, states) with the ``<ACT>`` queries."""
+    def forward(self, batch: dict[str, torch.Tensor]) -> dict[str, Any]:
+        """Encode ``batch`` with the ``<ACT>`` queries appended.
+
+        Args:
+            batch: ``images``, ``input_ids``, ``attention_mask`` and ``states``.
+
+        Returns:
+            ``HaloVLM.encode_sequence``'s encoding plus ``input_ids`` and the detached
+            ``reference_embeds`` used by the alignment loss.
+        """
         b = batch["input_ids"].size(0)
         extra = None if self.act_queries is None else self.act_queries.unsqueeze(0).expand(b, -1, -1)
-        layer = None
-        if self.config.latent == "middle_layer":
-            depth = len(self.model.decoder_layers())
-            layer = self.config.middle_layer if self.config.middle_layer is not None else depth // 2
+        layer = self.capture_layer()
         with torch.set_grad_enabled(torch.is_grad_enabled() and not (self.frozen and extra is None)):
             out = self.model.encode_sequence(
                 self.view_images(batch["images"]), batch["input_ids"], batch["attention_mask"],
