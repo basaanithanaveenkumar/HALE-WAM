@@ -1,10 +1,16 @@
 """Frame composition for the visualisation tools: fonts, headers, panels, badges and dividers."""
 
+from __future__ import annotations
+
 import textwrap
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import numpy as np
+from loguru import logger
+
+if TYPE_CHECKING:
+    from PIL.Image import Image as PILImage
 
 
 # ---------------------------------------------------------------------------
@@ -56,7 +62,7 @@ _FONT_CANDIDATES_BOLD = [
 ]
 
 
-def get_font(size: int, bold: bool = False):
+def get_font(size: int, bold: bool = False) -> Any:
     """Load a TTF font with a sensible fallback. Cached per (style, size)."""
     _, _, ImageFont = _import_pil()
     key = ("bold" if bold else "regular", size)
@@ -69,8 +75,8 @@ def get_font(size: int, bold: bool = False):
                 font = ImageFont.truetype(path, size)
                 _FONT_CACHE[key] = font
                 return font
-            except Exception:
-                continue
+            except OSError as exc:  # unreadable / corrupt font file: try the next candidate
+                logger.debug("skipping font {}: {}", path, exc)
     # Last resort: PIL's built-in bitmap font (won't be pretty but won't crash).
     font = ImageFont.load_default()
     _FONT_CACHE[key] = font
@@ -78,6 +84,7 @@ def get_font(size: int, bold: bool = False):
 
 
 def wrap_text(text: str, max_chars: int = 60) -> List[str]:
+    """Wrap ``text`` to lines of at most ``max_chars`` characters (an empty text gives ``[""]``)."""
     return textwrap.wrap(text, width=max_chars) or [""]
 
 
@@ -86,19 +93,20 @@ def wrap_text(text: str, max_chars: int = 60) -> List[str]:
 # which can only render ASCII (anything else, including curly quotes and
 # em-dashes that often appear in dataset prompts, shows as "???").
 # ---------------------------------------------------------------------------
-def _bgr_to_pil(frame_bgr: np.ndarray):
+def _bgr_to_pil(frame_bgr: np.ndarray) -> PILImage:
     """Convert an OpenCV BGR uint8 frame to a PIL Image (RGB)."""
     Image, _, _ = _import_pil()
     return Image.fromarray(frame_bgr[:, :, ::-1].copy())
 
 
-def _pil_to_bgr(img) -> np.ndarray:
+def _pil_to_bgr(img: PILImage) -> np.ndarray:
     """Convert a PIL Image (RGB) back to a BGR uint8 numpy frame."""
     arr = np.asarray(img.convert("RGB"))
     return arr[:, :, ::-1].copy()
 
 
-def draw_header(img, phase: str, sub: str = "", accent: Tuple[int, int, int] = (96, 200, 255)):
+def draw_header(img: PILImage, phase: str, sub: str = "",
+                accent: Tuple[int, int, int] = (96, 200, 255)) -> None:
     """Draw a slim gradient header strip with phase label and an optional sub-label."""
     Image, ImageDraw, _ = _import_pil()
     W, H = img.size
@@ -146,7 +154,7 @@ _PRAI_PHASES = [
 _PRAI_BAR_H = 32  # pixel height of the PRAI bar
 
 
-def draw_prai_bar(img, active_phase: int = 0) -> None:
+def draw_prai_bar(img: PILImage, active_phase: int = 0) -> None:
     """
     Draw the Perceive → Reason → Act → Imagine progress bar directly
     below the header strip.  ``active_phase`` is 0-based (0=PERCEIVE …
@@ -220,10 +228,10 @@ def draw_prai_bar(img, active_phase: int = 0) -> None:
               fill=(35, 50, 75, 200), width=1)
 
 
-def draw_panel(img, lines: List[Tuple[str, Tuple[int, int, int], bool]],
+def draw_panel(img: PILImage, lines: List[Tuple[str, Tuple[int, int, int], bool]],
                anchor: str = "bottom", padding: int = 14, line_gap: int = 6,
                font_size: int = 17, label_font_size: int = 15,
-               max_chars: int = 70, min_top: int = 44):
+               max_chars: int = 70, min_top: int = 44) -> None:
     """
     Draw a translucent rounded panel containing labelled text lines.
 
@@ -277,7 +285,7 @@ def draw_panel(img, lines: List[Tuple[str, Tuple[int, int, int], bool]],
         y += row_h
 
 
-def draw_correctness_badge(img, is_correct: bool, top: int):
+def draw_correctness_badge(img: PILImage, is_correct: bool, top: int) -> None:
     """Small pill badge in the top-right area indicating CORRECT/WRONG."""
     Image, ImageDraw, _ = _import_pil()
     W, _ = img.size

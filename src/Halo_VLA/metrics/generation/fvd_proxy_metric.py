@@ -39,6 +39,7 @@ class FVDProxyMetric(RoboticsMetricBase):
         self.reset()
 
     def reset(self) -> None:
+        """Clear the collected per-frame feature vectors."""
         # Accumulate (mean, std) feature vectors per frame across all update calls
         self._pred_feats: List[Tensor] = []
         self._tgt_feats: List[Tensor] = []
@@ -63,6 +64,12 @@ class FVDProxyMetric(RoboticsMetricBase):
         pred_frames: Tensor,    # [B, T, C, H, W]
         target_frames: Tensor,  # [B, T, C, H, W]
     ) -> None:
+        """Collect per-frame statistics of one batch of videos.
+
+        Args:
+            pred_frames: predicted videos ``[B, T, C, H, W]``.
+            target_frames: ground-truth videos ``[B, T, C, H, W]``.
+        """
         self._pred_feats.append(self._frame_features(pred_frames.float().detach().cpu()))
         self._tgt_feats.append(self._frame_features(target_frames.float().detach().cpu()))
 
@@ -95,6 +102,12 @@ class FVDProxyMetric(RoboticsMetricBase):
         return mean_diff_sq + cov_trace - 2.0 * cov_sqrt_trace
 
     def compute(self) -> dict[str, float]:
+        """Return the metrics.
+
+        Returns:
+            ``pixel_fvd_proxy``: the Fréchet distance between predicted and target feature sets
+            (0 when nothing was collected).
+        """
         if not self._pred_feats:
             return {"pixel_fvd_proxy": 0.0}
         pred_all = torch.cat(self._pred_feats, dim=0)   # [N_total, 2C]

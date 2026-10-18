@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import torch
+from exceptions import HaloVLAConfigError
 
 from hale_core.deploy.core.io_signature import IOSignature
 
@@ -34,12 +35,24 @@ class PromptIOSignature(IOSignature):
         return 1 + len(self.head_tokens) + len(self.tail_tokens) + 1
 
     def sample(self, which: str = "opt", generator: torch.Generator | None = None) -> dict[str, torch.Tensor]:
+        """Sample reference inputs with the prompt template written into ``input_ids``.
+
+        Args:
+            which: shape corner (``min``, ``opt`` or ``max``).
+            generator: random generator for reproducible samples.
+
+        Returns:
+            Named input tensors.
+
+        Raises:
+            HaloVLAConfigError: if the prompt is shorter than the template needs.
+        """
         out = super().sample(which, generator)
         ids = out[self.prompt_input].clone()
         head = torch.tensor(self.head_tokens, dtype=ids.dtype)
         tail = torch.tensor(self.tail_tokens, dtype=ids.dtype)
         if ids.size(1) < self.min_prompt_length:
-            raise ValueError(f"{self.prompt_input} length {ids.size(1)} cannot hold the prompt template "
+            raise HaloVLAConfigError(f"{self.prompt_input} length {ids.size(1)} cannot hold the prompt template "
                              f"(needs >= {self.min_prompt_length})")
         if head.numel():
             ids[:, 1:1 + head.numel()] = head

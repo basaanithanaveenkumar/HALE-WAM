@@ -30,10 +30,10 @@ class AiroaMomaDataset(MomaPromptMixin, MomaEpisodeIndexMixin, Dataset):
     def __init__(
         self,
         config: Optional[AiroaMomaConfig] = None,
-        tokenizer=None,
+        tokenizer: Any = None,
         split: str = "train",
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         super().__init__()
         if config is None:
             config = AiroaMomaConfig(**kwargs)

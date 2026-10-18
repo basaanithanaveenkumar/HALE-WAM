@@ -44,7 +44,16 @@ from rl.grpo import compute_grpo_loss
 from rl.rewards import negative_distance_reward
 
 
-def build_loader(args, config):
+def build_loader(args: argparse.Namespace, config: HaloVLMConfig) -> DataLoader:
+    """The EO-Data1.5M DataLoader for the RL run.
+
+    Args:
+        args: parsed arguments (subset, batch size, sequence lengths, ...).
+        config: model configuration (image size, action / state sizes).
+
+    Returns:
+        The training DataLoader.
+    """
     from dataloader.eo_dataset import build_eo_dataloader
 
     return build_eo_dataloader(
@@ -62,7 +71,8 @@ def build_loader(args, config):
     )
 
 
-def main():
+def main() -> None:
+    """Fine-tune the Halo-VLA action policy with GRPO on top of a frozen Halo-VLA encoder."""
     args = parse_args()
     device = torch.device(args.device)
     logger.info("Device: {}", device)
@@ -101,7 +111,8 @@ def main():
 
             # reward_fn must broadcast the per-state target across the G group
             # samples; group i shares target row i.
-            def reward_fn(a, _t=target, _g=args.group_size):
+            def reward_fn(a: torch.Tensor, _t: torch.Tensor = target, _g: int = args.group_size) -> torch.Tensor:
+                """Negative distance of each sampled action to its state's target (``_g`` per state)."""
                 tgt = _t.repeat_interleave(_g, dim=0)
                 return negative_distance_reward(a, tgt, offset=args.reward_offset)
 
@@ -130,7 +141,12 @@ def main():
     logger.info("Training complete.")
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
+    """Parse the command line.
+
+    Returns:
+        The parsed arguments.
+    """
     p = argparse.ArgumentParser(description="GRPO fine-tuning for Halo-VLA")
     p.add_argument("--dataset", choices=("eo",), default="eo")
     p.add_argument("--subset", default="interleave-temporal")

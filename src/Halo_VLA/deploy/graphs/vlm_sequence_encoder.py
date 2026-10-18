@@ -34,11 +34,25 @@ class VLMSequenceEncoder(nn.Module):
         if capture_layer is not None:
             vlm.decoder_layers()[capture_layer].register_forward_hook(self._grab)
 
-    def _grab(self, _module, _inputs, output) -> None:
+    def _grab(self, _module: nn.Module, _inputs: tuple, output: torch.Tensor | tuple) -> None:
         self._captured["h"] = output[0] if isinstance(output, tuple) else output
 
     def forward(self, images: torch.Tensor, input_ids: torch.Tensor, attention_mask: torch.Tensor,
-                states: torch.Tensor, extra_embeds: torch.Tensor | None = None):
+                states: torch.Tensor,
+                extra_embeds: torch.Tensor | None = None,
+                ) -> tuple[torch.Tensor, torch.Tensor, int, torch.Tensor | None]:
+        """Encode the observation and prompt with the VLM decoder.
+
+        Args:
+            images: frames ``[B, N, 3, H, W]``.
+            input_ids: prompt ``[B, L]``.
+            attention_mask: prompt mask ``[B, L]``.
+            states: proprioception ``[B, S, state_dim]``.
+            extra_embeds: optional ``[B, K, emb_dim]`` embeddings appended after the text.
+
+        Returns:
+            ``(hidden, mask, num_prefix, layer_hidden)`` as described in the class docstring.
+        """
         b = input_ids.shape[0]
         combined, num_prefix = self.embedder(images, input_ids, states)
         mask = torch.cat([torch.ones(b, num_prefix, dtype=attention_mask.dtype, device=attention_mask.device),

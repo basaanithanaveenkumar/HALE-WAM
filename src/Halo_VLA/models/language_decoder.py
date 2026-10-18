@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 import torch
 import torch.nn as nn
 
 from config.tokens import get_all_custom_tokens
+
+if TYPE_CHECKING:
+    from config.model_config import HaloVLMConfig
 
 
 class PretrainedLanguageDecoder(nn.Module):
@@ -30,7 +35,7 @@ class PretrainedLanguageDecoder(nn.Module):
         config: ``HaloVLMConfig`` with ``llm_backbone`` set; updated in place with token ids.
     """
 
-    def __init__(self, config) -> None:
+    def __init__(self, config: HaloVLMConfig) -> None:
         super().__init__()
         from hale_core.nn.llm import build_language_backbone  # lazy: optional HaleBlocks extra
 
@@ -50,12 +55,13 @@ class PretrainedLanguageDecoder(nn.Module):
                 nn.init.zeros_(layer.bias)
 
     @property
-    def tokenizer(self):
+    def tokenizer(self) -> Any:
         """The LLM's tokenizer, including the VLA's special tokens."""
         return self.llm.tokenizer
 
     @property
     def hidden_size(self) -> int:
+        """Width of the LLM's hidden states."""
         return self.llm.hidden_size
 
     def embed_text(self, input_ids: torch.Tensor) -> torch.Tensor:

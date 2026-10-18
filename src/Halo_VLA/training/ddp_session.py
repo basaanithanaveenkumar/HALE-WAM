@@ -69,6 +69,7 @@ class DDPSession:
 
     @property
     def distributed(self) -> bool:
+        """Whether more than one process takes part."""
         return self.world_size > 1
 
     # ------------------------------------------------------------------ model / data
@@ -121,6 +122,7 @@ class DDPSession:
         return t.item() / self.world_size
 
     def barrier(self) -> None:
+        """Wait for every rank (no-op in a single process)."""
         if self.distributed:
             dist.barrier()
 

@@ -30,6 +30,7 @@ class TaskCompletionMetric(RoboticsMetricBase):
         self.reset()
 
     def reset(self) -> None:
+        """Clear the completion counters."""
         self._total_completion = 0.0
         self._total_subtasks_done = 0.0
         self._n_episodes = 0
@@ -46,6 +47,11 @@ class TaskCompletionMetric(RoboticsMetricBase):
         self._n_episodes += 1
 
     def compute(self) -> dict[str, float]:
+        """Return the metrics.
+
+        Returns:
+            ``task_completion_rate`` and ``mean_subtasks_done``.
+        """
         n = max(self._n_episodes, 1)
         return {
             "task_completion_rate": self._total_completion / n,

@@ -48,7 +48,7 @@ def build_preference_pairs(
 def sample_preference_pairs(
     policy: GaussianActionPolicy,
     cond: torch.Tensor,
-    reward_fn,
+    reward_fn: RewardFn,
     num_candidates: int = 8,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Sample ``num_candidates`` actions per state from ``policy`` and label the

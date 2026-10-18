@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import torch
+from exceptions import HaloVLAConfigError
 from torch import nn
 
 
@@ -21,11 +22,20 @@ class TokenStateSelector(nn.Module):
     def __init__(self, token_id: int, count: int) -> None:
         super().__init__()
         if count < 1:
-            raise ValueError("count must be >= 1")
+            raise HaloVLAConfigError("count must be >= 1")
         self.token_id = int(token_id)
         self.count = int(count)
 
     def forward(self, text_hidden: torch.Tensor, input_ids: torch.Tensor) -> torch.Tensor:
+        """Gather the states at the placeholder positions.
+
+        Args:
+            text_hidden: decoder states ``[B, L, D]``.
+            input_ids: token ids ``[B, L]``.
+
+        Returns:
+            ``[B, count, D]``; rows without a matching placeholder are zero.
+        """
         hit = input_ids == self.token_id                                   # [B, L]
         rank = torch.cumsum(hit.to(torch.int64), dim=1)                    # k-th hit has rank k
         slots = torch.arange(1, self.count + 1, device=input_ids.device).view(1, self.count, 1)

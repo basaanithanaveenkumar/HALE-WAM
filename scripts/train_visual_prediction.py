@@ -53,6 +53,14 @@ class FrameContextEncoder(nn.Module):
         self.fc = nn.Linear(256, emb_dim)
 
     def forward(self, frames: torch.Tensor) -> torch.Tensor:
+        """Encode frames into a context vector.
+
+        Args:
+            frames: ``[B, 3, H, W]`` or ``[B, T, 3, H, W]`` (frame features are averaged over ``T``).
+
+        Returns:
+            ``[B, emb_dim]``.
+        """
         if frames.dim() == 5:
             b, t, c, h, w = frames.shape
             x = frames.reshape(b * t, c, h, w)
@@ -62,7 +70,12 @@ class FrameContextEncoder(nn.Module):
         return self.fc(self.net(frames).flatten(1))
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
+    """Parse the command line.
+
+    Returns:
+        The parsed arguments.
+    """
     p = argparse.ArgumentParser(description="Train DiT frame / depth / flow heads")
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     p.add_argument("--batch_size", type=int, default=2)
@@ -73,7 +86,8 @@ def parse_args():
     return p.parse_args()
 
 
-def main():
+def main() -> None:
+    """Train the DiT frame / depth / flow heads against a standalone context encoder."""
     args = parse_args()
     device = torch.device(args.device)
     cfg = HaloVLMConfig()

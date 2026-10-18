@@ -35,6 +35,11 @@ from profiling import PROFILE_COMPONENTS, ProfileComponentBuilder
 # ---------------------------------------------------------------------------
 
 def parse_args() -> argparse.Namespace:
+    """Parse the command line.
+
+    Returns:
+        The parsed arguments.
+    """
     p = argparse.ArgumentParser(description="HALE-WAM profiler")
     p.add_argument("--component",     default="vla", choices=list(PROFILE_COMPONENTS))
     p.add_argument("--device",        default="cpu")
@@ -53,6 +58,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Profile the chosen component and print the report to stdout."""
     args = parse_args()
     device = torch.device(args.device)
 

@@ -23,12 +23,14 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from exceptions import HaloVLAConfigError
 
 from hale_core.config import load_registered_config
 from hale_core.config.sections.common import StrictModel
 from hale_core.registry import register_config
 from pydantic import Field
 
+from config.sections.base import VLASection
 from config.sections import (
     VLADataConfig,
     VLAEvalConfig,
@@ -52,7 +54,8 @@ class VLARunConfig(StrictModel):
     logging: VLALoggingConfig = Field(default_factory=VLALoggingConfig)
     viz: VLAVizConfig = Field(default_factory=VLAVizConfig)
 
-    def sections(self) -> list[Any]:
+    def sections(self) -> list[VLASection]:
+        """The nested sections that map onto ``scripts/train.py`` arguments."""
         return [self.model, self.train, self.data, self.eval, self.logging, self.viz]
 
     def train_arguments(self) -> dict[str, Any]:
@@ -75,7 +78,8 @@ class VLARunConfig(StrictModel):
 def load_vla_config(path: str | Path) -> VLARunConfig:
     """Load ``path`` (following ``inherits:``) and validate it as a :class:`VLARunConfig`."""
     cfg = load_registered_config(path, schema="vla")
-    assert isinstance(cfg, VLARunConfig)
+    if not isinstance(cfg, VLARunConfig):
+        raise HaloVLAConfigError(f"{path} did not validate as a Halo-VLA run config (got {type(cfg).__name__})")
     return cfg
 
 

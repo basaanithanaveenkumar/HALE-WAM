@@ -72,6 +72,7 @@ class DualSystemVLA(nn.Module):
     # ------------------------------------------------------------------ staging
     @property
     def in_prealignment(self) -> bool:
+        """Whether System 1 is still frozen (OpenHelix stage 1)."""
         return self._stage == "prealign"
 
     def set_training_step(self, step: int) -> None:
@@ -101,7 +102,18 @@ class DualSystemVLA(nn.Module):
         enc["latent_tokens"], enc["latent_mask"] = tokens, mask
         return self.bridge(tokens.float()), mask, enc
 
-    def system1_condition(self, latent, latent_mask, batch):
+    def system1_condition(self, latent: torch.Tensor, latent_mask: torch.Tensor,
+                          batch: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
+        """Condition System 1 on a latent and the batch's newest frame and state.
+
+        Args:
+            latent: projected latent ``(B, K, system1_dim)``.
+            latent_mask: its mask ``(B, K)``.
+            batch: the batch (``images``, optional ``image_mask``, ``states``).
+
+        Returns:
+            ``(condition tokens, condition mask)``.
+        """
         image = latest_frame(batch["images"], batch.get("image_mask"))
         state = latest_state(batch["states"], self.state_dim)
         return self.system1.condition(latent, latent_mask, image, state)

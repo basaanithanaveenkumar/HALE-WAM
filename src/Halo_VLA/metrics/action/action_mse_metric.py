@@ -33,6 +33,7 @@ class ActionMSEMetric(RoboticsMetricBase):
         self.reset()
 
     def reset(self) -> None:
+        """Clear the accumulated squared-error sums."""
         self._total_sq = torch.zeros(self.action_dim)
         self._n = 0
 
@@ -42,12 +43,24 @@ class ActionMSEMetric(RoboticsMetricBase):
         target: Tensor,                 # [B, T, action_dim]
         mask: Optional[Tensor] = None,  # [B, T]
     ) -> None:
+        """Accumulate one batch.
+
+        Args:
+            pred: predicted actions ``[B, T, action_dim]``.
+            target: ground-truth actions ``[B, T, action_dim]``.
+            mask: ``[B, T]``, True where the timestep is valid (default: all valid).
+        """
         sq_err = ((pred - target) ** 2).detach().cpu()  # [B, T, D]
         flat = _apply_mask(sq_err, mask)                 # [N_valid, D]
         self._total_sq += flat.sum(0)
         self._n += flat.shape[0]
 
     def compute(self) -> dict[str, float]:
+        """Return the metrics.
+
+        Returns:
+            ``action_mse`` and ``action_rmse``.
+        """
         n = max(self._n, 1)
         mean_sq = self._total_sq / n        # [D]
         mse = float(mean_sq.mean())

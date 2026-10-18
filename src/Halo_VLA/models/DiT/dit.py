@@ -1,5 +1,9 @@
 """DiT: diffusion Transformer for image-like data (frames, depth, flow)."""
 
+from __future__ import annotations
+
+from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
 import torch
 import torch.nn as nn
@@ -8,10 +12,23 @@ import torch.nn.functional as F
 from .dit_block import DiTBlock
 from .scalar_timestep_embedder import ScalarTimestepEmbedder
 
+if TYPE_CHECKING:
+    from config.model_config import HaloVLMConfig
+
 
 class DiT(nn.Module):
-    """Diffusion Transformer for image-like data (frames, depth, flow)."""
-    def __init__(self, config):
+    """Diffusion Transformer for image-like data (frames, depth, flow).
+
+    Patchifies the noisy input, adds (interpolated) learned positions, runs adaLN-Zero blocks
+    conditioned on the timestep gated by a context vector, then unpatchifies.
+
+    Args:
+        config: settings with the ``dit_*`` fields (``dit_in_channels``, ``dit_out_channels``,
+            ``dit_patch_size``, ``dit_hidden_size``, ``dit_num_heads``, ``dit_depth``,
+            ``dit_max_resolution``, ``dit_mlp_ratio``, optional ``dit_time_freq_dim``) and ``emb_dim``.
+    """
+
+    def __init__(self, config: HaloVLMConfig | SimpleNamespace) -> None:
         super().__init__()
         in_channels = config.dit_in_channels
         out_channels = config.dit_out_channels
@@ -53,7 +70,8 @@ class DiT(nn.Module):
         self.out_channels = out_channels
         self.initialize_weights()
 
-    def initialize_weights(self):
+    def initialize_weights(self) -> None:
+        """Xavier-initialise linears, then zero the adaLN modulation and unpatchify layers (adaLN-Zero)."""
         # Standard weight init
         for m in self.modules():
             if isinstance(m, nn.Linear):
@@ -69,12 +87,16 @@ class DiT(nn.Module):
         # Zero-out the unpatch embedding output layer (optional)
         nn.init.constant_(self.unpatch_embed.weight, 0)
 
-    def forward(self, x, t, context=None):
-        """
-        x:       [B, C, H, W]       noisy input (e.g., frame, depth, flow)
-        t:       [B]                diffusion timestep (int or float)
-        context: [B, D_context]     additional conditioning (from HaloVLM) or None
-        Returns: [B, out_C, H, W]   predicted noise (or v-prediction)
+    def forward(self, x: torch.Tensor, t: torch.Tensor, context: torch.Tensor | None = None) -> torch.Tensor:
+        """Predict the velocity (or noise) for a noisy input.
+
+        Args:
+            x: noisy input ``[B, C, H, W]`` (frame, depth, flow).
+            t: diffusion / flow time ``[B]`` (int or float).
+            context: conditioning ``[B, emb_dim]`` from HaloVLM, or ``None``.
+
+        Returns:
+            ``[B, out_C, H, W]``.
         """
         B, C, H, W = x.shape
         # 1. Patchify

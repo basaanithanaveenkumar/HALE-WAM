@@ -1,4 +1,4 @@
-"""VLATrainConfig: vLATrainConfig."""
+"""VLATrainConfig: optimisation settings of a training run."""
 
 from __future__ import annotations
 
@@ -11,6 +11,21 @@ from .ray_section import RaySection
 
 
 class VLATrainConfig(VLASection):
+    """Optimisation settings.
+
+    Attributes:
+        epochs: training epochs.
+        batch_size: samples per micro-step.
+        lr: AdamW learning rate.
+        weight_decay: AdamW weight decay.
+        grad_clip: global gradient-norm clip (0 disables).
+        grad_accum_steps: micro-steps per optimiser step.
+        action_loss_weight: weight of the flow-matching action loss.
+        resume: checkpoint to resume from.
+        checkpoint: checkpoint cadence.
+        ray: Ray Train launcher settings.
+    """
+
     ARGS = {"epochs": "epochs", "batch_size": "batch_size", "lr": "lr", "weight_decay": "weight_decay",
             "grad_clip": "grad_clip", "grad_accum_steps": "grad_accum_steps",
             "action_loss_weight": "action_loss_weight", "resume": "resume"}

@@ -25,5 +25,13 @@ class FastObservationEncoder(nn.Module):
         nn.init.trunc_normal_(self.pos, std=0.02)
 
     def forward(self, image: torch.Tensor) -> torch.Tensor:
+        """Encode the current frame into tokens.
+
+        Args:
+            image: ``(B, 3, H, W)``.
+
+        Returns:
+            ``(B, N, dim)`` tokens with learned positions.
+        """
         tokens = self.stem(image).flatten(2).transpose(1, 2)  # (B, N, dim)
         return tokens + self.pos[:, : tokens.size(1)]

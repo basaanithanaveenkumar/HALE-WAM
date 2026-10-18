@@ -64,7 +64,8 @@ def encode_frames(model: HaloVLM, images: torch.Tensor) -> torch.Tensor:
     return torch.stack(embs, dim=1)                  # [B, T, emb_dim]
 
 
-def main():
+def main() -> None:
+    """Train the Dreamer-style world model and imagination actor-critic on Halo-VLA features."""
     args = parse_args()
     device = torch.device(args.device)
     logger.info("Device: {}", device)
@@ -154,7 +155,12 @@ def main():
     logger.info("Training complete.")
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
+    """Parse the command line.
+
+    Returns:
+        The parsed arguments.
+    """
     p = argparse.ArgumentParser(description="Dreamer-style training on Halo-VLA features")
     p.add_argument("--dataset", choices=("eo",), default="eo")
     p.add_argument("--subset", default="interleave-temporal")

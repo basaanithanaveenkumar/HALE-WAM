@@ -28,7 +28,7 @@ import torch
 import torch.nn.functional as F
 from torch.distributions import kl_divergence
 
-from rl.rssm import RSSM
+from rl.rssm import RSSM, LatentState
 from rl.actor_critic import Actor, Critic, lambda_return
 
 
@@ -120,7 +120,7 @@ def _detach_dist(dist):
 # Phase 2 — imagination + actor-critic
 # ---------------------------------------------------------------------------
 @torch.no_grad()
-def imagine(rssm: RSSM, actor: Actor, init_state, horizon: int):
+def imagine(rssm: RSSM, actor: Actor, init_state: LatentState, horizon: int) -> dict[str, torch.Tensor]:
     """Roll the RSSM prior forward under the actor, purely in latent space.
 
     The dynamics rollout runs under ``no_grad`` — gradients for the actor are
@@ -161,13 +161,13 @@ def actor_critic_loss(
     rssm: RSSM,
     actor: Actor,
     critic: Critic,
-    init_state,
+    init_state: LatentState,
     *,
     horizon: int = 10,
     gamma: float = 0.99,
     lam: float = 0.95,
     entropy_coef: float = 1e-3,
-) -> tuple[torch.Tensor, torch.Tensor, dict]:
+) -> tuple[torch.Tensor, torch.Tensor, dict[str, float]]:
     """Compute actor and critic losses from imagined trajectories.
 
     Args:

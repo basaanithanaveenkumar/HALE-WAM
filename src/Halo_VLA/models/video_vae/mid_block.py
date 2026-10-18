@@ -19,4 +19,5 @@ class MidBlock(nn.Module):
         self.res2 = ResBlock(ch, ch)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Apply ResBlock, attention, ResBlock: ``[B, C, H, W] -> [B, C, H, W]``."""
         return self.res2(self.attn(self.res1(x)))

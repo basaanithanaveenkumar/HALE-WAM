@@ -1,4 +1,4 @@
-"""HFVisionEncoder: hFVisionEncoder."""
+"""HFVisionEncoder: a pretrained SigLIP / CLIP vision tower from the Hub."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from exceptions import HaloVLAConfigError
 #: Statistics the VLA datasets normalise images with (``img_mean`` / ``img_std``).
 DATASET_MEAN = (0.485, 0.456, 0.406)
 
-
+#: Per-channel standard deviation of the same normalisation.
 DATASET_STD = (0.229, 0.224, 0.225)
 
 
@@ -54,15 +54,25 @@ class HFVisionEncoder(nn.Module):
 
     @property
     def output_dim(self) -> int:
+        """Width of the tower's output tokens."""
         return int(self.model.config.hidden_size)
 
     def train(self, mode: bool = True) -> HFVisionEncoder:
+        """Switch train / eval; a frozen tower stays in eval mode."""
         super().train(mode)
         if self.frozen:
             self.model.eval()  # frozen towers never switch dropout / norms to training mode
         return self
 
     def forward(self, images: torch.Tensor) -> torch.Tensor:
+        """Encode images into patch tokens.
+
+        Args:
+            images: ``[B, 3, H, W]`` normalised with the datasets' ImageNet statistics.
+
+        Returns:
+            The last hidden state ``[B, N, output_dim]`` as float32.
+        """
         pixel_values = images * self.scale + self.shift
         with torch.set_grad_enabled(torch.is_grad_enabled() and not self.frozen):
             return self.model(pixel_values=pixel_values.to(self.model.dtype)).last_hidden_state.float()

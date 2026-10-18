@@ -152,7 +152,7 @@ def build_eo_dataloader(
     split: str = "train",
     batch_size: int = 4,
     num_workers: int = 4,
-    tokenizer=None,
+    tokenizer: Any = None,
     img_size: int = 224,
     max_seq_len: int = 512,
     max_action_len: int = 64,
@@ -163,7 +163,7 @@ def build_eo_dataloader(
     cache_dir: Optional[str] = None,
     shuffle: bool = True,
     pin_memory: bool = True,
-    **kwargs,
+    **kwargs: Any,
 ) -> DataLoader:
     """
     Build a ready-to-use DataLoader for EO-Data1.5M.

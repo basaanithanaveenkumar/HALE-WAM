@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import torch
 from torch import nn
 
 from hale_core.deploy.core.io_signature import IOSignature
@@ -18,11 +19,22 @@ class DualSystem1ObserverAdapter(DualSystem1AdapterBase):
     """
 
     def default_signature(self) -> IOSignature:
+        """Latent, latent mask, image and state in; condition tokens and mask out."""
         return self.build_signature({"inputs": self.latent_inputs(), "outputs": ["condition", "condition_mask"],
                                      "dims": {"batch": self.batch_dim(), "latent_len": self.latent_dim()}})
 
     def graph(self, model: nn.Module) -> nn.Module:
+        """The whole System 1 policy (only ``condition`` is called)."""
         return model.system1
 
-    def forward_for_export(self, graph: nn.Module, inputs: dict):
+    def forward_for_export(self, graph: nn.Module, inputs: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
+        """Run ``System1Policy.condition``.
+
+        Args:
+            graph: the System 1 policy.
+            inputs: ``latent``, ``latent_mask``, ``image``, ``state``.
+
+        Returns:
+            ``(condition, condition_mask)``.
+        """
         return graph.condition(inputs["latent"], inputs["latent_mask"], inputs["image"], inputs["state"])

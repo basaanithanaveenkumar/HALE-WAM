@@ -166,7 +166,8 @@ from visualization.video_writer import (  # noqa: F401 - moved; re-exported for 
 # ---------------------------------------------------------------------------
 # Main routine
 # ---------------------------------------------------------------------------
-def main(args):
+def main(args: argparse.Namespace) -> None:
+    """Render dataset samples (and, with a checkpoint, predictions) as annotated videos."""
     cv2 = _import_cv2()
     device = torch.device(args.device)
 
@@ -375,7 +376,12 @@ def main(args):
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
-def parse_args():
+def parse_args() -> argparse.Namespace:
+    """Parse the command line.
+
+    Returns:
+        The parsed arguments.
+    """
     p = argparse.ArgumentParser(description="Halo-VLA Visualisation")
 
     # Data

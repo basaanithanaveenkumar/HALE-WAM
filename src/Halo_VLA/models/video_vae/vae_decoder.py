@@ -37,6 +37,14 @@ class VAEDecoder(nn.Module):
         self.conv_out = nn.Conv2d(ch[-1], out_ch, 3, padding=1)
 
     def forward(self, z: torch.Tensor) -> torch.Tensor:
+        """Decode latents to images.
+
+        Args:
+            z: latent sample ``[B, latent_ch, H/8, W/8]``.
+
+        Returns:
+            Reconstructed images ``[B, out_ch, H, W]``.
+        """
         h = self.mid(self.conv_in(z))
         for block in self.blocks:
             h = block(h)

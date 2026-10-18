@@ -20,7 +20,9 @@ class HaloPerceptionAdapter(ObservationPromptAdapter):
     requires_dual = False
 
     def default_signature(self) -> IOSignature:
+        """Observation and prompt in; the action conditioning out."""
         return self.observation_signature(["action_context"])
 
     def graph(self, model: nn.Module) -> nn.Module:
+        """Vision encoder and decoder up to the action-token states."""
         return PerceptionGraph(model, self.num_action_tokens)

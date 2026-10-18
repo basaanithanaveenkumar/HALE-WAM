@@ -25,4 +25,12 @@ class EncoderBlock(nn.Module):
         self.down      = Downsample(out_ch) if downsample else nn.Identity()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Apply the residual blocks then the optional 2x downsampling.
+
+        Args:
+            x: ``[B, in_ch, H, W]``.
+
+        Returns:
+            ``[B, out_ch, H', W']`` with ``H' = H / 2`` when ``downsample`` else ``H``.
+        """
         return self.down(self.resblocks(x))

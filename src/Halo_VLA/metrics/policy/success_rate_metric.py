@@ -28,15 +28,26 @@ class SuccessRateMetric(RoboticsMetricBase):
         self.reset()
 
     def reset(self) -> None:
+        """Clear the success counters."""
         self._n_success = 0
         self._n_total = 0
 
     def update(self, success: bool) -> None:  # type: ignore[override]
+        """Record one episode.
+
+        Args:
+            success: whether the episode succeeded.
+        """
         self._n_total += 1
         if success:
             self._n_success += 1
 
     def compute(self) -> dict[str, float]:
+        """Return the metrics.
+
+        Returns:
+            ``success_rate``, ``n_episodes`` and ``n_success``.
+        """
         return {
             "success_rate": self._n_success / max(self._n_total, 1),
             "n_episodes":   float(self._n_total),

@@ -14,4 +14,5 @@ class Downsample(nn.Module):
         self.conv = nn.Conv2d(ch, ch, 3, stride=2, padding=1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Halve the spatial size: ``[B, C, H, W] -> [B, C, H/2, W/2]``."""
         return self.conv(x)

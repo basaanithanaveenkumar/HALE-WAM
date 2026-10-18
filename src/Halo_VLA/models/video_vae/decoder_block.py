@@ -25,4 +25,12 @@ class DecoderBlock(nn.Module):
         self.up        = Upsample(out_ch) if upsample else nn.Identity()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Apply the residual blocks then the optional 2x upsampling.
+
+        Args:
+            x: ``[B, in_ch, H, W]``.
+
+        Returns:
+            ``[B, out_ch, H', W']`` with ``H' = 2H`` when ``upsample`` else ``H``.
+        """
         return self.up(self.resblocks(x))

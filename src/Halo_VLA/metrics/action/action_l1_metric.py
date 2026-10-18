@@ -35,6 +35,7 @@ class ActionL1Metric(RoboticsMetricBase):
         self.reset()
 
     def reset(self) -> None:
+        """Clear the accumulated absolute-error sums."""
         # Total absolute error and count — used for the overall mean
         self._total_err = torch.zeros(self.action_dim)   # [D]
         self._n = 0
@@ -49,6 +50,13 @@ class ActionL1Metric(RoboticsMetricBase):
         target: Tensor,         # [B, T, action_dim]
         mask: Optional[Tensor] = None,  # [B, T] — True where timestep is valid
     ) -> None:
+        """Accumulate one batch.
+
+        Args:
+            pred: predicted actions ``[B, T, action_dim]``.
+            target: ground-truth actions ``[B, T, action_dim]``.
+            mask: ``[B, T]``, True where the timestep is valid (default: all valid).
+        """
         err = (pred - target).abs().detach().cpu()  # [B, T, D]
 
         # ── overall ──────────────────────────────────────────────────────────
@@ -68,6 +76,11 @@ class ActionL1Metric(RoboticsMetricBase):
             self._t_n[ti] += step_err.shape[0]
 
     def compute(self) -> dict[str, float]:
+        """Return the metrics.
+
+        Returns:
+            the overall and per-dimension / per-timestep mean absolute errors under the ``action_l1`` prefix.
+        """
         n = max(self._n, 1)
         mean_per_dim = self._total_err / n           # [D]
 

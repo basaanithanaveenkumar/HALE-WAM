@@ -27,12 +27,16 @@ class DualSystemPolicyAdapter(ObservationPromptAdapter):
         self.steps = steps
 
     def default_signature(self) -> IOSignature:
+        """Observation, prompt and (for sampling policies) noise in; the action chunk out."""
+        from dual_system.system1.system1_registry import SYSTEM1_POLICIES  # lazy: import roots are set up by Halo_VLA.deploy
+
         cfg = self.model_config()
-        extra = []
-        if self.dual_config().policy != "regression":
+        extra: list[dict[str, Any]] = []
+        if SYSTEM1_POLICIES.get(self.dual_config().policy).needs_noise:
             extra.append({"name": "noise", "shape": ["batch", cfg.action_chunk_size, cfg.action_dim],
                           "dtype": "float32", "value_range": [-2.0, 2.0]})
         return self.observation_signature(["actions"], extra)
 
     def graph(self, model: nn.Module) -> nn.Module:
+        """System 2 and System 1 chained in one graph."""
         return DualSystemPolicyGraph(model, self.steps)

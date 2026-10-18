@@ -184,6 +184,7 @@ def build_jsonl(
 
 
 def main() -> None:
+    """Generate ``episodes.jsonl`` for the MoMa dataset from the command line."""
     ap = argparse.ArgumentParser(description="Generate episodes.jsonl for AiroaMomaDataset")
     ap.add_argument("--data_root", default="/home/ha/datasets/airoa-moma",
                     help="Path to the local airoa-moma clone")

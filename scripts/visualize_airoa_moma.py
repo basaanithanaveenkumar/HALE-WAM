@@ -61,6 +61,7 @@ def tensor_to_bgr(
 
 
 def pred_rgb_to_bgr(pred: torch.Tensor) -> np.ndarray:
+    """Convert a predicted RGB tensor (arbitrary range) into a contrast-stretched BGR ``uint8`` image."""
     cv2 = _import_cv2()
     x = pred.detach().cpu().float().clamp(-8, 8)
     if x.dim() == 4:
@@ -74,6 +75,7 @@ def pred_rgb_to_bgr(pred: torch.Tensor) -> np.ndarray:
 
 
 def resize_h(img: np.ndarray, h: int) -> np.ndarray:
+    """Resize ``img`` to height ``h`` keeping the aspect ratio."""
     cv2 = _import_cv2()
     if img.shape[0] == h:
         return img
@@ -82,6 +84,7 @@ def resize_h(img: np.ndarray, h: int) -> np.ndarray:
 
 
 def label_bar(img: np.ndarray, text: str) -> np.ndarray:
+    """Stack a dark caption bar with ``text`` above ``img``."""
     cv2 = _import_cv2()
     h, w = img.shape[:2]
     bar = np.ones((32, w, 3), dtype=np.uint8) * 45
@@ -90,11 +93,13 @@ def label_bar(img: np.ndarray, text: str) -> np.ndarray:
 
 
 def hstack_three(inp: np.ndarray, gt: np.ndarray, pr: np.ndarray, height: int) -> np.ndarray:
+    """Place the input, ground-truth and prediction side by side, each captioned and padded to a common width."""
     a = label_bar(resize_h(inp, height), "input (seq)")
     b = label_bar(resize_h(gt, height), "ground truth")
     c = label_bar(resize_h(pr, height), "predicted")
     w_max = max(a.shape[1], b.shape[1], c.shape[1])
-    def pad(x):
+    def pad(x: np.ndarray) -> np.ndarray:
+        """Right-pad ``x`` with grey to the common width."""
         if x.shape[1] < w_max:
             padw = w_max - x.shape[1]
             return np.pad(x, ((0, 0), (0, padw), (0, 0)), constant_values=40)
@@ -103,7 +108,16 @@ def hstack_three(inp: np.ndarray, gt: np.ndarray, pr: np.ndarray, height: int) -
     return np.hstack([a, b, c])
 
 
-def load_model_ckpt(path: str | None, device: torch.device):
+def load_model_ckpt(path: str | None, device: torch.device) -> tuple[HaloVLM | None, HaloVLMConfig | None]:
+    """Load a checkpoint's weights into a ``HaloVLM``.
+
+    Args:
+        path: checkpoint file, or ``None``/empty for no model.
+        device: where to put the model.
+
+    Returns:
+        ``(model, config)``, or ``(None, None)`` without a checkpoint.
+    """
     from dataclasses import fields
 
     if not path:
@@ -121,7 +135,12 @@ def load_model_ckpt(path: str | None, device: torch.device):
     return model, cfg
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
+    """Parse the command line.
+
+    Returns:
+        The parsed arguments.
+    """
     p = argparse.ArgumentParser(description="MoMa 1 FPS input/GT/pred video")
     p.add_argument("--moma_data_root", required=True)
     p.add_argument("--checkpoint", default=None)
@@ -135,7 +154,8 @@ def parse_args():
     return p.parse_args()
 
 
-def main():
+def main() -> None:
+    """Write one input / ground-truth / prediction video per MoMa sample."""
     args = parse_args()
     cv2 = _import_cv2()
     device = torch.device(args.device)

@@ -67,6 +67,14 @@ class QFormer(nn.Module):
         return self.num_queries
 
     def forward(self, vision_features: torch.Tensor) -> torch.Tensor:
+        """Compress vision tokens into ``num_queries`` tokens.
+
+        Args:
+            vision_features: ``[B, N, vision_dim]``.
+
+        Returns:
+            ``[B, num_queries, llm_dim]``.
+        """
         memory = self.memory_norm(vision_features)
         queries = self.query_tokens.expand(vision_features.shape[0], -1, -1)
         queries = queries.to(memory.dtype)

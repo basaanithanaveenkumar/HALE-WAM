@@ -31,6 +31,7 @@ class WebDatasetCliOptions:
 
     @staticmethod
     def add_arguments(parser: argparse.ArgumentParser) -> None:
+        """Add the ``--webdataset*`` flags to ``parser``."""
         group = parser.add_argument_group("WebDataset (optional, needs hale-blocks[webdataset])")
         group.add_argument("--webdataset", action="store_true",
                            help="Convert the training dataset to WebDataset shards and stream them")

@@ -36,12 +36,17 @@ choice, which we keep Gaussian for simplicity and easy unit testing.
 
 from __future__ import annotations
 
+from typing import Any
+
 import torch
 import torch.nn as nn
 from torch.distributions import Independent, Normal
 
+#: The recurrent state-space model's latent state ``(h, z)``: deterministic and stochastic parts.
+LatentState = tuple[torch.Tensor, torch.Tensor]
 
-def _mlp(sizes, act=nn.ELU):
+
+def _mlp(sizes: list[int], act: type[nn.Module] = nn.ELU) -> nn.Sequential:
     """Small helper: build an MLP from a list of layer sizes."""
     layers = []
     for i in range(len(sizes) - 1):
@@ -98,7 +103,7 @@ class RSSM(nn.Module):
     # ------------------------------------------------------------------ #
     # State helpers
     # ------------------------------------------------------------------ #
-    def initial_state(self, batch_size: int, device=None) -> tuple[torch.Tensor, torch.Tensor]:
+    def initial_state(self, batch_size: int, device: torch.device | str | None = None) -> LatentState:
         """Zero (h, z) initial latent state."""
         device = device or next(self.parameters()).device
         h = torch.zeros(batch_size, self.deter_dim, device=device)
@@ -106,7 +111,7 @@ class RSSM(nn.Module):
         return h, z
 
     @staticmethod
-    def feature(state: tuple[torch.Tensor, torch.Tensor]) -> torch.Tensor:
+    def feature(state: LatentState) -> torch.Tensor:
         """Concatenate (h, z) into the model state read by the heads/actor."""
         h, z = state
         return torch.cat([h, z], dim=-1)
@@ -120,7 +125,7 @@ class RSSM(nn.Module):
     # ------------------------------------------------------------------ #
     # Single-step transitions
     # ------------------------------------------------------------------ #
-    def img_step(self, state, action):
+    def img_step(self, state: LatentState, action: torch.Tensor) -> tuple[LatentState, Independent]:
         """Imagination step: advance the deterministic state and sample the
         *prior* latent (no observation involved).
 
@@ -135,7 +140,8 @@ class RSSM(nn.Module):
         z = prior.rsample()                           # reparameterised sample
         return (h, z), prior
 
-    def obs_step(self, state, action, obs_embed):
+    def obs_step(self, state: LatentState, action: torch.Tensor,
+                 obs_embed: torch.Tensor) -> tuple[LatentState, Independent, Independent]:
         """Filtering step on real data: advance ``h`` via the prior, then form
         the *posterior* latent corrected by the observation embedding.
 
@@ -152,7 +158,8 @@ class RSSM(nn.Module):
     # ------------------------------------------------------------------ #
     # Sequence rollout on real data
     # ------------------------------------------------------------------ #
-    def observe(self, obs_embeds: torch.Tensor, actions: torch.Tensor, state=None):
+    def observe(self, obs_embeds: torch.Tensor, actions: torch.Tensor,
+                state: LatentState | None = None) -> dict[str, Any]:
         """Run the posterior filter over a sequence of observations/actions.
 
         Args:

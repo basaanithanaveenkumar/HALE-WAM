@@ -137,6 +137,7 @@ class HaloVisionBackbone(nn.Module):
         return self._out_dim
 
     def train(self, mode: bool = True) -> "HaloVisionBackbone":
+        """Switch train / eval; a frozen backbone stays in eval mode."""
         super().train(mode)
         if self._freeze_encoder:
             self.backbone.eval()  # a frozen backbone keeps dropout off and BatchNorm statistics fixed

@@ -11,6 +11,7 @@ Distributed (same script, same losses - see src/Halo_VLA/training/):
     python scripts/train.py --webdataset --webdataset_root /fast/shards ...   # any dataset -> WebDataset shards
 """
 
+import argparse
 import sys
 import time
 from contextlib import nullcontext
@@ -61,8 +62,16 @@ def _latest_ray_checkpoint() -> Path | None:
     return None if restored is None else CheckpointManager(Path(restored)).latest()
 
 
-def train(args):
+def train(args: argparse.Namespace) -> None:
     # ---- Distributed session: single process, torchrun or a Ray Train worker ----
+    """Train Halo-VLA (or a dual-system VLA) end to end.
+
+    Runs in a single process, under ``torchrun`` or inside a Ray Train worker, and is the entry
+    point the Ray launcher imports.
+
+    Args:
+        args: parsed training arguments (see :func:`training.train_arg_parser.parse_args`).
+    """
     session = DDPSession.start(args.device)
     device = session.device
     amp_enabled = device.type == "cuda"  # fp16 autocast + loss scaling only exist on CUDA

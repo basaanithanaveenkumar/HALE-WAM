@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import torch
 from torch import nn
 
 from hale_core.deploy.core.dim_spec import DimSpec
@@ -22,6 +23,11 @@ class DualSystem1ActionStepAdapter(DualSystem1AdapterBase):
     """
 
     def default_signature(self) -> IOSignature:
+        """Condition tokens, noisy actions and timestep in; the head's prediction out.
+
+        Raises:
+            ConfigError: for a regression policy, which has no sampler step.
+        """
         from dual_system.system1.system1_registry import SYSTEM1_POLICIES  # lazy: import roots are set up by Halo_VLA.deploy
 
         cfg, dual = self.model_config(), self.dual_config()
@@ -44,7 +50,17 @@ class DualSystem1ActionStepAdapter(DualSystem1AdapterBase):
         })
 
     def graph(self, model: nn.Module) -> nn.Module:
+        """The System 1 action transformer."""
         return model.system1.head
 
-    def forward_for_export(self, graph: nn.Module, inputs: dict):
+    def forward_for_export(self, graph: nn.Module, inputs: dict[str, torch.Tensor]) -> torch.Tensor:
+        """Call the transformer with the named inputs.
+
+        Args:
+            graph: the System 1 action transformer.
+            inputs: ``condition``, ``condition_mask``, ``noisy_actions``, ``timestep``.
+
+        Returns:
+            The velocity (flow matching) or v-prediction (diffusion) ``[B, chunk, action_dim]``.
+        """
         return graph(inputs["condition"], inputs["condition_mask"], inputs["noisy_actions"], inputs["timestep"])

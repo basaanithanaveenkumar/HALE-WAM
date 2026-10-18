@@ -24,6 +24,10 @@ class DualSystem1AdapterBase(HaloAdapterBase):
         self._latent_tokens = latent_tokens
 
     def latent_dim(self) -> int | list[int]:
+        """Latent length ``K`` as a static int or a ``[min, opt, max]`` dynamic range.
+
+        Uses ``latent_tokens`` when given, else the registered latent extractor's ``static_length``.
+        """
         if self._latent_tokens is not None:
             return self._latent_tokens
         from dual_system.latent.latent_registry import LATENT_EXTRACTORS  # lazy: import roots are set up by Halo_VLA.deploy
@@ -32,13 +36,15 @@ class DualSystem1AdapterBase(HaloAdapterBase):
         return static if static is not None else [1, 16, 512]
 
     def observation_tokens(self) -> int:
+        """Number of observation tokens System 1's encoder emits (the resampler's count or the conv grid)."""
         dual = self.dual_config()
         if dual.obs_resampler_tokens:
             return int(dual.obs_resampler_tokens)
         grid = max(1, self.model_config().img_size // 16)
         return grid * grid
 
-    def latent_inputs(self) -> list[dict]:
+    def latent_inputs(self) -> list[dict[str, Any]]:
+        """Input specs shared by the System 1 graphs: latent, latent mask, current image, state."""
         cfg, dual = self.model_config(), self.dual_config()
         return [
             {"name": "latent", "shape": ["batch", "latent_len", dual.system1_dim], "dtype": "float32",

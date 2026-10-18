@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 from .step_output import StepOutput
 
 
-def compute_language_loss(logits, labels, num_prepended):
+def compute_language_loss(logits: torch.Tensor, labels: torch.Tensor, num_prepended: int) -> torch.Tensor:
     """
     Cross-entropy loss on the text portion of the sequence.
 

@@ -22,6 +22,7 @@ import argparse
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 import torch
 import torch.nn.functional as F
@@ -45,7 +46,7 @@ from loguru import logger
 # ---------------------------------------------------------------------------
 # Checkpoint loading
 # ---------------------------------------------------------------------------
-def load_checkpoint(ckpt_path: str, device: torch.device):
+def load_checkpoint(ckpt_path: str, device: torch.device) -> tuple[HaloVLM, HaloVLMConfig]:
     """Load model from a training checkpoint."""
     ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
 
@@ -74,7 +75,7 @@ def load_checkpoint(ckpt_path: str, device: torch.device):
 # ---------------------------------------------------------------------------
 # Tokenizer helper
 # ---------------------------------------------------------------------------
-def get_tokenizer(max_seq_len: int = 512):
+def get_tokenizer(max_seq_len: int = 512) -> Any:
     """Return the same tokenizer used during training."""
     from transformers import AutoTokenizer
     from config.tokens import get_all_custom_tokens
@@ -113,7 +114,7 @@ def preprocess_image(img_path: str, img_size: int = 224) -> torch.Tensor:
 @torch.no_grad()
 def generate(
     model: HaloVLM,
-    tokenizer,
+    tokenizer: Any,
     images: torch.Tensor,       # [1, N_img, 3, H, W]
     input_ids: torch.Tensor,    # [1, seq_len]
     attention_mask: torch.Tensor,
@@ -123,7 +124,7 @@ def generate(
     top_k: int = 0,
     top_p: float = 1.0,
     eos_token_id: int | None = None,
-):
+) -> tuple[list[int], torch.Tensor | None]:
     """
     Auto-regressive greedy / top-k / nucleus generation.
 
@@ -205,7 +206,8 @@ def generate(
 # ---------------------------------------------------------------------------
 # Interactive mode
 # ---------------------------------------------------------------------------
-def interactive(args):
+def interactive(args: argparse.Namespace) -> None:
+    """Chat with a checkpoint on the terminal (REPL: text in, text and actions out)."""
     device = torch.device(args.device)
     model, config = load_checkpoint(args.checkpoint, device)
     tokenizer = get_tokenizer(max_seq_len=args.max_seq_len)
@@ -296,7 +298,8 @@ def interactive(args):
 # Dataset evaluation mode
 # ---------------------------------------------------------------------------
 @torch.no_grad()
-def evaluate_dataset(args):
+def evaluate_dataset(args: argparse.Namespace) -> None:
+    """Run a checkpoint over a dataset split and report the language, action and image metrics."""
     device = torch.device(args.device)
     model, config = load_checkpoint(args.checkpoint, device)
     tokenizer = get_tokenizer(max_seq_len=args.max_seq_len)
@@ -392,7 +395,12 @@ def evaluate_dataset(args):
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
-def parse_args():
+def parse_args() -> argparse.Namespace:
+    """Parse the command line.
+
+    Returns:
+        The parsed arguments.
+    """
     p = argparse.ArgumentParser(description="Halo-VLA Inference")
 
     p.add_argument("--checkpoint", type=str, required=True, help="Path to .pt checkpoint")

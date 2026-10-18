@@ -1,6 +1,6 @@
 """Animated GIFs of the visual DiT: denoising snapshots, filmstrips and autoregressive rollouts."""
 
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -60,7 +60,7 @@ _PHASE_LABEL_TO_PRAI = {
 # ---------------------------------------------------------------------------
 @torch.no_grad()
 def sample_dit_with_intermediates(
-    predictor,
+    predictor: Any,
     text_emb: torch.Tensor,
     height: int,
     width: int,
@@ -68,7 +68,7 @@ def sample_dit_with_intermediates(
     num_steps: int = 30,
     num_snapshots: int = 24,
     world_video_query_hiddens: Optional[torch.Tensor] = None,
-):
+) -> Tuple[List[torch.Tensor], List[float]]:
     """
     Mirror of ``RGBFramePredictor.predict_future_frames`` that records
     intermediate ``x`` values during Euler integration.
@@ -103,7 +103,7 @@ def sample_dit_with_intermediates(
     snapshots: List[torch.Tensor] = []
     step_times: List[float] = []
 
-    def _record(step_idx: int, x_now: torch.Tensor):
+    def _record(step_idx: int, x_now: torch.Tensor) -> None:
         snap = x_now.view(B, num_frames, rgb_channels, height, width).cpu()
         snapshots.append(snap)
         step_times.append(step_idx * dt)
@@ -134,7 +134,7 @@ def save_diffusion_gif(
     hold_final_seconds: float = 1.5,
     img_mean: Tuple = (0.485, 0.456, 0.406),
     img_std: Tuple = (0.229, 0.224, 0.225),
-):
+) -> None:
     """
     Render the noise -> image diffusion trajectory for a single predicted
     frame as an animated GIF. Each GIF frame is annotated with the step

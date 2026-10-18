@@ -31,6 +31,7 @@ def _ssim_map(
     kk = kernel.view(1, 1, K, K).expand(C, 1, K, K).to(pred.device)
 
     def smooth(x: Tensor) -> Tensor:
+        """Gaussian-window local mean."""
         return F.conv2d(x, kk, padding=pad, groups=C)
 
     mu1 = smooth(pred)
@@ -81,13 +82,25 @@ class SSIMMetric(RoboticsMetricBase):
         self.reset()
 
     def reset(self) -> None:
+        """Clear the accumulated SSIM sum."""
         self._total = 0.0
         self._n = 0
 
     def update(self, pred: Tensor, target: Tensor) -> None:
+        """Accumulate one batch.
+
+        Args:
+            pred: predicted images ``[B, C, H, W]`` in ``[0, 1]``.
+            target: ground-truth images, same shape.
+        """
         s = float(_ssim_map(pred.float(), target.float(), self._kernel).item())
         self._total += s * pred.shape[0]
         self._n += pred.shape[0]
 
     def compute(self) -> dict[str, float]:
+        """Return the metrics.
+
+        Returns:
+            ``ssim_mean`` over all samples seen.
+        """
         return {"ssim_mean": self._total / max(self._n, 1)}

@@ -32,6 +32,7 @@ class ActionChunkAccuracyMetric(RoboticsMetricBase):
         self.reset()
 
     def reset(self) -> None:
+        """Clear the accumulated per-threshold hit counts."""
         self._correct = [0] * len(self.thresholds)
         self._total = 0
 
@@ -40,6 +41,12 @@ class ActionChunkAccuracyMetric(RoboticsMetricBase):
         pred: Tensor,    # [B, T, action_dim]
         target: Tensor,  # [B, T, action_dim]
     ) -> None:
+        """Accumulate one batch.
+
+        Args:
+            pred: predicted actions ``[B, T, action_dim]``.
+            target: ground-truth actions ``[B, T, action_dim]``.
+        """
         # max L1 error per sample across all timesteps and dimensions
         max_err = (pred - target).abs().max(dim=-1).values.max(dim=-1).values  # [B]
         max_err = max_err.detach().cpu()
@@ -48,6 +55,11 @@ class ActionChunkAccuracyMetric(RoboticsMetricBase):
             self._correct[i] += int((max_err < thr).sum().item())
 
     def compute(self) -> dict[str, float]:
+        """Return the metrics.
+
+        Returns:
+            ``chunk_acc_<threshold>``: the share of chunks whose maximum per-step L1 error is below each threshold.
+        """
         total = max(self._total, 1)
         out: dict[str, float] = {}
         for i, thr in enumerate(self.thresholds):

@@ -37,6 +37,7 @@ class ActionNormalisedError(RoboticsMetricBase):
         self.reset()
 
     def reset(self) -> None:
+        """Clear the accumulated errors and the observed per-dimension range."""
         self._dim_min = torch.full((self.action_dim,), float("inf"))
         self._dim_max = torch.full((self.action_dim,), float("-inf"))
         self._total_err = torch.zeros(self.action_dim)
@@ -48,6 +49,13 @@ class ActionNormalisedError(RoboticsMetricBase):
         target: Tensor,                 # [B, T, action_dim]
         mask: Optional[Tensor] = None,  # [B, T]
     ) -> None:
+        """Accumulate one batch.
+
+        Args:
+            pred: predicted actions ``[B, T, action_dim]``.
+            target: ground-truth actions ``[B, T, action_dim]``.
+            mask: ``[B, T]``, True where the timestep is valid (default: all valid).
+        """
         pred_f = _apply_mask(pred.detach().cpu(), mask)    # [N, D]
         tgt_f  = _apply_mask(target.detach().cpu(), mask)  # [N, D]
 
@@ -59,6 +67,11 @@ class ActionNormalisedError(RoboticsMetricBase):
         self._n += pred_f.shape[0]
 
     def compute(self) -> dict[str, float]:
+        """Return the metrics.
+
+        Returns:
+            ``normalised_action_error``: mean L1 divided by the observed range of each dimension.
+        """
         n = max(self._n, 1)
         mean_err = self._total_err / n                            # [D]
         dim_range = (self._dim_max - self._dim_min).clamp(min=self.eps)  # [D]

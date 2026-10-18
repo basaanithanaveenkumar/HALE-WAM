@@ -37,6 +37,7 @@ class PSNRMetric(RoboticsMetricBase):
         self.reset()
 
     def reset(self) -> None:
+        """Clear the accumulated mean squared error."""
         self._total_mse = 0.0
         self._n = 0
 
@@ -45,11 +46,22 @@ class PSNRMetric(RoboticsMetricBase):
         pred: Tensor,    # [B, C, H, W] float32, same range as max_val
         target: Tensor,  # [B, C, H, W]
     ) -> None:
+        """Accumulate one batch.
+
+        Args:
+            pred: predicted images ``[B, C, H, W]`` in the range of ``max_val``.
+            target: ground-truth images ``[B, C, H, W]``.
+        """
         mse = float(F.mse_loss(pred.float(), target.float()).item())
         self._total_mse += mse * pred.shape[0]
         self._n += pred.shape[0]
 
     def compute(self) -> dict[str, float]:
+        """Return the metrics.
+
+        Returns:
+            ``psnr_mean`` in dB (capped for identical images).
+        """
         n = max(self._n, 1)
         mean_mse = self._total_mse / n
         if mean_mse < 1e-10:

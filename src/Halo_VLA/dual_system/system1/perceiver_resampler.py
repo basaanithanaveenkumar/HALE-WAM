@@ -20,6 +20,14 @@ class PerceiverResampler(nn.Module):
         self.norm = nn.LayerNorm(dim)
 
     def forward(self, tokens: torch.Tensor) -> torch.Tensor:
+        """Compress observation tokens into ``num_latents`` tokens.
+
+        Args:
+            tokens: ``(B, N, dim)``.
+
+        Returns:
+            ``(B, num_latents, dim)``.
+        """
         q = self.latents.expand(tokens.size(0), -1, -1)
         x = q + self.attn(q, self.norm(tokens), self.norm(tokens))[0]
         return x + self.ff(x)

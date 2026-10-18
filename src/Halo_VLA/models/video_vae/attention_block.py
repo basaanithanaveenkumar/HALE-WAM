@@ -19,6 +19,14 @@ class AttentionBlock(nn.Module):
         self.scale = ch ** -0.5
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Residual spatial self-attention.
+
+        Args:
+            x: feature map ``[B, C, H, W]``.
+
+        Returns:
+            ``[B, C, H, W]``; attention is over the ``H * W`` positions (O((HW)^2) memory).
+        """
         B, C, H, W = x.shape
         h   = self.norm(x)
         q   = self.q(h).view(B, C, H * W).permute(0, 2, 1)   # [B, HW, C]

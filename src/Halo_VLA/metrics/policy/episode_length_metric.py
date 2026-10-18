@@ -31,6 +31,7 @@ class EpisodeLengthMetric(RoboticsMetricBase):
         self.reset()
 
     def reset(self) -> None:
+        """Forget the recorded episode lengths."""
         self._steps: List[int] = []
 
     def update(self, episode_steps: int, max_steps: int | None = None) -> None:  # type: ignore[override]
@@ -42,6 +43,11 @@ class EpisodeLengthMetric(RoboticsMetricBase):
         self._steps.append(episode_steps)
 
     def compute(self) -> dict[str, float]:
+        """Return the metrics.
+
+        Returns:
+            ``mean_episode_steps``, ``efficiency`` (1 - steps / budget) and ``timeout_rate``.
+        """
         if not self._steps:
             return {
                 "mean_episode_steps": 0.0,

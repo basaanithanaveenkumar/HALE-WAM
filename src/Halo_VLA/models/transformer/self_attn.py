@@ -1,4 +1,6 @@
-"""SelfAttn: selfAttn."""
+"""SelfAttn: single-head self-attention with full-width projections."""
+
+from __future__ import annotations
 
 import math
 
@@ -8,7 +10,14 @@ import torch.nn.functional as F
 
 
 class SelfAttn(nn.Module):
-    def __init__(self, emb_dim, return_attn_weights=False):
+    """Single-head scaled dot-product self-attention (query / key / value are ``emb_dim`` wide).
+
+    Args:
+        emb_dim: model width.
+        return_attn_weights: also return the ``[B, L, L]`` attention weights.
+    """
+
+    def __init__(self, emb_dim: int, return_attn_weights: bool = False) -> None:
         super().__init__()
         self.em_dim = emb_dim
 
@@ -19,8 +28,18 @@ class SelfAttn(nn.Module):
         self.scale = 1.0 / math.sqrt(emb_dim)
         self.return_attn_weights = return_attn_weights
 
-    def forward(self, inputs, causal_mask=None, pad_mask=None):
-        # inputs: [B, Seq_len, D]
+    def forward(self, inputs: torch.Tensor, causal_mask: torch.Tensor | None = None,
+                pad_mask: torch.Tensor | None = None) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
+        """Attend over ``inputs``.
+
+        Args:
+            inputs: ``[B, L, D]``.
+            causal_mask: ``[L, L]`` with 0 where attention is forbidden.
+            pad_mask: ``[B, L]`` with 1 for real tokens and 0 for padding.
+
+        Returns:
+            ``[B, L, D]``, plus the attention weights when ``return_attn_weights`` is set.
+        """
         Query = self.query_proj(inputs)  # [B, Seq_len, D]
         Key = self.key_proj(inputs)      # [B, Seq_len, D]
         Val = self.val_proj(inputs)      # [B, Seq_len, D]

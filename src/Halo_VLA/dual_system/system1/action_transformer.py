@@ -40,6 +40,17 @@ class ActionTransformer(nn.Module):
 
     def forward(self, cond: torch.Tensor, cond_mask: torch.Tensor, noisy: torch.Tensor | None = None,
                 t: torch.Tensor | None = None) -> torch.Tensor:
+        """Predict the action chunk (regression) or its velocity / noise (generative policies).
+
+        Args:
+            cond: conditioning tokens ``(B, S, dim)``.
+            cond_mask: their mask ``(B, S)`` (1 = real).
+            noisy: noisy actions ``(B, chunk, action_dim)``, or ``None`` for regression.
+            t: timestep ``(B,)``, or ``None`` for regression.
+
+        Returns:
+            ``(B, chunk, action_dim)``.
+        """
         b = cond.size(0)
         x = self.queries.expand(b, -1, -1) if noisy is None else self.action_in(noisy)
         if t is not None:

@@ -62,7 +62,7 @@ def create_video(
     fps: int = 12,
     frame_hold: float = 3.0,
     save_gif: bool = True,
-):
+) -> None:
     """
     Write a polished visualisation for a single sample.
 

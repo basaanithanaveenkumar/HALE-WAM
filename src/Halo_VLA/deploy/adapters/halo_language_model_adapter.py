@@ -38,9 +38,11 @@ class HaloLanguageModelAdapter(HaloAdapterBase):
         self.max_seq, self.opt_seq = int(max_seq), int(opt_seq)
 
     def language(self, model: nn.Module) -> nn.Module:
+        """The pretrained-LLM wrapper inside ``model``."""
         return self.vlm(model).language
 
     def default_signature(self) -> IOSignature:
+        """Token ids and mask in; next-token logits out."""
         cfg = self.model_config()
         return self.build_signature({
             "inputs": [{"name": "input_ids", "shape": ["batch", "seq"], "dtype": "int64",
@@ -51,9 +53,21 @@ class HaloLanguageModelAdapter(HaloAdapterBase):
         })
 
     def graph(self, model: nn.Module) -> nn.Module:
+        """The text tower (embedding, LLM, LM head) without the vision prefix."""
         return TextTowerGraph(self.language(model))
 
     def hf_checkpoint(self, model: nn.Module) -> tuple[Any, Any]:
+        """The LLM as a Hugging Face model with LoRA merged, plus its tokenizer.
+
+        Args:
+            model: the built VLA.
+
+        Returns:
+            ``(hf_model, tokenizer)`` for ``HuggingFaceCheckpointStage``.
+
+        Raises:
+            ConfigError: if the backbone is not a Hugging Face model.
+        """
         backbone = self.language(model).llm
         hf = getattr(backbone, "model", None)
         if hf is None:

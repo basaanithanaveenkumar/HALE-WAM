@@ -47,7 +47,7 @@ from rl.reinforce import compute_reinforce_loss
 from rl.rewards import negative_distance_reward
 
 
-def build_loader(args, config):
+def build_loader(args: argparse.Namespace, config: HaloVLMConfig) -> DataLoader:
     """Build a dataloader; only the ``eo`` path needs no local data root."""
     from dataloader.eo_dataset import build_eo_dataloader
 
@@ -66,7 +66,8 @@ def build_loader(args, config):
     )
 
 
-def main():
+def main() -> None:
+    """Fine-tune the Halo-VLA action policy with REINFORCE and a learned baseline on top of a frozen Halo-VLA encoder."""
     args = parse_args()
     device = torch.device(args.device)
     logger.info("Device: {}", device)
@@ -107,7 +108,8 @@ def main():
                 target = torch.cat([target, pad], dim=1)
             target = target[:, :flat_dim]
 
-            def reward_fn(a, _t=target):
+            def reward_fn(a: torch.Tensor, _t: torch.Tensor = target) -> torch.Tensor:
+                """Negative distance of each sampled action to its state's target."""
                 return negative_distance_reward(a, _t, offset=args.reward_offset)
 
             # 3. RL update.
@@ -138,7 +140,12 @@ def main():
     logger.info("Training complete.")
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
+    """Parse the command line.
+
+    Returns:
+        The parsed arguments.
+    """
     p = argparse.ArgumentParser(description="REINFORCE + baseline fine-tuning for Halo-VLA")
     p.add_argument("--dataset", choices=("eo",), default="eo")
     p.add_argument("--subset", default="interleave-temporal")

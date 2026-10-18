@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections.abc import Iterator, Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import torch
 from torch import nn
@@ -15,6 +15,10 @@ from hale_core.deploy.core.io_signature import IOSignature
 from hale_core.deploy.exceptions import ConfigError
 from Halo_VLA.deploy.graphs.moe_densifier import MoEDensifier
 from Halo_VLA.deploy.model_factory import HaloModelFactory
+
+if TYPE_CHECKING:
+    from config.model_config import HaloVLMConfig
+    from dual_system.config import DualSystemConfig
 
 
 class HaloAdapterBase(ModelAdapter):
@@ -62,14 +66,15 @@ class HaloAdapterBase(ModelAdapter):
         """The ``HaloVLM`` inside ``model`` (itself, or System 2's trunk)."""
         return model.system2.model if self.factory.is_dual else model
 
-    def model_config(self):
+    def model_config(self) -> HaloVLMConfig:
         """``HaloVLMConfig`` as the built model sees it (pretrained LLMs rewrite token ids)."""
         if self.factory.model_kwargs.get("llm_backbone"):
             return self.vlm(self.build_model()).config
         return self.factory.config()
 
-    def dual_config(self):
-        from dual_system import resolve_dual_system_config
+    def dual_config(self) -> DualSystemConfig:
+        """The resolved dual-system settings (``requires_dual`` adapters only)."""
+        from dual_system import resolve_dual_system_config  # lazy: import roots are set up by Halo_VLA.deploy
 
         return resolve_dual_system_config(self.factory.dual_system, self.factory.dual_system_options)
 
@@ -85,6 +90,7 @@ class HaloAdapterBase(ModelAdapter):
         return ExportModule(self.graph(model).eval(), self.forward_for_export, sig.input_names, sig.outputs).eval()
 
     def forward_for_export(self, graph: nn.Module, inputs: dict[str, torch.Tensor]) -> Any:
+        """Call ``graph`` with the named inputs (default: keyword arguments)."""
         return graph(**inputs)
 
     def calibration_batches(self, num_batches: int) -> Iterator[dict[str, torch.Tensor]]:
@@ -94,8 +100,10 @@ class HaloAdapterBase(ModelAdapter):
             yield sig.sample("opt", torch.Generator().manual_seed(1000 + i))
 
     def batch_dim(self) -> list[int]:
+        """The batch axis as ``[min, opt, max]``."""
         return [1, 1, self.max_batch]
 
     @staticmethod
     def build_signature(cfg: Mapping[str, Any]) -> IOSignature:
+        """Build an :class:`IOSignature` from a plain mapping (inputs, outputs, dims)."""
         return IOSignature.from_config(cfg)

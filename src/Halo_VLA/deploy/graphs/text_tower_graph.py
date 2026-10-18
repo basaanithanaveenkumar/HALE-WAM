@@ -21,6 +21,15 @@ class TextTowerGraph(nn.Module):
         self.language = language
 
     def forward(self, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
+        """Next-token logits for a text prompt.
+
+        Args:
+            input_ids: ``[B, L]``.
+            attention_mask: ``[B, L]``.
+
+        Returns:
+            Logits ``[B, L, vocab_size]``.
+        """
         embeds = self.language.embed_text(input_ids)
         logits, _hidden = self.language(embeds, attention_mask, input_ids)
         return logits

@@ -1,5 +1,7 @@
 """Flow-matching action head of HaloVLM: training loss and Euler ODE sampling."""
 
+from __future__ import annotations
+
 import torch
 
 
@@ -20,7 +22,8 @@ class FlowActionHeadMixin:
     # that the velocity field is aware of the full visual-language context
     # when predicting robot actions.
     # ------------------------------------------------------------------ #
-    def compute_flow_loss(self, action_hiddens, target_actions, action_mask_seq):
+    def compute_flow_loss(self, action_hiddens: torch.Tensor | None, target_actions: torch.Tensor,
+                          action_mask_seq: torch.Tensor) -> torch.Tensor:
         """
         Conditional Flow Matching (CFM) loss for action prediction.
 
@@ -139,7 +142,7 @@ class FlowActionHeadMixin:
     # source to its mouth.
     # ------------------------------------------------------------------ #
     @torch.no_grad()
-    def sample_actions(self, action_hiddens, num_steps=None):
+    def sample_actions(self, action_hiddens: torch.Tensor | None, num_steps: int | None = None) -> torch.Tensor | None:
         """
         Generate actions by integrating the learned velocity field from t=0 to t=1
         using the Euler method.

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 from torch.utils.data import DataLoader
 
@@ -26,7 +26,7 @@ def build_airoa_moma_dataloader(
     data_root: str,
     batch_size: int = 4,
     num_workers: int = 4,
-    tokenizer=None,
+    tokenizer: Any = None,
     img_size: int = 224,
     max_seq_len: int = 512,
     max_action_len: int = 256,
@@ -40,7 +40,7 @@ def build_airoa_moma_dataloader(
     shuffle: bool = True,
     max_samples: Optional[int] = None,
     pin_memory: bool = True,
-    **kwargs,
+    **kwargs: Any,
 ) -> DataLoader:
     """
     Build a DataLoader compatible with ``scripts/train.py`` (same keys as EO loader).

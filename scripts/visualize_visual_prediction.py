@@ -48,7 +48,17 @@ def load_model(
     ckpt_path: str | None,
     device: torch.device,
     enable_visual_dit: bool,
-):
+) -> tuple[HaloVLM, HaloVLMConfig]:
+    """Load (or randomly initialise) a ``HaloVLM`` for the DiT visualisation.
+
+    Args:
+        ckpt_path: checkpoint file, or ``None`` for random weights.
+        device: where to put the model.
+        enable_visual_dit: whether the model should include the visual DiT head.
+
+    Returns:
+        ``(model, config)``.
+    """
     if ckpt_path:
         ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
         raw_cfg = ckpt.get("config")
@@ -143,6 +153,7 @@ def flow_to_bgr(flow: torch.Tensor, max_mag: float | None = None) -> np.ndarray:
 
 
 def add_label(img: np.ndarray, text: str) -> np.ndarray:
+    """Draw ``text`` in the corner of a copy of ``img``."""
     cv2 = _import_cv2()
     out = img.copy()
     cv2.putText(
@@ -169,6 +180,7 @@ def add_label(img: np.ndarray, text: str) -> np.ndarray:
 
 
 def resize_h(img: np.ndarray, height: int) -> np.ndarray:
+    """Resize ``img`` to ``height`` keeping the aspect ratio."""
     cv2 = _import_cv2()
     if img.shape[0] == height:
         return img
@@ -177,6 +189,7 @@ def resize_h(img: np.ndarray, height: int) -> np.ndarray:
 
 
 def hstack_images(imgs: List[np.ndarray], height: int) -> np.ndarray:
+    """Resize every image to ``height`` and place them side by side."""
     resized = [resize_h(im, height) for im in imgs]
     return np.hstack(resized)
 
@@ -190,6 +203,7 @@ def build_panel(
     warped_bgr: np.ndarray,
     row_height: int = 240,
 ) -> np.ndarray:
+    """Compose past frames, the ground-truth future and the RGB / depth / flow predictions into one panel."""
     row1 = hstack_images(
         [add_label(x, f"past {i}") for i, x in enumerate(past_bgr)],
         row_height,
@@ -211,7 +225,12 @@ def build_panel(
     return np.vstack([row1, gap, row2])
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
+    """Parse the command line.
+
+    Returns:
+        The parsed arguments.
+    """
     p = argparse.ArgumentParser(description="Visualise DiT RGB / depth / flow")
     p.add_argument("--checkpoint", default=None, help="Path to .pt checkpoint")
     p.add_argument("--no_checkpoint", action="store_true", help="Random weights")
@@ -225,7 +244,8 @@ def parse_args():
     return p.parse_args()
 
 
-def main():
+def main() -> None:
+    """Render the DiT RGB / depth / flow predictions for dataset samples."""
     args = parse_args()
     cv2 = _import_cv2()
     device = torch.device(args.device)

@@ -59,6 +59,14 @@ class GatedCrossAttentionProjector(nn.Module):
         return self.num_latents
 
     def forward(self, vision_features: torch.Tensor) -> torch.Tensor:
+        """Map vision tokens to ``num_latents`` LLM tokens.
+
+        Args:
+            vision_features: ``[B, N, vision_dim]``.
+
+        Returns:
+            ``[B, num_latents, llm_dim]``.
+        """
         memory = self.memory_norm(vision_features)
         x = self.latents.expand(vision_features.shape[0], -1, -1).to(memory.dtype)
         for block in self.blocks:

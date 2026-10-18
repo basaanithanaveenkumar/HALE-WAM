@@ -30,6 +30,18 @@ class FlowPolicyGraph(nn.Module):
 
     def forward(self, images: torch.Tensor, input_ids: torch.Tensor, attention_mask: torch.Tensor,
                 states: torch.Tensor, noise: torch.Tensor) -> torch.Tensor:
+        """Sample action chunks with the unrolled Euler integrator.
+
+        Args:
+            images: frames ``[B, N, 3, H, W]``.
+            input_ids: prompt ``[B, L]``.
+            attention_mask: prompt mask ``[B, L]``.
+            states: proprioception ``[B, S, state_dim]``.
+            noise: initial noise ``[B, K, chunk * action_dim]``.
+
+        Returns:
+            ``[B, K, chunk, action_dim]``.
+        """
         cond = self.perception(images, input_ids, attention_mask, states)          # [B, K, D]
         b, k, d = cond.shape
         cond = cond.reshape(b * k, d)

@@ -28,10 +28,12 @@ class HaloFlowPolicyAdapter(ObservationPromptAdapter):
         self.num_steps = num_steps
 
     def default_signature(self) -> IOSignature:
+        """Observation, prompt and noise in; the sampled action chunks out."""
         cfg = self.model_config()
         noise = {"name": "noise", "shape": ["batch", self.num_action_tokens, cfg.action_chunk_size * cfg.action_dim],
                  "dtype": "float32", "value_range": [-2.0, 2.0]}
         return self.observation_signature(["actions"], [noise])
 
     def graph(self, model: nn.Module) -> nn.Module:
+        """Perception followed by the unrolled Euler sampler."""
         return FlowPolicyGraph(model, self.num_action_tokens, self.num_steps)

@@ -5,9 +5,13 @@ Model configuration for Halo-VLA.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from config.tokens import get_vocab_size, get_token_id
 from exceptions import HaloVLAConfigError
+
+if TYPE_CHECKING:
+    from hale_core.config.sections.llm_backbone import LLMBackboneConfig
 
 
 @dataclass
@@ -206,7 +210,7 @@ class HaloVLMConfig:
         """True when a registered LLM replaces the built-in decoder."""
         return self.llm_backbone is not None
 
-    def llm_backbone_config(self):
+    def llm_backbone_config(self) -> LLMBackboneConfig:
         """HaleBlocks ``LLMBackboneConfig`` for the ``llm_*`` fields (imports HaleBlocks lazily)."""
         try:
             from hale_core.config.sections.llm_backbone import LLMBackboneConfig, LoRASettings

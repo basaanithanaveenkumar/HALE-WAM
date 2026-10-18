@@ -31,6 +31,7 @@ class TrajectorySmoothnessMetric(RoboticsMetricBase):
         self.reset()
 
     def reset(self) -> None:
+        """Clear the accumulated jerk sums."""
         self._pred_jerk_sum = 0.0
         self._tgt_jerk_sum = 0.0
         self._n = 0
@@ -41,6 +42,12 @@ class TrajectorySmoothnessMetric(RoboticsMetricBase):
         pred: Tensor,                   # [B, T, action_dim]
         target: Optional[Tensor] = None,  # [B, T, action_dim]
     ) -> None:
+        """Accumulate one batch.
+
+        Args:
+            pred: predicted trajectories ``[B, T, action_dim]``.
+            target: optional ground-truth trajectories ``[B, T, action_dim]`` for the reference jerk.
+        """
         if pred.shape[1] < 3:
             return  # need at least 3 timesteps for second-order diff
 
@@ -55,6 +62,11 @@ class TrajectorySmoothnessMetric(RoboticsMetricBase):
             self._has_target = True
 
     def compute(self) -> dict[str, float]:
+        """Return the metrics.
+
+        Returns:
+            ``pred_smoothness`` and, when targets were given, the target smoothness and their ratio.
+        """
         n = max(self._n, 1)
         out = {"pred_smoothness": self._pred_jerk_sum / n}
         if self._has_target:

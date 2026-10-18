@@ -21,6 +21,7 @@ class RayCliOptions:
 
     @staticmethod
     def add_arguments(parser: argparse.ArgumentParser) -> None:
+        """Add the ``--ray*`` flags to ``parser``."""
         group = parser.add_argument_group("Ray Train (optional, needs hale-blocks[ray])")
         group.add_argument("--ray", action="store_true", help="Launch training on Ray Train workers")
         group.add_argument("--ray_address", default=None,

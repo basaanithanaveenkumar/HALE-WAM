@@ -1,6 +1,6 @@
 """Autoregressive multi-frame DiT rollout rendered as an annotated GIF with a filmstrip."""
 
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -161,8 +161,8 @@ def _filmstrip_bar(
 
 @torch.no_grad()
 def generate_autoregressive_gif(
-    model,
-    predictor,
+    model: Any,
+    predictor: Any,
     visual_context_emb: torch.Tensor,
     world_video_query_hiddens: Optional[torch.Tensor],
     context_frames_bgr: List[np.ndarray],
@@ -177,7 +177,7 @@ def generate_autoregressive_gif(
     img_mean: Tuple = (0.485, 0.456, 0.406),
     img_std: Tuple = (0.229, 0.224, 0.225),
     fps: int = 12,
-):
+) -> None:
     """
     Produce an autoregressive future-frame prediction GIF.
 

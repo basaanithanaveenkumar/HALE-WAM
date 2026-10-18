@@ -8,6 +8,7 @@ from typing import Any, Optional, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from loguru import logger
 
 from models.DiT import DiT
 
@@ -40,6 +41,15 @@ class _VGGPerceptualLoss(nn.Module):
         return (x - self.mean) / self.std
 
     def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        """Perceptual distance between two image batches.
+
+        Args:
+            pred: predicted images ``[B, 3, H, W]`` in ``[0, 1]``.
+            target: target images, same shape.
+
+        Returns:
+            Sum of the feature MSEs at ``relu1_2`` and ``relu2_2``.
+        """
         pred_n, tgt_n = self._norm(pred.clamp(0, 1)), self._norm(target.clamp(0, 1))
         f1_p, f1_t = self.slice1(pred_n), self.slice1(tgt_n)
         f2_p, f2_t = self.slice2(f1_p),   self.slice2(f1_t)
@@ -48,15 +58,25 @@ class _VGGPerceptualLoss(nn.Module):
 
 # Module-level singleton — built lazily so import doesn't trigger torchvision download.
 _vgg_loss: Optional[_VGGPerceptualLoss] = None
+_vgg_unavailable = False
 
 
-def _get_vgg_loss(device: torch.device) -> _VGGPerceptualLoss:
-    global _vgg_loss
+def _get_vgg_loss(device: torch.device) -> Optional[_VGGPerceptualLoss]:
+    """The shared VGG perceptual-loss network on ``device``, or ``None`` if its weights are unavailable.
+
+    Fetching the ImageNet weights needs network access on first use; when that fails the
+    perceptual term is skipped (with one warning) rather than aborting training.
+    """
+    global _vgg_loss, _vgg_unavailable
+    if _vgg_unavailable:
+        return None
     if _vgg_loss is None:
         try:
             _vgg_loss = _VGGPerceptualLoss()
-        except Exception:
-            return None  # type: ignore[return-value]
+        except (OSError, RuntimeError, ValueError) as exc:  # download / checkpoint-loading failures
+            _vgg_unavailable = True
+            logger.warning("VGG perceptual loss disabled: could not load the ImageNet weights ({})", exc)
+            return None
     return _vgg_loss.to(device)
 
 
@@ -76,7 +96,8 @@ def _ssim_loss(pred: torch.Tensor, target: torch.Tensor, window_size: int = 11) 
     kernel = kernel.expand(C, 1, window_size, window_size).contiguous()
     pad = window_size // 2
 
-    def mu(x):
+    def mu(x: torch.Tensor) -> torch.Tensor:
+        """Gaussian-windowed local mean."""
         return F.conv2d(x, kernel, padding=pad, groups=C)
 
     mu_p, mu_t = mu(pred), mu(target)

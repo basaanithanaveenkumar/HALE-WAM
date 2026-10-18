@@ -1,4 +1,6 @@
-"""DeepseekMoE: deepseekMoE."""
+"""DeepseekMoE: DeepSeek-style mixture of experts with shared and routed experts."""
+
+from __future__ import annotations
 
 import torch
 import torch.nn as nn
@@ -7,10 +9,23 @@ from .expert import Expert
 from .noise_best_k_router import NoiseBestKRouter
 
 
-#  Added the shared expert to deepseek model
 class DeepseekMoE(nn.Module):
-    def __init__(self, emb_dim,hid_dim,num_router_exprts, best_k, num_shared_exprts):
-        super(DeepseekMoE, self).__init__()
+    """Feed-forward made of always-on shared experts plus top-k routed experts (DeepSeekMoE).
+
+    Complexity: each routed expert processes only the tokens routed to it, so the cost per token
+    is ``num_shared_exprts + best_k`` expert evaluations (plus the O(num_router_exprts) router).
+
+    Args:
+        emb_dim: token width.
+        hid_dim: hidden width of each expert.
+        num_router_exprts: routed experts.
+        best_k: routed experts selected per token.
+        num_shared_exprts: shared experts applied to every token.
+    """
+
+    def __init__(self, emb_dim: int, hid_dim: int, num_router_exprts: int, best_k: int,
+                 num_shared_exprts: int) -> None:
+        super().__init__()
         self.router = NoiseBestKRouter(emb_dim, num_router_exprts, best_k)
         self.shared_experts = nn.ModuleList([
             Expert(emb_dim, hid_dim) 
@@ -19,7 +34,15 @@ class DeepseekMoE(nn.Module):
         self.routed_experts = nn.ModuleList([Expert(emb_dim,hid_dim) for _ in range(num_router_exprts)])
         self.best_k = best_k
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Mix the shared and routed experts' outputs.
+
+        Args:
+            x: tokens ``[B, L, emb_dim]``.
+
+        Returns:
+            ``[B, L, emb_dim]``.
+        """
         batch, seq, dim = x.shape
         x_flat = x.view(-1, dim)
         shared_output = 0

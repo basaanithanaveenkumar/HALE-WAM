@@ -25,13 +25,17 @@ class DualSystem1PolicyAdapter(DualSystem1AdapterBase):
         self.steps = steps
 
     def default_signature(self) -> IOSignature:
+        """Latent, observation and (for sampling policies) noise in; the action chunk out."""
+        from dual_system.system1.system1_registry import SYSTEM1_POLICIES  # lazy: import roots are set up by Halo_VLA.deploy
+
         cfg, dual = self.model_config(), self.dual_config()
         inputs = self.latent_inputs()
-        if dual.policy != "regression":
+        if SYSTEM1_POLICIES.get(dual.policy).needs_noise:
             inputs.append({"name": "noise", "shape": ["batch", cfg.action_chunk_size, cfg.action_dim],
                            "dtype": "float32", "value_range": [-2.0, 2.0]})
         return self.build_signature({"inputs": inputs, "outputs": ["actions"],
                                      "dims": {"batch": self.batch_dim(), "latent_len": self.latent_dim()}})
 
     def graph(self, model: nn.Module) -> nn.Module:
+        """The condition-plus-unrolled-sampler graph."""
         return System1PolicyGraph(model, self.steps)

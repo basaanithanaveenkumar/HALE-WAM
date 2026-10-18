@@ -27,7 +27,7 @@ from __future__ import annotations
 import torch
 import torch.nn.functional as F
 
-from rl.policy import GaussianActionPolicy
+from rl.policy import GaussianActionPolicy, RewardFn
 from rl.value_baseline import ValueBaseline
 
 
@@ -35,7 +35,7 @@ def compute_reinforce_loss(
     policy: GaussianActionPolicy,
     value: ValueBaseline,
     cond: torch.Tensor,
-    reward_fn,
+    reward_fn: RewardFn,
     *,
     use_baseline: bool = True,
     entropy_coef: float = 0.01,

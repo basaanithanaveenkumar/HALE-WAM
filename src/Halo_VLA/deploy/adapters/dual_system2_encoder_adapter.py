@@ -22,7 +22,9 @@ class DualSystem2EncoderAdapter(ObservationPromptAdapter):
     requires_dual = True
 
     def default_signature(self) -> IOSignature:
+        """Observation and prompt in; latent tokens and mask out."""
         return self.observation_signature(["latent", "latent_mask"])
 
     def graph(self, model: nn.Module) -> nn.Module:
+        """System 2 with its latent extractor and bridge projector."""
         return System2LatentGraph(model)

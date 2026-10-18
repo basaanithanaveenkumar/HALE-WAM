@@ -1,12 +1,21 @@
 """DiTBlock: a transformer block with adaptive LayerNorm (adaLN) modulation."""
 
+from __future__ import annotations
 
+import torch
 import torch.nn as nn
 
 
 class DiTBlock(nn.Module):
-    """A transformer block with adaptive LayerNorm (adaLN) modulation."""
-    def __init__(self, hidden_size, num_heads, mlp_ratio=4.0):
+    """A transformer block with adaptive LayerNorm (adaLN-Zero) modulation (Peebles & Xie, 2023).
+
+    Args:
+        hidden_size: token width.
+        num_heads: attention heads.
+        mlp_ratio: feed-forward hidden width as a multiple of ``hidden_size``.
+    """
+
+    def __init__(self, hidden_size: int, num_heads: int, mlp_ratio: float = 4.0) -> None:
         super().__init__()
         self.norm1 = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
         self.attn = nn.MultiheadAttention(hidden_size, num_heads, batch_first=True)
@@ -23,10 +32,15 @@ class DiTBlock(nn.Module):
             nn.Linear(hidden_size, 6 * hidden_size, bias=True)
         )
 
-    def forward(self, x, c):
-        """
-        x: [B, N, D]  token sequence
-        c: [B, D]     conditioning vector (timestep + optional context)
+    def forward(self, x: torch.Tensor, c: torch.Tensor) -> torch.Tensor:
+        """Apply modulated self-attention and feed-forward with gated residuals.
+
+        Args:
+            x: token sequence ``[B, N, D]``.
+            c: conditioning vector ``[B, D]`` (timestep plus optional context).
+
+        Returns:
+            ``[B, N, D]``.
         """
         # c is the adaLN conditioning vector (e.g., time embedding + context)
         shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = \

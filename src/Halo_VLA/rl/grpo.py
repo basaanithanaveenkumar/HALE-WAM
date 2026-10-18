@@ -33,7 +33,7 @@ from __future__ import annotations
 import torch
 from torch.distributions import kl_divergence
 
-from rl.policy import GaussianActionPolicy
+from rl.policy import GaussianActionPolicy, RewardFn
 
 
 def group_relative_advantage(rewards: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
@@ -55,7 +55,7 @@ def compute_grpo_loss(
     policy: GaussianActionPolicy,
     ref_policy: GaussianActionPolicy,
     cond: torch.Tensor,
-    reward_fn,
+    reward_fn: RewardFn,
     *,
     group_size: int = 8,
     clip_eps: float = 0.2,

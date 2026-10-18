@@ -15,4 +15,5 @@ class Upsample(nn.Module):
         self.conv = nn.Conv2d(ch, ch, 3, padding=1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Double the spatial size: ``[B, C, H, W] -> [B, C, 2H, 2W]``."""
         return self.conv(F.interpolate(x, scale_factor=2.0, mode="nearest"))

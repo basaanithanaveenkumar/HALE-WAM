@@ -19,6 +19,14 @@ class HaleWamDeployCLI(DeployCLI):
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Run the deploy CLI.
+
+    Args:
+        argv: arguments (default ``sys.argv[1:]``).
+
+    Returns:
+        The process exit code.
+    """
     return HaleWamDeployCLI().main(argv)
 
 

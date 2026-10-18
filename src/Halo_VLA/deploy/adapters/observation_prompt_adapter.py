@@ -30,7 +30,16 @@ class ObservationPromptAdapter(HaloAdapterBase):
         self.opt_seq = int(opt_seq)
         self.max_seq = int(max_seq)
 
-    def observation_signature(self, outputs: list[str], extra_inputs: list[dict] = ()) -> PromptIOSignature:
+    def observation_signature(self, outputs: list[str], extra_inputs: list[dict[str, Any]] | tuple[()] = ()) -> PromptIOSignature:
+        """Signature of an observation + prompt graph.
+
+        Args:
+            outputs: names of the graph outputs.
+            extra_inputs: further input specs (e.g. noise).
+
+        Returns:
+            A :class:`PromptIOSignature` whose prompt template carries the special tokens.
+        """
         cfg = self.model_config()
         head = (cfg.image_token_id,) * self.num_images + (cfg.state_token_id,) * self.num_states
         tail = (cfg.world_video_token_id,) * self.num_world_video_tokens + (cfg.action_token_id,) * self.num_action_tokens

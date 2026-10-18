@@ -32,10 +32,15 @@ vector from a real Halo-VLA forward pass when wiring up the training script.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import torch
 import torch.nn as nn
-from torch.distributions import Independent, Normal
 from exceptions import ModelInputError
+from torch.distributions import Independent, Normal
+
+#: ``actions [M, A] -> reward [M]``: the scalar signal the policy-gradient trainers maximise.
+RewardFn = Callable[[torch.Tensor], torch.Tensor]
 
 
 class GaussianActionPolicy(nn.Module):
@@ -144,7 +149,8 @@ class GaussianActionPolicy(nn.Module):
     # ------------------------------------------------------------------ #
     @staticmethod
     @torch.no_grad()
-    def conditioning_from_halo(model, batch: dict, device=None) -> torch.Tensor:
+    def conditioning_from_halo(model: nn.Module, batch: dict[str, torch.Tensor],
+                               device: torch.device | str | None = None) -> torch.Tensor:
         """Extract a conditioning vector from a real Halo-VLA forward pass.
 
         Runs ``HaloVLM.forward`` and mean-pools the transformer hidden states at
@@ -161,7 +167,8 @@ class GaussianActionPolicy(nn.Module):
         Returns:
             cond: [B, emb_dim].  Rows are zero where a sample had no action token.
         """
-        def to(x):
+        def to(x: torch.Tensor | None) -> torch.Tensor | None:
+            """Move ``x`` to ``device`` when one is given."""
             return x.to(device) if (device is not None and x is not None) else x
 
         _, action_hiddens, _, _ = model(

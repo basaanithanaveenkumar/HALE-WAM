@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -12,6 +12,9 @@ from torch.utils.data import Dataset
 from config.tokens import get_all_custom_tokens, get_token
 
 from .eo_dataset_config import EODatasetConfig
+
+if TYPE_CHECKING:
+    from torchvision.transforms import Compose
 
 IMAGE_TOKEN = get_token("image_token")
 
@@ -28,7 +31,7 @@ WORLD_VIDEO_TOKEN = get_token("world_video_token")
 # ---------------------------------------------------------------------------
 # Image transforms
 # ---------------------------------------------------------------------------
-def build_image_transform(img_size: int, mean: Tuple, std: Tuple):
+def build_image_transform(img_size: int, mean: Tuple, std: Tuple) -> Compose:
     """Build torchvision transforms for images."""
     from torchvision import transforms
 
@@ -64,10 +67,10 @@ class EODataset(Dataset):
     def __init__(
         self,
         config: Optional[EODatasetConfig] = None,
-        hf_dataset=None,
-        tokenizer=None,
-        **kwargs,
-    ):
+        hf_dataset: Any = None,
+        tokenizer: Any = None,
+        **kwargs: Any,
+    ) -> None:
         super().__init__()
         self.cfg = config or EODatasetConfig(**kwargs)
         self._setup_tokenizer(tokenizer)
@@ -75,7 +78,7 @@ class EODataset(Dataset):
         self._load_dataset(hf_dataset)
 
     # ------------------------------------------------------------------ init
-    def _setup_tokenizer(self, tokenizer):
+    def _setup_tokenizer(self, tokenizer: Any) -> None:
         """Initialise or configure the tokenizer."""
         if tokenizer is not None:
             self.tokenizer = tokenizer

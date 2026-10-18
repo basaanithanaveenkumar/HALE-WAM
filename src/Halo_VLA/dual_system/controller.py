@@ -64,5 +64,6 @@ class DualSystemController:
         return self.model.predict_actions(batch, latent=self.latent)
 
     def close(self) -> None:
+        """Wait for any pending System 2 update and stop the worker thread."""
         if self._pool is not None:
             self._pool.shutdown(wait=True)

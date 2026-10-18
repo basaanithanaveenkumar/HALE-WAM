@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import torch
+import torch.nn as nn
 from exceptions import ModelStateError
 
 
@@ -26,11 +27,11 @@ class WorldModelImaginationReward:
 
     def __init__(
         self,
-        model,
+        model: nn.Module,
         goal_frame: torch.Tensor,
         num_frames: int = 1,
         num_ode_steps: int = 20,
-    ):
+    ) -> None:
         """
         Args:
             model:      a ``models.halo_vla.HaloVLM`` with a visual predictor.

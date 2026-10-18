@@ -45,6 +45,16 @@ class StaticPromptEmbedder(nn.Module):
 
     def forward(self, images: torch.Tensor, input_ids: torch.Tensor,
                 states: torch.Tensor) -> tuple[torch.Tensor, int]:
+        """Embed images, states and text into one sequence.
+
+        Args:
+            images: frames ``[B, N, 3, H, W]``.
+            input_ids: prompt ``[B, L]``.
+            states: proprioception ``[B, S, state_dim]``.
+
+        Returns:
+            ``(combined [B, num_prefix + L, D], num_prefix)``; image patches come first.
+        """
         b, n_img = images.shape[0], images.shape[1]
         # 1. images: one batched encoder call, then [B, N_img * P, D] in frame order.
         frames = images.reshape(b * n_img, *images.shape[2:])

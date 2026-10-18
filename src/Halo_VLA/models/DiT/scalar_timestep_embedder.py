@@ -1,5 +1,7 @@
 """ScalarTimestepEmbedder: create sinusoidal embeddings from scalar timesteps t ∈ ℝ (e.g. flow time in [0, 1])."""
 
+from __future__ import annotations
+
 import math
 
 import torch
@@ -25,9 +27,14 @@ def _timestep_embedding(t: torch.Tensor, dim: int, max_period: float = 10000.0) 
 
 
 class ScalarTimestepEmbedder(nn.Module):
-    """Maps scalar t [B] → vector [B, hidden_size] (DiT / flow-matching compatible)."""
+    """Maps scalar t [B] → vector [B, hidden_size] (DiT / flow-matching compatible).
 
-    def __init__(self, hidden_size: int, frequency_embedding_size: int = 256):
+    Args:
+        hidden_size: output width.
+        frequency_embedding_size: width of the sinusoidal features fed to the MLP.
+    """
+
+    def __init__(self, hidden_size: int, frequency_embedding_size: int = 256) -> None:
         super().__init__()
         self.frequency_embedding_size = frequency_embedding_size
         self.mlp = nn.Sequential(
@@ -37,6 +44,14 @@ class ScalarTimestepEmbedder(nn.Module):
         )
 
     def forward(self, t: torch.Tensor) -> torch.Tensor:
+        """Embed timesteps.
+
+        Args:
+            t: scalar times ``[B]`` (or ``[B, 1]``).
+
+        Returns:
+            ``[B, hidden_size]``.
+        """
         if t.dim() > 1:
             t = t.reshape(t.size(0))
         t_freq = _timestep_embedding(t, self.frequency_embedding_size)

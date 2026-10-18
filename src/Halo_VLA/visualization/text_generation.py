@@ -1,8 +1,11 @@
 """Load a Halo-VLA checkpoint and generate/compare answers for visualisation."""
 
-from typing import Dict, Tuple
+from __future__ import annotations
+
+from typing import Any, Dict, Tuple
 
 import torch
+import torch.nn as nn
 from loguru import logger
 
 from config import HaloVLMConfig
@@ -36,7 +39,16 @@ from visualization.drawing import (  # noqa: F401 - moved; re-exported for calle
 # ---------------------------------------------------------------------------
 # Checkpoint / model helpers (optional — used when --checkpoint is given)
 # ---------------------------------------------------------------------------
-def load_model(ckpt_path: str, device: torch.device):
+def load_model(ckpt_path: str, device: torch.device) -> Tuple[nn.Module, HaloVLMConfig]:
+    """Load a training checkpoint into a ``HaloVLM`` in eval mode.
+
+    Args:
+        ckpt_path: ``halo_vla_epoch*.pt`` written by ``scripts/train.py``.
+        device: where to put the model.
+
+    Returns:
+        ``(model, config)``; missing keys are logged and left at their random initialisation.
+    """
     from models.halo_vla import HaloVLM
 
     ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
@@ -57,8 +69,9 @@ def load_model(ckpt_path: str, device: torch.device):
 
 
 @torch.no_grad()
-def generate_text(model, tokenizer, images, input_ids, attention_mask, states,
-                  max_new_tokens=128, device="cpu"):
+def generate_text(model: nn.Module, tokenizer: Any, images: torch.Tensor, input_ids: torch.Tensor,
+                  attention_mask: torch.Tensor, states: torch.Tensor, max_new_tokens: int = 128,
+                  device: torch.device | str = "cpu") -> Tuple[str, torch.Tensor | None]:
     """Greedy auto-regressive generation. Returns decoded string + action preds."""
     eos_id = tokenizer.eos_token_id
     action_preds = None

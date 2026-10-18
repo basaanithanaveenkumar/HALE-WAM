@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import torch
 from loguru import logger
 from torch import nn
 
+from exceptions import HaloVLAConfigError
 from hale_core.deploy.exceptions import ConfigError
+
+if TYPE_CHECKING:
+    from config.model_config import HaloVLMConfig
 
 
 class HaloModelFactory:
@@ -35,9 +39,10 @@ class HaloModelFactory:
 
     @property
     def is_dual(self) -> bool:
+        """Whether a dual-system preset is configured."""
         return self.dual_system != "none"
 
-    def config(self):
+    def config(self) -> HaloVLMConfig:
         """The validated ``HaloVLMConfig``."""
         from config import HaloVLMConfig
 
@@ -47,6 +52,14 @@ class HaloModelFactory:
             raise ConfigError(f"invalid HaloVLMConfig fields in adapter.model: {exc}") from exc
 
     def build(self) -> nn.Module:
+        """Build the network, seeded for reproducible initialisation.
+
+        Returns:
+            A ``HaloVLM`` or, with a dual-system preset, a ``DualSystemVLA``.
+
+        Raises:
+            ConfigError: for invalid dual-system settings.
+        """
         from dual_system import DualSystemVLA, resolve_dual_system_config
         from models.halo_vla import HaloVLM
 
@@ -56,7 +69,7 @@ class HaloModelFactory:
             return vlm
         try:
             dual_cfg = resolve_dual_system_config(self.dual_system, self.dual_system_options)
-        except ValueError as exc:
+        except HaloVLAConfigError as exc:
             raise ConfigError(f"invalid dual-system settings: {exc}") from exc
         logger.info("dual-system VLA preset={} policy={} latent={}", dual_cfg.name, dual_cfg.policy, dual_cfg.latent)
         return DualSystemVLA(vlm, dual_cfg)

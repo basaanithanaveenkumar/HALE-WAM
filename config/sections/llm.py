@@ -69,6 +69,7 @@ class LLMConfig(VLASection):
         return "lora" if self.use_lora else ("frozen" if self.freeze_llm else "full")
 
     def train_arguments(self) -> dict[str, Any]:
+        """``--llm_*`` argument values for the keys the YAML sets (LoRA / freeze flags folded into ``llm_finetune``)."""
         out = super().train_arguments()
         given = self.model_fields_set
         if given & {"use_lora", "freeze_llm"}:

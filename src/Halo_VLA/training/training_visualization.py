@@ -1,9 +1,14 @@
 """Periodic training visualisations: per-sample frames, answers, action plots and DiT GIFs."""
 
+from __future__ import annotations
+
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import torch
+import torch.nn as nn
+from config import HaloVLMConfig
 from loguru import logger
 from visualization.action_plots import action_comparison_image, unnormalise_image
 from visualization.diffusion_gifs import sample_dit_with_intermediates, save_diffusion_gif
@@ -28,7 +33,22 @@ except ImportError:
     _IMAGEIO_AVAILABLE = False
 
 
-def draw_overlays(frame, question, gt_answer, pred_answer, gt_actions, pred_actions, frame_idx):
+def draw_overlays(frame: np.ndarray, question: str, gt_answer: str, pred_answer: str,
+                  gt_actions: np.ndarray | None, pred_actions: np.ndarray | None, frame_idx: int) -> np.ndarray:
+    """Draw the question, ground-truth and predicted answers onto a BGR frame (no-op without OpenCV).
+
+    Args:
+        frame: BGR frame; drawn on in place.
+        question: task text.
+        gt_answer: ground-truth answer.
+        pred_answer: model answer (omitted when empty).
+        gt_actions: ground-truth actions (unused by the text overlay).
+        pred_actions: predicted actions (unused by the text overlay).
+        frame_idx: index of the frame (unused by the text overlay).
+
+    Returns:
+        The annotated frame.
+    """
     if not _CV2_AVAILABLE:
         return frame
     cv2.putText(frame, f"Q: {question[:50]}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
@@ -43,11 +63,11 @@ def draw_overlays(frame, question, gt_answer, pred_answer, gt_actions, pred_acti
 # ---------------------------------------------------------------------------
 @torch.no_grad()
 def generate_training_visualization(
-    model,
-    batch,
-    tokenizer,
-    config,
-    device,
+    model: nn.Module,
+    batch: dict[str, Any],
+    tokenizer: Any,
+    config: HaloVLMConfig,
+    device: torch.device,
     output_dir: Path,
     global_step: int,
     epoch: int,
@@ -63,9 +83,9 @@ def generate_training_visualization(
     diffusion_steps: int = 30,
     diffusion_snapshots: int = 24,
     diffusion_fps: int = 12,
-    img_mean=(0.485, 0.456, 0.406),
-    img_std=(0.229, 0.224, 0.225),
-):
+    img_mean: tuple[float, float, float] = (0.485, 0.456, 0.406),
+    img_std: tuple[float, float, float] = (0.229, 0.224, 0.225),
+) -> None:
     """
     Training-time visualisation GIF — 2x2 panel layout with PIL-rendered text.
 
@@ -154,7 +174,8 @@ def generate_training_visualization(
                band_label, font=F_BAND, fill=C_CYN)
         return canvas
 
-    def panel_origin(row, col):
+    def panel_origin(row: int, col: int) -> tuple[int, int]:
+        """Top-left pixel of the panel at grid ``(row, col)``."""
         x0 = col * (PANEL_W + COL_SEP)
         y0 = HDR_H + row * (PANEL_H + ROW_SEP)
         return x0, y0
@@ -164,8 +185,9 @@ def generate_training_visualization(
             return ""
         return text if len(text) <= max_chars else text[: max_chars - 1] + "…"
 
-    def draw_header(canvas, task, gt, pred_partial, cursor=False,
-                    is_correct=None):
+    def draw_header(canvas: Any, task: str, gt: str, pred_partial: str, cursor: bool = False,
+                    is_correct: bool | None = None) -> None:
+        """Draw the task / ground-truth / prediction rows and the optional correctness badge."""
         d = PILDraw.Draw(canvas, "RGBA")
         max_c = max(20, (CW - 30) // 9)
         tick = "|" if cursor else ""
@@ -203,8 +225,9 @@ def generate_training_visualization(
             d.text((x0 + pad_x, y0 + pad_y - 1), label, font=F_BADGE,
                    fill=(255, 255, 255))
 
-    def place_image(canvas, img_bgr, row, col, label,
-                    color=C_WHT, border=None):
+    def place_image(canvas: Any, img_bgr: np.ndarray, row: int, col: int, label: str,
+                    color: tuple[int, ...] = C_WHT, border: tuple[int, ...] | None = None) -> None:
+        """Paste a BGR image into a grid panel with a label ribbon and optional border."""
         x0, y0 = panel_origin(row, col)
         panel = cv2.resize(img_bgr, (PANEL_W, PANEL_H))
         panel_rgb = cv2.cvtColor(panel, cv2.COLOR_BGR2RGB)
@@ -219,7 +242,9 @@ def generate_training_visualization(
                     fill=(0, 0, 0, 160))
         d.text((x0 + 9, y0 + 5), label, font=F_PANEL, fill=color)
 
-    def place_chart(canvas, chart_bgr, row, col, label="", color=C_TXT):
+    def place_chart(canvas: Any, chart_bgr: np.ndarray, row: int, col: int, label: str = "",
+                    color: tuple[int, ...] = C_TXT) -> None:
+        """Paste a chart image into a grid panel with an optional bottom label."""
         x0, y0 = panel_origin(row, col)
         resized = cv2.resize(chart_bgr, (PANEL_W, PANEL_H))
         chart_rgb = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
@@ -231,7 +256,8 @@ def generate_training_visualization(
             d.text((x0 + 9, y0 + PANEL_H - 18), label, font=F_PANEL,
                    fill=color)
 
-    def place_placeholder(canvas, row, col, label):
+    def place_placeholder(canvas: Any, row: int, col: int, label: str) -> None:
+        """Fill a grid panel with a hatched placeholder and a label."""
         x0, y0 = panel_origin(row, col)
         d = PILDraw.Draw(canvas, "RGBA")
         d.rectangle((x0, y0, x0 + PANEL_W, y0 + PANEL_H), fill=C_BG)
@@ -244,7 +270,8 @@ def generate_training_visualization(
         d.text(((x0 + (PANEL_W - tw) // 2), y0 + (PANEL_H - th) // 2),
                label, font=F_LABEL, fill=C_DIM)
 
-    def render_action_chart(gt_arr, pred_arr, reveal_up_to=None):
+    def render_action_chart(gt_arr: np.ndarray | None, pred_arr: np.ndarray | None,
+                            reveal_up_to: int | None = None) -> np.ndarray:
         """Use the polished shared chart renderer from visualize.py."""
         if gt_arr is None and pred_arr is None:
             return np.full((PANEL_H, PANEL_W, 3), (28, 32, 50), dtype=np.uint8)
@@ -258,7 +285,8 @@ def generate_training_visualization(
             phase_label="Action Trajectory",
         )
 
-    def to_rgb_array(canvas):
+    def to_rgb_array(canvas: Any) -> np.ndarray:
+        """Convert a PIL canvas to an RGB ``uint8`` array."""
         return np.asarray(canvas.convert("RGB"))
 
     # ── load batch ───────────────────────────────────────────
@@ -337,8 +365,8 @@ def generate_training_visualization(
                 )
                 if preds and "rgb" in preds:
                     pred_rgb = preds["rgb"]
-            except Exception as e:
-                logger.warning("Visual pred failed sample {}: {}", b, e)
+            except Exception as e:  # noqa: BLE001 - visualisation must never kill a training run
+                logger.opt(exception=e).warning("Visual pred failed sample {}", b)
 
         # ── text + action generation ─────────────────────────
         pred_answer = ""
@@ -354,8 +382,8 @@ def generate_training_visualization(
             if not pred_answer:
                 pred_answer = "(no output)"
             pred_answer = pred_answer[:90]
-        except Exception as e:
-            logger.warning("Text gen failed sample {}: {}", b, e)
+        except Exception as e:  # noqa: BLE001 - visualisation must never kill a training run
+            logger.opt(exception=e).warning("Text gen failed sample {}", b)
             pred_answer = "(error)"
 
         # ── action arrays: full GT traj + predicted chunk ────
@@ -534,8 +562,8 @@ def generate_training_visualization(
                             canvas_h=PANEL_H,
                             fps=diffusion_fps,
                         )
-            except Exception as e:
-                logger.warning("Diffusion GIF failed sample {}: {}", b, e)
+            except Exception as e:  # noqa: BLE001 - visualisation must never kill a training run
+                logger.opt(exception=e).warning("Diffusion GIF failed sample {}", b)
 
         written += 1
 

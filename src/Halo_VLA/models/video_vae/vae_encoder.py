@@ -37,6 +37,14 @@ class VAEEncoder(nn.Module):
         self.conv_out = nn.Conv2d(ch[-1], latent_ch * 2, 3, padding=1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Encode images to the latent distribution parameters.
+
+        Args:
+            x: images ``[B, in_ch, H, W]``.
+
+        Returns:
+            ``[B, latent_ch * 2, H/8, W/8]``: mean and log-variance concatenated on the channel axis.
+        """
         h = self.conv_in(x)
         for block in self.blocks:
             h = block(h)

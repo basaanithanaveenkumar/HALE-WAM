@@ -59,6 +59,7 @@ class DualSystemSection(VLASection):
         return self
 
     def train_arguments(self) -> dict[str, Any]:
+        """``--dual_system`` / ``--dual_system_option`` values for the keys the YAML sets."""
         out: dict[str, Any] = {}
         if "preset" in self.model_fields_set:
             out["dual_system"] = self.preset

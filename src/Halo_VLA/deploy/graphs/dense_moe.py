@@ -34,6 +34,14 @@ class DenseMoE(nn.Module):
         self.top_k = int(moe.best_k)
 
     def gates(self, x: torch.Tensor) -> torch.Tensor:
+        """Top-k softmax gates over the routed experts.
+
+        Args:
+            x: tokens ``[B, L, D]``.
+
+        Returns:
+            Gates ``[B, L, num_experts]``, exactly zero outside each token's top-k.
+        """
         logits = self.router_logits(x)
         remaining = logits
         for _ in range(self.top_k - 1):
@@ -44,6 +52,14 @@ class DenseMoE(nn.Module):
         return torch.softmax(sparse, dim=-1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Evaluate every expert and combine them with the gates.
+
+        Args:
+            x: tokens ``[B, L, D]``.
+
+        Returns:
+            ``[B, L, D]``.
+        """
         b, s, d = x.shape
         flat = x.reshape(b * s, d)
         gates = self.gates(x).reshape(b * s, len(self.routed_experts))

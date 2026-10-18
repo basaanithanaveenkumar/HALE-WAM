@@ -33,6 +33,7 @@ class GoalReachingMetric(RoboticsMetricBase):
         self.reset()
 
     def reset(self) -> None:
+        """Forget the recorded distances."""
         self._distances: List[float] = []
 
     def update(
@@ -40,10 +41,21 @@ class GoalReachingMetric(RoboticsMetricBase):
         final_pos: Tensor,  # [3] — final end-effector XYZ in world frame (metres)
         goal_pos: Tensor,   # [3] — goal XYZ in world frame (metres)
     ) -> None:  # type: ignore[override]
+        """Record one episode.
+
+        Args:
+            final_pos: final end-effector position ``[3]`` in metres.
+            goal_pos: goal position ``[3]`` in metres.
+        """
         dist = float((final_pos.float() - goal_pos.float()).norm(p=2).item())
         self._distances.append(dist)
 
     def compute(self) -> dict[str, float]:
+        """Return the metrics.
+
+        Returns:
+            ``goal_dist_mean``, ``goal_dist_std`` and ``goal_reach_rate_<threshold>`` per threshold.
+        """
         if not self._distances:
             base = {"goal_dist_mean": 0.0, "goal_dist_std": 0.0}
             for t in self.thresholds_m:

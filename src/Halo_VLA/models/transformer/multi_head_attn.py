@@ -1,19 +1,39 @@
-"""MultiHeadAttn: multiHeadAttn."""
+"""MultiHeadAttn: multi-head self-attention built from per-head projections."""
 
+from __future__ import annotations
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from exceptions import HaloVLAConfigError
 
 from .head_attn import HeadAttn
 
 
 class MultiHeadAttn(nn.Module):
-    def __init__(self, emb_dim=256, num_heads=8, drop_fact=0.0, causal_mask=False, return_attn_weights=False):
+    """Multi-head self-attention over ``num_heads`` :class:`HeadAttn` heads.
+
+    The heads keep separate ``Linear`` layers (checkpoint-compatible) but are evaluated together
+    with ``F.scaled_dot_product_attention``, which avoids materialising the ``[B, H, L, L]`` matrix.
+
+    Args:
+        emb_dim: model width (divisible by ``num_heads``).
+        num_heads: number of heads.
+        drop_fact: dropout probability.
+        causal_mask: forbid attending to later positions.
+        return_attn_weights: forwarded to the heads (unused by the fused path).
+
+    Raises:
+        HaloVLAConfigError: if ``emb_dim`` is not divisible by ``num_heads``.
+    """
+
+    def __init__(self, emb_dim: int = 256, num_heads: int = 8, drop_fact: float = 0.0, causal_mask: bool = False,
+                 return_attn_weights: bool = False) -> None:
         super().__init__()
         self.em_dim = emb_dim
         self.num_heads = num_heads
-        assert emb_dim % num_heads == 0, f"emb_dim {emb_dim} must be divisible by num_heads {num_heads}"
+        if emb_dim % num_heads != 0:
+            raise HaloVLAConfigError(f"emb_dim {emb_dim} must be divisible by num_heads {num_heads}")
 
         self.head_size = emb_dim // num_heads
         self.causal_mask = causal_mask
@@ -25,7 +45,16 @@ class MultiHeadAttn(nn.Module):
         self.proj = nn.Linear(emb_dim, emb_dim)
         self.dropout = nn.Dropout(drop_fact)
 
-    def forward(self, inputs, pad_mask=None):
+    def forward(self, inputs: torch.Tensor, pad_mask: torch.Tensor | None = None) -> torch.Tensor:
+        """Attend over ``inputs``.
+
+        Args:
+            inputs: ``[B, L, D]``.
+            pad_mask: ``[B, L]`` with 1 for real tokens and 0 for padding.
+
+        Returns:
+            ``[B, L, D]``.
+        """
         B, L, D = inputs.shape
         # Project all heads at once → [B, H, L, head_size].
         # Weights come from the existing per-head Linear layers (checkpoint-compatible).

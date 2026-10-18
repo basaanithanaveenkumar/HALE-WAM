@@ -19,6 +19,7 @@ class ResBlock(nn.Module):
         self.skip  = nn.Conv2d(in_ch,  out_ch, 1) if in_ch != out_ch else nn.Identity()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Residual forward: ``[B, in_ch, H, W] -> [B, out_ch, H, W]``."""
         h = self.conv1(F.silu(self.norm1(x)))
         h = self.conv2(F.silu(self.norm2(h)))
         return h + self.skip(x)

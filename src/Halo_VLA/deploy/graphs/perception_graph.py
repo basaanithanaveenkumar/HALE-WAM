@@ -27,5 +27,16 @@ class PerceptionGraph(nn.Module):
 
     def forward(self, images: torch.Tensor, input_ids: torch.Tensor, attention_mask: torch.Tensor,
                 states: torch.Tensor) -> torch.Tensor:
+        """Encode the observation and select the action-token states.
+
+        Args:
+            images: frames ``[B, N, 3, H, W]``.
+            input_ids: prompt ``[B, L]``.
+            attention_mask: prompt mask ``[B, L]``.
+            states: proprioception ``[B, S, state_dim]``.
+
+        Returns:
+            ``[B, num_action_tokens, emb_dim]``.
+        """
         hidden, _mask, num_prefix, _ = self.encoder(images, input_ids, attention_mask, states)
         return self.select(hidden[:, num_prefix:], input_ids)

@@ -35,10 +35,10 @@ class DROIDDataset(DroidPromptMixin, DroidEpisodeIndexMixin, Dataset):
     def __init__(
         self,
         config: Optional[DROIDConfig] = None,
-        tokenizer=None,
+        tokenizer: Any = None,
         split: str = "train",
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         super().__init__()
         if config is None:
             config = DROIDConfig(**kwargs)

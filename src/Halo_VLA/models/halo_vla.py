@@ -1,3 +1,9 @@
+"""HaloVLM: the Halo-VLA model - vision-language decoder with flow-matching action and DiT video heads."""
+
+from __future__ import annotations
+
+from typing import Any
+
 import torch
 import torch.nn as nn
 from exceptions import ModelStateError
@@ -60,7 +66,25 @@ def pool_past_frame_embeddings_for_visual_dit(
 
 
 class HaloVLM(VisualPredictionMixin, FlowActionHeadMixin, nn.Module):
-    def __init__(self, config: HaloVLMConfig | None = None, **kwargs):
+    """Halo-VLA: one causal decoder reading images, proprioception and text, with three task heads.
+
+    Images (built-in ViT, SigLIP / CLIP or a HaleBlocks backbone) are projected to the decoder
+    width and spliced in at ``<image>`` slots, states at ``<state>`` slots. The decoder's states at
+    ``<halo_action>`` slots condition a conditional flow-matching action head; those at
+    ``<halo_world_video>`` slots condition a DiT that predicts future frames. The decoder is either
+    the built-in :class:`DecoderTransformer` or a pretrained LLM (``llm_backbone``). The heads live in
+    :class:`FlowActionHeadMixin` and :class:`VisualPredictionMixin`.
+
+    Args:
+        config: model settings; ``None`` builds one from ``kwargs``.
+        **kwargs: ``HaloVLMConfig`` fields used when ``config`` is ``None``.
+
+    Example:
+        >>> model = HaloVLM(HaloVLMConfig(emb_dim=64))  # doctest: +SKIP
+        >>> out = model(images, input_ids, attention_mask, states)  # doctest: +SKIP
+    """
+
+    def __init__(self, config: HaloVLMConfig | None = None, **kwargs: Any) -> None:
         super().__init__()
         if config is None:
             config = HaloVLMConfig(**kwargs)
@@ -265,8 +289,9 @@ class HaloVLM(VisualPredictionMixin, FlowActionHeadMixin, nn.Module):
             raise ModelStateError("could not locate the LLM backbone's decoder layers")
         return max(candidates, key=len)
 
-    def encode_sequence(self, images, input_ids, attention_mask, states, *,
-                        extra_embeds=None, capture_layer=None):
+    def encode_sequence(self, images: torch.Tensor, input_ids: torch.Tensor, attention_mask: torch.Tensor,
+                        states: torch.Tensor, *, extra_embeds: torch.Tensor | None = None,
+                        capture_layer: int | None = None) -> dict[str, Any]:
         """Run the vision-language decoder and return its hidden states (no task heads).
 
         Args:
@@ -299,7 +324,8 @@ class HaloVLM(VisualPredictionMixin, FlowActionHeadMixin, nn.Module):
         captured = {}
         handle = None
         if capture_layer is not None:
-            def grab(_module, _inputs, output):
+            def grab(_module: nn.Module, _inputs: tuple, output: Any) -> None:
+                """Forward hook: remember the captured layer's output."""
                 captured["h"] = output[0] if isinstance(output, tuple) else output
             handle = self.decoder_layers()[capture_layer].register_forward_hook(grab)
         try:
@@ -317,7 +343,9 @@ class HaloVLM(VisualPredictionMixin, FlowActionHeadMixin, nn.Module):
             "layer_hidden": captured.get("h"),
         }
 
-    def forward(self, images, input_ids, attention_mask, states, image_mask=None):
+    def forward(self, images: torch.Tensor, input_ids: torch.Tensor, attention_mask: torch.Tensor,
+                states: torch.Tensor, image_mask: torch.Tensor | None = None,
+                ) -> tuple[torch.Tensor, torch.Tensor | None, torch.Tensor | None, torch.Tensor | None]:
         """
         Forward pass with interleaved multi-image, state-injection, and
         action-decoding support.

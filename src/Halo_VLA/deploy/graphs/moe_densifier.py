@@ -16,6 +16,14 @@ class MoEDensifier:
     """
 
     def apply(self, model: nn.Module) -> int:
+        """Replace every ``DeepseekMoE`` in ``model`` with a :class:`DenseMoE`.
+
+        Args:
+            model: the module tree to rewrite in place.
+
+        Returns:
+            The number of layers replaced.
+        """
         from models.moe import DeepseekMoE
 
         replaced = 0

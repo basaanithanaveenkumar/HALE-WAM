@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import torch
 from torch import nn
 
 from hale_core.deploy.core.io_signature import IOSignature
@@ -27,6 +28,7 @@ class HaloFlowActionStepAdapter(HaloAdapterBase):
         self.max_rows = int(max_rows or self.max_batch)
 
     def default_signature(self) -> IOSignature:
+        """Noisy action rows, time and context in; the velocity out."""
         cfg = self.model_config()
         flat = cfg.action_chunk_size * cfg.action_dim
         return self.build_signature({
@@ -40,7 +42,17 @@ class HaloFlowActionStepAdapter(HaloAdapterBase):
         })
 
     def graph(self, model: nn.Module) -> nn.Module:
+        """The flow-matching decoder."""
         return model.flow_decoder
 
-    def forward_for_export(self, graph: nn.Module, inputs: dict):
+    def forward_for_export(self, graph: nn.Module, inputs: dict[str, torch.Tensor]) -> torch.Tensor:
+        """Evaluate the velocity field once.
+
+        Args:
+            graph: the flow decoder.
+            inputs: ``noisy_actions``, ``t``, ``context``.
+
+        Returns:
+            The velocity ``[N, chunk * action_dim]``.
+        """
         return graph(inputs["noisy_actions"], inputs["t"], inputs["context"])

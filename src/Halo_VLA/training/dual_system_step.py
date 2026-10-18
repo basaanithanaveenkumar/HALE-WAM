@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import torch
 import torch.nn as nn
 
 from training.training_step import StepOutput
@@ -19,7 +20,16 @@ class DualSystemTrainingStep(nn.Module):
         super().__init__()
         self.model = model
 
-    def forward(self, batch: dict) -> StepOutput:
+    def forward(self, batch: dict[str, torch.Tensor]) -> StepOutput:
+        """Compute the dual-system losses for ``batch``.
+
+        Args:
+            batch: collated batch (``images``, ``input_ids``, ``attention_mask``, ``labels``, ``states``,
+                ``actions``, ``action_mask``).
+
+        Returns:
+            A :class:`StepOutput` with the policy loss as ``act``.
+        """
         losses = self.model(batch)
         zero = losses.policy.new_zeros(())
         return StepOutput(total=losses.total, lang=losses.lm, act=losses.policy, vis=zero,

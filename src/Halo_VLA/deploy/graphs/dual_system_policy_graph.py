@@ -28,6 +28,18 @@ class DualSystemPolicyGraph(nn.Module):
 
     def forward(self, images: torch.Tensor, input_ids: torch.Tensor, attention_mask: torch.Tensor,
                 states: torch.Tensor, noise: torch.Tensor | None = None) -> torch.Tensor:
+        """Predict an action chunk from an observation and prompt.
+
+        Args:
+            images: frames ``[B, N, 3, H, W]``.
+            input_ids: prompt ``[B, L]``.
+            attention_mask: prompt mask ``[B, L]``.
+            states: proprioception ``[B, S, state_dim]``.
+            noise: initial System 1 noise; ``None`` for regression.
+
+        Returns:
+            ``[B, chunk, action_dim]``.
+        """
         latent, latent_mask = self.system2(images, input_ids, attention_mask, states)
         image = images[:, -1]                     # newest frame (latest_frame without an image mask)
         state = states[:, -1] if states.shape[1] > 0 else states.new_zeros(states.shape[0], states.shape[2])

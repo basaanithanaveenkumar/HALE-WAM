@@ -1,4 +1,6 @@
-"""HeadAttn: headAttn."""
+"""HeadAttn: one self-attention head with explicit score computation."""
+
+from __future__ import annotations
 
 import math
 
@@ -8,7 +10,21 @@ import torch.nn.functional as F
 
 
 class HeadAttn(nn.Module):
-    def __init__(self, emb_dim=256, head_size=16, drop_fact=0.0, causal_mask=False, return_attn_weights=False):
+    """A single scaled dot-product attention head.
+
+    :class:`MultiHeadAttn` reuses this head's projections for a fused implementation; the explicit
+    :meth:`forward` is kept for inspection (it can return the attention weights).
+
+    Args:
+        emb_dim: input width.
+        head_size: width of the head's queries, keys and values.
+        drop_fact: attention dropout probability.
+        causal_mask: forbid attending to later positions.
+        return_attn_weights: also return the ``[B, L, L]`` attention weights.
+    """
+
+    def __init__(self, emb_dim: int = 256, head_size: int = 16, drop_fact: float = 0.0, causal_mask: bool = False,
+                 return_attn_weights: bool = False) -> None:
         super().__init__()
         self.em_dim = emb_dim
 
@@ -21,8 +37,18 @@ class HeadAttn(nn.Module):
         self.dropout = nn.Dropout(drop_fact)
         self.return_attn_weights = return_attn_weights
 
-    def forward(self, inputs, pad_mask=None):
-        # inputs: [B, Seq_len, D]
+    def forward(self, inputs: torch.Tensor,
+                pad_mask: torch.Tensor | None = None) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
+        """Attend over ``inputs``.
+
+        Args:
+            inputs: ``[B, L, D]``.
+            pad_mask: ``[B, L]`` with 1 for real tokens and 0 for padding (padded keys are masked).
+
+        Returns:
+            The head output ``[B, L, head_size]``, plus the attention weights when
+            ``return_attn_weights`` is set.
+        """
         B, seq_len, D = inputs.shape
         Query = self.query_proj(inputs)  # [B, Seq_len, head_size]
         Key = self.key_proj(inputs)      # [B, Seq_len, head_size]
