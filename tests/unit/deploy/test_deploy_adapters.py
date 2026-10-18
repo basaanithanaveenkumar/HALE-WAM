@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 import torch
-from tests.deploy.support import TINY_DUAL, TINY_MODEL, TINY_PROMPT
+from tests.support.deploy_support import TINY_DUAL, TINY_MODEL, TINY_PROMPT
 
 from hale_core.deploy.exceptions import ConfigError
 from hale_core.deploy.registry import ADAPTERS
@@ -114,7 +114,7 @@ def test_language_model_adapter_exports_a_merged_hf_checkpoint(monkeypatch) -> N
     pytest.importorskip("peft")
     from unittest.mock import patch
 
-    from tests.test_llm_backbone import tiny_llama, tiny_tokenizer
+    from tests.support.llm_support import tiny_llama, tiny_tokenizer
 
     with patch.object(transformers.AutoModelForCausalLM, "from_pretrained", side_effect=lambda *a, **k: tiny_llama()), \
          patch.object(transformers.AutoTokenizer, "from_pretrained", side_effect=lambda *a, **k: tiny_tokenizer()):

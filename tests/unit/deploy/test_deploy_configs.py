@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from tests.deploy.support import CONFIGS
+from tests.support.deploy_support import CONFIGS
 
 from hale_core.deploy import DeployRunner
 from hale_core.deploy.config import Config

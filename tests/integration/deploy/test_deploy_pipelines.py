@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 
 import pytest
-from tests.deploy.support import CONFIGS
+from tests.support.deploy_support import CONFIGS
 
 from hale_core.deploy import DeployRunner
 

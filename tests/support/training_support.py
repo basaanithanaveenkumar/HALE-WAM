@@ -19,7 +19,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 # Same import roots as scripts/train.py (the Halo_VLA sources are not an installed package).
 for _path in (ROOT, ROOT / "src" / "Halo_VLA"):
     if str(_path) not in sys.path:
@@ -126,7 +126,7 @@ def load_train_script() -> ModuleType:
 
 
 def train_tiny(args: argparse.Namespace) -> None:
-    """Ray entry point (``tests.training_support:train_tiny``): the real ``train`` on tiny fakes."""
+    """Ray entry point (``tests.support.training_support:train_tiny``): the real ``train`` on tiny fakes."""
     load_train_script().train(args)
 
 

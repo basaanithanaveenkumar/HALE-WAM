@@ -17,7 +17,7 @@ import pytest
 import torch
 import torch.multiprocessing as mp
 
-from tests.training_support import TinyHaloVLM, load_train_script, tiny_args
+from tests.support.training_support import TinyHaloVLM, load_train_script, tiny_args
 
 HAS_HALE_CORE = importlib.util.find_spec("hale_core") is not None
 HAS_WEBDATASET = HAS_HALE_CORE and importlib.util.find_spec("webdataset") is not None
@@ -72,7 +72,7 @@ def _ddp_rank(rank: int, world: int, port: int, tmp: str) -> None:
     """One torchrun-style rank: env vars set, process group created by DDPSession."""
     os.environ.update(MASTER_ADDR="127.0.0.1", MASTER_PORT=str(port), RANK=str(rank),
                       LOCAL_RANK=str(rank), WORLD_SIZE=str(world))
-    root = Path(__file__).resolve().parents[1]
+    root = Path(__file__).resolve().parents[2]
     sys.path[:0] = [str(root), str(root / "src" / "Halo_VLA")]
     module = load_train_script()
     built: list[TinyHaloVLM] = []
@@ -103,7 +103,7 @@ def test_ray_two_workers_report_checkpoint(tmp_path: Path) -> None:
     args = tiny_args(module, tmp_path / "ckpt", "--ray", "--ray_num_workers", "2",
                      "--ray_storage_path", str(tmp_path / "ray"))
     # Workers import the entry by name (repo root is on their PYTHONPATH via RayCliOptions).
-    result = module.launch_train_on_ray("tests.training_support:train_tiny", args)
+    result = module.launch_train_on_ray("tests.support.training_support:train_tiny", args)
     assert result.ok, result.error
     assert result.metrics["epoch"] == 2
     assert result.checkpoint_path is not None
@@ -113,9 +113,9 @@ def test_ray_two_workers_report_checkpoint(tmp_path: Path) -> None:
 def test_resolve_entry_accepts_script_path_and_module() -> None:
     from training.ray_launch import resolve_entry
 
-    root = Path(__file__).resolve().parents[1]
+    root = Path(__file__).resolve().parents[2]
     assert resolve_entry(f"{root / 'scripts' / 'train.py'}:train").__name__ == "train"
-    assert resolve_entry("tests.training_support:train_tiny").__name__ == "train_tiny"
+    assert resolve_entry("tests.support.training_support:train_tiny").__name__ == "train_tiny"
     with pytest.raises(ValueError):
         resolve_entry("no_function_given")
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 import torch
-from tests.deploy.support import prompt_batch, tiny_dual
+from tests.support.deploy_support import prompt_batch, tiny_dual
 
 from Halo_VLA.deploy.graphs import (
     DenseMoE,
@@ -81,7 +81,7 @@ def test_dense_moe_matches_sparse_dispatch_and_densifier_swaps_layers() -> None:
     moe = DeepseekMoE(32, 40, 6, 2, 2).eval()
     x = torch.randn(3, 7, 32)
     torch.testing.assert_close(DenseMoE(moe)(x), moe(x), atol=1e-6, rtol=0)
-    from tests.deploy.support import TINY_MODEL
+    from tests.support.deploy_support import TINY_MODEL
 
     vlm = HaloVLM(HaloVLMConfig(**{**TINY_MODEL, "use_moe": True, "moe_num_routed_experts": 4,
                                     "moe_num_shared_experts": 1})).eval()

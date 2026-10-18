@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 import torch
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 for _path in (ROOT, ROOT / "src" / "Halo_VLA"):
     if str(_path) not in sys.path:
         sys.path.insert(0, str(_path))
@@ -23,7 +23,7 @@ from rl import (  # noqa: E402
     world_model_loss,
 )
 
-from tests.test_llm_backbone import batch_for, hf_patched, small_config  # noqa: E402,F401
+from tests.support.llm_support import batch_for, hf_patched, small_config  # noqa: E402,F401
 
 
 def test_every_algorithm_is_exported() -> None:

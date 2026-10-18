@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pytest
 import torch
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 for _path in (ROOT, ROOT / "src" / "Halo_VLA"):
     if str(_path) not in sys.path:
         sys.path.insert(0, str(_path))
@@ -18,7 +18,7 @@ from config import HaloVLMConfig  # noqa: E402
 from models.halo_vla import HaloVLM  # noqa: E402
 from training import HaloVLATrainingStep, VLAEvaluator, split_validation  # noqa: E402
 
-from tests.test_llm_backbone import batch_for  # noqa: E402
+from tests.support.llm_support import batch_for  # noqa: E402
 
 
 def small(**kw) -> HaloVLMConfig:
