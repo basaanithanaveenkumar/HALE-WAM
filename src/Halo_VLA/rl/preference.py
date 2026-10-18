@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import torch
 
-from rl.policy import GaussianActionPolicy
+from rl.policy import GaussianActionPolicy, RewardFn
 from exceptions import ModelInputError
 
 

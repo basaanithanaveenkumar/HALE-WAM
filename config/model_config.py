@@ -7,7 +7,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from config.tokens import get_vocab_size, get_token_id
 from exceptions import HaloVLAConfigError
 
 if TYPE_CHECKING:

@@ -388,8 +388,6 @@ class HaloVLM(VisualPredictionMixin, FlowActionHeadMixin, nn.Module):
         B = input_ids.size(0)
         device = input_ids.device
         network_config = self.config
-        image_token_id = network_config.image_token_id          # e.g. 151665
-        state_token_id = network_config.state_token_id          # e.g. 151667
         action_token_id = network_config.action_token_id        # e.g. 151666
         world_video_token_id = network_config.world_video_token_id  # e.g. 151668
 

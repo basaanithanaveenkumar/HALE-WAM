@@ -31,7 +31,7 @@ from training import HaloVLATrainingStep  # noqa: E402
 from tests.support.llm_support import batch_for, hf_patched, small_config, tiny_llama, tiny_tokenizer  # noqa: E402,F401
 
 
-def test_hf_backbone_replaces_the_decoder_and_rewrites_token_ids(hf_patched) -> None:
+def test_hf_backbone_replaces_the_decoder_and_rewrites_token_ids(hf_patched) -> None:  # noqa: F811
     cfg = small_config(llm_backbone="smollm2-135m")
     model = HaloVLM(cfg)
     assert model.decoder_transformer is None and not hasattr(model, "token_emb")
@@ -47,7 +47,7 @@ def test_hf_backbone_replaces_the_decoder_and_rewrites_token_ids(hf_patched) -> 
     assert action_hiddens.shape == (2, 1, cfg.emb_dim) and world.shape == (2, 1, cfg.emb_dim)
 
 
-def test_lora_trains_adapters_embeddings_and_bridges_only(hf_patched) -> None:
+def test_lora_trains_adapters_embeddings_and_bridges_only(hf_patched) -> None:  # noqa: F811
     cfg = small_config(llm_backbone="qwen2.5-0.5b", llm_finetune="lora", llm_lora_r=4, llm_lora_alpha=8)
     model = HaloVLM(cfg)
     llm_trainable = {n for n, p in model.language.llm.named_parameters() if p.requires_grad}
@@ -63,7 +63,7 @@ def test_lora_trains_adapters_embeddings_and_bridges_only(hf_patched) -> None:
     assert all(p.grad is not None for n, p in model.language.llm.named_parameters() if "lora_B" in n)
 
 
-def test_frozen_llm_still_trains_the_vla_heads(hf_patched) -> None:
+def test_frozen_llm_still_trains_the_vla_heads(hf_patched) -> None:  # noqa: F811
     cfg = small_config(llm_backbone="smollm2-135m", llm_finetune="frozen")
     model = HaloVLM(cfg)
     assert not any(p.requires_grad for p in model.language.llm.parameters())

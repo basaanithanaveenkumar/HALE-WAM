@@ -133,10 +133,8 @@ def generate_training_visualization(
     C_GRN      = (130, 235, 170)   # GT
     C_CYN      = (255, 200, 110)   # prediction (amber)
     C_ORG      = (150, 220, 255)   # task / accent blue
-    C_PINK     = (235, 130, 150)
     C_ACCENT   = (96,  200, 255)
 
-    F_HEAD     = get_font(20, bold=True)
     F_LABEL    = get_font(14, bold=True)
     F_BODY     = get_font(15)
     F_PANEL    = get_font(13, bold=True)

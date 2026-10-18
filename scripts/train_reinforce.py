@@ -31,6 +31,7 @@ from pathlib import Path
 
 import torch
 from torch.optim import AdamW
+from torch.utils.data import DataLoader
 
 # --- project paths (mirrors scripts/train.py) ---
 ROOT = Path(__file__).resolve().parent.parent

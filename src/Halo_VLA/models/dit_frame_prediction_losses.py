@@ -247,6 +247,6 @@ def sample_di_t_euler(
     return x
 
 
-def F_func_temporal(v_frames: torch.Tensor) -> torch.Tensor:
+def F_func_temporal(v_frames: torch.Tensor) -> torch.Tensor:  # noqa: N802 - name kept for importers
     """L2 difference between consecutive predicted velocity fields [B, F, C, H, W]."""
     return F.mse_loss(v_frames[:, 1:], v_frames[:, :-1])

@@ -255,7 +255,6 @@ class RGBFramePredictor(nn.Module):
           5. Return [B, emb_dim] for DiT conditioning
         """
         batch_size = text_emb.size(0)
-        device = text_emb.device
 
         # Handle text embedding shape: convert to [B, seq_len, emb_dim]
         if text_emb.dim() == 2:

@@ -333,8 +333,7 @@ def compose_frame(
 def add_divider(top_img: np.ndarray, bottom_img: np.ndarray,
                 divider_height: int = 6) -> np.ndarray:
     """Stack two BGR images with a thin gradient divider in between."""
-    h_top, w, _ = top_img.shape
-    h_bot = bottom_img.shape[0]
+    _, w, _ = top_img.shape
     divider = np.zeros((divider_height, w, 3), dtype=np.uint8)
     # Subtle teal accent strip.
     for y in range(divider_height):

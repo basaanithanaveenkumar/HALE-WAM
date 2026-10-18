@@ -30,6 +30,7 @@ from pathlib import Path
 
 import torch
 from torch.optim import AdamW
+from torch.utils.data import DataLoader
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))

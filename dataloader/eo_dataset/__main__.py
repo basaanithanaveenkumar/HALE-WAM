@@ -7,7 +7,7 @@ import argparse
 import torch
 from loguru import logger
 
-from . import *  # noqa: F403
+from . import build_eo_dataloader
 
 parser = argparse.ArgumentParser(description="EO-Data1.5M dataloader test")
 parser.add_argument("--subset", default="interleave-temporal")

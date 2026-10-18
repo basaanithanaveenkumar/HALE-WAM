@@ -133,7 +133,6 @@ def generate(
         action_preds  : Tensor or None — action predictions (from last step)
     """
     device = input_ids.device
-    config = model.config
     generated_ids: list[int] = []
     action_preds = None
 
@@ -302,7 +301,6 @@ def evaluate_dataset(args: argparse.Namespace) -> None:
     """Run a checkpoint over a dataset split and report the language, action and image metrics."""
     device = torch.device(args.device)
     model, config = load_checkpoint(args.checkpoint, device)
-    tokenizer = get_tokenizer(max_seq_len=args.max_seq_len)
 
     loader = build_eo_dataloader(
         subset=args.subset,
