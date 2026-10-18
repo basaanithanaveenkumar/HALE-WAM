@@ -114,7 +114,13 @@ def load_train_script() -> ModuleType:
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     module.HaloVLM = TinyHaloVLM
-    module.build_eo_dataloader = build_tiny_loader
+    from training.train_datasets import TRAIN_DATASETS
+
+    # The "eo" dataset builder stands in for EO-Data1.5M with the tiny in-memory loader.
+    TRAIN_DATASETS.register_module(name="eo", force=True)(
+        lambda args, config, tokenizer: build_tiny_loader(
+            batch_size=args.batch_size, num_workers=args.num_workers, max_samples=args.max_samples)
+    )
     module.log_module_parameters = lambda *a, **k: None
     return module
 

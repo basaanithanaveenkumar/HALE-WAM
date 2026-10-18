@@ -4,16 +4,13 @@ import argparse
 import sys
 
 import torch
-from dual_system import PRESETS as DUAL_PRESETS
+from dual_system import DUAL_SYSTEM_PRESETS
+from models.image_proj import PROJECTOR_TYPES
+from models.vision_encoders import ENCODER_TYPES
 
-from training import (
-    RayCliOptions,
-    WebDatasetCliOptions,
-)
-from training.training_visualization import (  # noqa: F401 - moved; re-exported for callers
-    draw_overlays,
-    generate_training_visualization,
-)
+from training.ray_cli import RayCliOptions
+from training.train_datasets import TRAIN_DATASETS
+from training.webdataset_cli import WebDatasetCliOptions
 
 
 # ---------------------------------------------------------------------------
@@ -31,7 +28,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     # Data
     p.add_argument(
         "--dataset",
-        choices=("eo", "moma", "droid"),
+        choices=tuple(TRAIN_DATASETS.items),
         default="eo",
         help="eo: EO-Data1.5M; moma: local AIRoA MoMa clone; droid: lerobot/droid_100 clone",
     )
@@ -86,7 +83,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument(
         "--projector_type",
         default="mlp",
-        choices=("mlp", "qformer", "gated_cross_attention"),
+        choices=PROJECTOR_TYPES,
         help="Vision -> decoder projector: per-patch MLP, Q-Former, or gated cross-attention.",
     )
     p.add_argument(
@@ -185,7 +182,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     # Vision encoder (mirrors Hale-VLM's vision.encoder)
     vis = p.add_argument_group("Vision encoder")
-    vis.add_argument("--vision_encoder", default="vit", choices=("vit", "siglip", "clip", "local"),
+    vis.add_argument("--vision_encoder", default="vit", choices=ENCODER_TYPES,
                      help="vit: built-in ViT; siglip/clip: pretrained Hub tower; local: hale_core.nn.vision backbone")
     vis.add_argument("--vision_model_id", default=None, help="siglip/clip repo (default: *-base-patch16-224)")
     vis.add_argument("--vision_backbone", default="dino_vit_small", help="backbone name for --vision_encoder local")
@@ -205,7 +202,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     # Dual-system VLA (src/Halo_VLA/dual_system, docs/dual_system.md)
     ds = p.add_argument_group("Dual-system VLA")
-    ds.add_argument("--dual_system", default="none", choices=("none", "custom", *sorted(DUAL_PRESETS)),
+    ds.add_argument("--dual_system", default="none", choices=("none", "custom", *sorted(DUAL_SYSTEM_PRESETS.keys())),
                     help="none: single-system Halo-VLA; a preset / custom: HaloVLM becomes System 2 of a "
                          "slow/fast dual system")
     ds.add_argument("--dual_system_option", action="append", default=[], metavar="KEY=VALUE",

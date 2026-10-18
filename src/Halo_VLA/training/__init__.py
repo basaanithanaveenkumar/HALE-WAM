@@ -8,21 +8,29 @@
   ``scripts/train.py`` mapped onto HaleBlocks' ``RayConfig`` / ``WebDatasetConfig``.
 * :func:`launch_train_on_ray` - run ``train(args)`` on Ray Train workers.
 * :class:`VLAEvaluator`, :func:`split_validation` - held-out losses and action metrics.
+* :class:`CheckpointManager` - atomic checkpoint writes, pruning and restore.
+* :data:`TRAIN_DATASETS` / :func:`build_train_loader` - ``--dataset`` registry;
+  :func:`build_model_config` - ``HaloVLMConfig`` from the parsed arguments.
 
 Ray and WebDataset come from HaleBlocks and are optional (``pip install -e '.[distributed]'``);
 nothing here imports them unless the corresponding flag is used.
 """
 
+from training.checkpoint_manager import CheckpointManager
 from training.ddp_session import DDPSession
 from training.dual_system_step import DualSystemTrainingStep
 from training.evaluator import VLAEvaluator
+from training.model_config_builder import build_model_config
 from training.ray_cli import RayCliOptions
 from training.ray_launch import launch_train_on_ray
+from training.train_datasets import TRAIN_DATASETS, build_train_loader
 from training.training_step import HaloVLATrainingStep, StepOutput
 from training.validation_split import split_validation
 from training.webdataset_cli import WebDatasetCliOptions
 
 __all__ = [
+    "TRAIN_DATASETS",
+    "CheckpointManager",
     "DDPSession",
     "DualSystemTrainingStep",
     "HaloVLATrainingStep",
@@ -30,6 +38,8 @@ __all__ = [
     "StepOutput",
     "VLAEvaluator",
     "WebDatasetCliOptions",
+    "build_model_config",
+    "build_train_loader",
     "launch_train_on_ray",
     "split_validation",
 ]

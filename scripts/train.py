@@ -11,7 +11,6 @@ Distributed (same script, same losses - see src/Halo_VLA/training/):
     python scripts/train.py --webdataset --webdataset_root /fast/shards ...   # any dataset -> WebDataset shards
 """
 
-import argparse
 import sys
 import time
 from contextlib import nullcontext
@@ -20,111 +19,46 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+from loguru import logger
+from torch.amp import GradScaler, autocast
 from torch.optim import AdamW
-from torch.amp import autocast, GradScaler
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
-# ---------------------------------------------------------------------------
-# Make sure project root is on sys.path so imports work
-# ---------------------------------------------------------------------------
+# The repo root and src/Halo_VLA are import roots (the sources are not an installed package).
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src" / "Halo_VLA"))
 
-from config import HaloVLMConfig
-from exceptions import CheckpointNotFoundError, HaloVLAConfigError
-from config.overrides import apply_model_overrides, parse_model_options
-from models.halo_vla import HaloVLM
-from dataloader.eo_dataset import build_eo_dataloader
-from dataloader.airoa_moma_dataset import build_airoa_moma_dataloader
-from dataloader.droid_dataset import build_droid_dataloader
-from training import (
+from dual_system import DualSystemVLA, resolve_dual_system_config  # noqa: E402
+from models.halo_vla import HaloVLM  # noqa: E402
+from training import (  # noqa: E402
+    CheckpointManager,
     DDPSession,
     DualSystemTrainingStep,
     HaloVLATrainingStep,
-    RayCliOptions,
     VLAEvaluator,
     WebDatasetCliOptions,
+    build_model_config,
+    build_train_loader,
     launch_train_on_ray,
     split_validation,
 )
-from dual_system import PRESETS as DUAL_PRESETS, DualSystemVLA, resolve_dual_system_config
-from dual_system.config import parse_overrides
-from utils import log_module_parameters
-from scripts.visualize import (
-    unnormalise_image,
-    generate_text,
-    get_font,
-    action_comparison_image,
-    sample_dit_with_intermediates,
-    save_diffusion_gif,
-    tensor_to_display_image,
-)
-
-from loguru import logger
+from training.train_arg_parser import parse_args  # noqa: E402
+from training.training_visualization import generate_training_visualization  # noqa: E402
+from utils import log_module_parameters  # noqa: E402
 
 try:
     from torch.utils.tensorboard import SummaryWriter
-except ImportError:
+except ImportError:  # tensorboard is optional
     SummaryWriter = None  # type: ignore[misc, assignment]
 
-import numpy as np
-from training.training_visualization import (  # noqa: F401 - moved; re-exported for callers
-    draw_overlays,
-    generate_training_visualization,
-)
-from training.train_arg_parser import (  # noqa: F401 - moved; re-exported for callers
-    parse_args,
-)
 
-
-# ---------------------------------------------------------------------------
-# Loss helpers
-# ---------------------------------------------------------------------------
-def compute_action_loss(action_preds, action_targets, action_mask):
-    """
-    MSE loss between predicted and ground-truth actions.
-
-    Args:
-        action_preds:   [B, n_act, chunk_size, action_dim] or None
-        action_targets: [B, max_T, action_dim]
-        action_mask:    [B, max_T]  (1 for real, 0 for pad)
-    """
-    if action_preds is None:
-        return torch.tensor(0.0, device=action_targets.device)
-
-    # Flatten chunk dimension: [B, n_act * chunk_size, action_dim]
-    B, n_act, chunk, dim = action_preds.shape
-    preds_flat = action_preds.view(B, n_act * chunk, dim)
-
-    # Align lengths (targets may be longer/shorter)
-    T = min(preds_flat.size(1), action_targets.size(1))
-    preds_flat = preds_flat[:, :T, :]
-    targets = action_targets[:, :T, :]
-    mask = action_mask[:, :T].unsqueeze(-1).float()  # [B, T, 1]
-
-    if mask.sum() == 0:
-        return torch.tensor(0.0, device=preds_flat.device)
-    # l1 loss
-    loss = ((preds_flat - targets).abs() * mask).sum() / mask.sum() / dim
-    return loss
-
-
-
-# ---------------------------------------------------------------------------
-# Training loop
-# ---------------------------------------------------------------------------
 def _latest_ray_checkpoint() -> Path | None:
     """Newest ``halo_vla_epoch*.pt`` in the checkpoint Ray restored this worker from, if any."""
     from hale_core.distributed import RayReporter  # lazy: HaleBlocks is only needed with --ray
 
     restored = RayReporter.latest_checkpoint_dir()
-    if restored is None:
-        return None
-    ckpts = sorted(Path(restored).glob("halo_vla_epoch*.pt"),
-                   key=lambda p: int(p.stem.replace("halo_vla_epoch", "")))
-    return ckpts[-1] if ckpts else None
+    return None if restored is None else CheckpointManager(Path(restored)).latest()
 
 
 def train(args):
@@ -137,45 +71,8 @@ def train(args):
     logger.info("Device: {}  |  rank {}/{}", device, session.rank, session.world_size)
 
     # ---- Config ----
-    config = HaloVLMConfig(
-        action_dim=args.action_dim,
-        state_dim=args.state_dim,
-        action_chunk_size=args.action_chunk_size,
-        num_visual_predict_frames=args.num_predict_frames,
-        proj_type=args.projector_type,
-    )
-    if args.num_query_tokens is not None:
-        config.qformer_num_queries = args.num_query_tokens
-        config.gated_xattn_num_latents = args.num_query_tokens
-    if args.visual_loss_weight is not None:
-        config.visual_loss_weight = args.visual_loss_weight
+    config = build_model_config(args)
     visual_loss_weight = config.visual_loss_weight
-    # Vision encoder: built-in ViT, SigLIP / CLIP, or a HaleBlocks backbone (--vision_encoder).
-    config.vision_encoder = args.vision_encoder
-    config.vision_model_id = args.vision_model_id
-    config.vision_backbone = args.vision_backbone
-    config.vision_freeze = args.vision_freeze
-    config.vision_freeze_up_to_stage = args.vision_freeze_up_to_stage
-    config.vision_pretrained_path = args.vision_pretrained_path
-    # Optional pretrained, fine-tunable LLM in place of the built-in decoder (--llm_backbone).
-    config.llm_backbone = args.llm_backbone
-    config.llm_model_id = args.llm_model_id
-    config.llm_checkpoint = args.llm_checkpoint
-    config.llm_finetune = args.llm_finetune
-    config.llm_lora_r, config.llm_lora_alpha = args.llm_lora_r, args.llm_lora_alpha
-    config.llm_lora_dropout = args.llm_lora_dropout
-    config.llm_lora_train_embeddings = not args.llm_freeze_embeddings
-    config.llm_dtype = args.llm_dtype
-    config.llm_gradient_checkpointing = args.llm_gradient_checkpointing
-    # Dual-system VLA (--dual_system): HaloVLM becomes System 2 of a slow/fast pair.
-    config.dual_system = args.dual_system
-    config.dual_system_options = parse_overrides(args.dual_system_option) or None
-    config.llm_attn_implementation = args.llm_attn_implementation
-    # Architecture fields without a flag: from the YAML (--config) and --model_option KEY=VALUE.
-    model_overrides = {**getattr(args, "model_overrides", {}), **parse_model_options(args.model_option)}
-    if model_overrides:
-        apply_model_overrides(config, model_overrides)
-        logger.info("HaloVLMConfig overrides: {}", model_overrides)
 
     # ---- Model ----
     model = HaloVLM(config=config).to(device)
@@ -194,62 +91,7 @@ def train(args):
     llm_tokenizer = language.tokenizer if language is not None else None
 
     # ---- Dataloader ----
-    if args.dataset == "eo":
-        train_loader = build_eo_dataloader(
-            subset=args.subset,
-            split="train",
-            batch_size=args.batch_size,
-            num_workers=args.num_workers,
-            img_size=config.img_size,
-            max_seq_len=args.max_seq_len,
-            action_dim=args.action_dim,
-            state_dim=args.state_dim,
-            num_predict_frames=args.num_predict_frames,
-            shuffle=True,
-            max_samples=args.max_samples,
-            tokenizer=llm_tokenizer,
-        )
-    elif args.dataset == "droid":
-        if not args.droid_data_root:
-            raise HaloVLAConfigError("--droid_data_root is required when --dataset droid")
-        train_loader = build_droid_dataloader(
-            data_root=args.droid_data_root,
-            batch_size=args.batch_size,
-            num_workers=args.moma_num_workers,
-            img_size=config.img_size,
-            max_seq_len=args.max_seq_len,
-            max_action_len=args.moma_max_action_len,
-            action_dim=args.action_dim,
-            state_dim=args.state_dim,
-            camera=args.droid_camera,
-            num_sample_frames=args.moma_num_frames,
-            num_predict_frames=args.num_predict_frames,
-            frame_stride=args.moma_frame_stride,
-            shuffle=True,
-            max_samples=args.max_samples,
-            tokenizer=llm_tokenizer,
-        )
-    else:
-        if not args.moma_data_root:
-            raise HaloVLAConfigError("--moma_data_root is required when --dataset moma")
-        moma_workers = args.moma_num_workers
-        train_loader = build_airoa_moma_dataloader(
-            data_root=args.moma_data_root,
-            batch_size=args.batch_size,
-            num_workers=moma_workers,
-            img_size=config.img_size,
-            max_seq_len=args.max_seq_len,
-            max_action_len=args.moma_max_action_len,
-            action_dim=args.action_dim,
-            state_dim=args.state_dim,
-            num_sample_frames=args.moma_num_frames,
-            num_predict_frames=args.num_predict_frames,
-            frame_stride=args.moma_frame_stride,
-            camera=args.moma_camera,
-            shuffle=True,
-            max_samples=args.max_samples,
-            tokenizer=llm_tokenizer,
-        )
+    train_loader = build_train_loader(args, config, llm_tokenizer)
     # ---- Grab tokenizer from dataset for debug decoding (before any dataset swap) ----
     tokenizer = train_loader.dataset.tokenizer
 
@@ -279,6 +121,7 @@ def train(args):
     # ---- Checkpoint dir ----
     ckpt_dir = Path(args.ckpt_dir)
     ckpt_dir.mkdir(parents=True, exist_ok=True)
+    checkpoints = CheckpointManager(ckpt_dir, keep=args.keep_ckpts)
     if args.config and session.is_main:
         # Provenance: the YAML as resolved (inheritance applied), plus the final command line.
         from config.run_config import save_resolved_config
@@ -294,28 +137,8 @@ def train(args):
         if restored is not None:
             args.resume = str(restored)
     if args.resume:
-        ckpt_path = Path(args.resume)
-        if not ckpt_path.exists():
-            raise CheckpointNotFoundError(f"Checkpoint not found: {ckpt_path}")
-        logger.info("Resuming from checkpoint: {}", ckpt_path)
-        with torch.serialization.safe_globals([HaloVLMConfig]):
-            ckpt = torch.load(ckpt_path, map_location=device, weights_only=True)
-        network.load_state_dict(ckpt["model_state_dict"])
-        try:
-            optimizer.load_state_dict(ckpt["optimizer_state_dict"])
-        except ValueError as exc:
-            # Checkpoints from before the trainable-only optimizer hold state for every
-            # parameter; keep the weights and restart the optimizer moments.
-            logger.warning("optimizer state not restored ({}); continuing with fresh moments", exc)
-        scheduler.load_state_dict(ckpt["scheduler_state_dict"])
-        if "scaler_state_dict" in ckpt:
-            scaler.load_state_dict(ckpt["scaler_state_dict"])
-        start_epoch = ckpt.get("epoch", 0) + 1
-        global_step = ckpt.get("global_step", 0)
-        logger.info(
-            "Resumed at epoch {} / global_step {}  (training from epoch {})",
-            ckpt.get("epoch"), global_step, start_epoch,
-        )
+        start_epoch, global_step = CheckpointManager.restore(
+            Path(args.resume), network, optimizer, scheduler, scaler, device)
 
     # ---- Model forward + all three losses as one module, DDP-wrapped when distributed ----
     # (the action-flow and DiT losses use parameters outside HaloVLM.forward; wrapping the whole
@@ -523,37 +346,10 @@ def train(args):
                         tb_writer.add_scalar(k, v, epoch)
             session.barrier()
 
-        # Save checkpoint — atomic (write to .tmp then rename) so a disk-full
-        # or crash never leaves a corrupted file.  Prune old checkpoints after.
-        # Only rank 0 writes; `model` is the unwrapped HaloVLM, so keys carry no DDP prefix.
+        # Only rank 0 writes; `network` is the unwrapped model, so keys carry no DDP prefix.
         save_now = epoch % args.save_every == 0 or epoch == args.epochs
         if save_now and session.is_main:
-            ckpt_path = ckpt_dir / f"halo_vla_epoch{epoch}.pt"
-            tmp_path  = ckpt_dir / f".tmp_epoch{epoch}.pt"
-            torch.save(
-                {
-                    "epoch": epoch,
-                    "global_step": global_step,
-                    "model_state_dict": network.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict(),
-                    "scheduler_state_dict": scheduler.state_dict(),
-                    "scaler_state_dict": scaler.state_dict(),
-                    "config": config,
-                },
-                tmp_path,
-            )
-            tmp_path.replace(ckpt_path)   # atomic rename on POSIX
-            logger.info("Saved checkpoint → {}", ckpt_path)
-
-            # Prune: keep only the latest `--keep_ckpts` checkpoints
-            if args.keep_ckpts > 0:
-                old_ckpts = sorted(
-                    ckpt_dir.glob("halo_vla_epoch*.pt"),
-                    key=lambda p: int(p.stem.replace("halo_vla_epoch", "")),
-                )
-                for old in old_ckpts[: -args.keep_ckpts]:
-                    old.unlink()
-                    logger.info("Removed old checkpoint {}", old)
+            checkpoints.save(epoch, global_step, network, optimizer, scheduler, scaler, config)
 
         if reporter is not None:
             # Ray Train: every rank reports; rank 0 attaches the checkpoint directory, which Ray
