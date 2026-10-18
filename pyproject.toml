@@ -112,8 +112,29 @@ include = '\.pyi?$'
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+# Notebooks, vendored SDK sources and the paper / project page are not library code.
+extend-exclude = ["notebooks", "ext_pkgs", "paper", "project-page"]
+
+[tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP"]
-ignore = ["E501"]
+ignore = [
+    "E501",  # line length is the formatter's job
+    "N803",  # tensor-dimension names (B, N, D, H, W) are the field's convention
+    "N806",
+    "N812",  # ``import torch.nn.functional as F``
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Entry points and tests put the repo root and src/Halo_VLA on sys.path before importing the sources.
+"scripts/*" = ["E402"]
+"tests/*" = ["E402"]
+
+[tool.ruff.lint.isort]
+# The sources use flat import roots (``from models.x import``), not a single package.
+known-first-party = [
+    "Halo_VLA", "config", "dataloader", "deploy", "dual_system", "exceptions", "metrics", "models",
+    "profiling", "rl", "tests", "training", "utils", "visualization",
+]
 
 [tool.isort]
 profile = "black"
