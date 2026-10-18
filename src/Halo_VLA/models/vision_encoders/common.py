@@ -1,25 +1,27 @@
-"""Helpers shared by the ``vision_encoders`` package."""
+"""build_vision_encoder: the encoder ``HaloVLMConfig.vision_encoder`` selects."""
 
 from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import torch
 import torch.nn as nn
 from exceptions import HaloVLAConfigError
+from hale_core.exceptions import RegistryError
 
-from .hf_vision_encoder import HFVisionEncoder
+from . import encoder_builders  # noqa: F401 - registers the built-in encoders
+from .encoder_builders import DEFAULT_HF_ENCODERS
+from .encoder_registry import VISION_ENCODERS
 from .vision_encoder_info import VisionEncoderInfo
 
-#: Default Hub repos for the pretrained encoders (both checked on the Hub).
-DEFAULT_HF_ENCODERS = {
-    "siglip": "google/siglip-base-patch16-224",  # Zhai et al., 2023, arXiv:2303.15343
-    "clip": "openai/clip-vit-base-patch16",      # Radford et al., 2021, arXiv:2103.00020
-}
+if TYPE_CHECKING:
+    from config.model_config import HaloVLMConfig
+
+#: Registered ``vision_encoder`` names, in registration order.
+ENCODER_TYPES = tuple(VISION_ENCODERS.items)
 
 
-ENCODER_TYPES = ("vit", "siglip", "clip", "local")
-
-
-def build_vision_encoder(config) -> tuple[nn.Module, VisionEncoderInfo]:
+def build_vision_encoder(config: HaloVLMConfig) -> tuple[nn.Module, VisionEncoderInfo]:
     """The encoder ``config.vision_encoder`` selects, plus its token width and count.
 
     * ``vit`` (default): the built-in ``VisTransformer`` - trained from scratch, ``emb_dim`` wide.
@@ -27,35 +29,27 @@ def build_vision_encoder(config) -> tuple[nn.Module, VisionEncoderInfo]:
     * ``local``: any ``hale_core.nn.vision`` backbone by name (frozen by default; optional
       ``vision_freeze_up_to_stage`` and ``vision_pretrained_path``).
 
-    The token count is measured with one dummy forward pass, so it is exact for every
-    architecture (patch tokens for ViTs, the finest feature-map grid for CNNs).
+    The token count is measured with one dummy forward pass (analytic for ``vit``), so it is
+    exact for every architecture (patch tokens for ViTs, the finest feature-map grid for CNNs).
+    New kinds register a builder in :data:`VISION_ENCODERS`.
+
+    Args:
+        config: model settings.
+
+    Returns:
+        ``(encoder, info)``.
+
+    Raises:
+        HaloVLAConfigError: for an unregistered ``vision_encoder``.
     """
     kind = config.vision_encoder
-    if kind not in ENCODER_TYPES:
-        raise HaloVLAConfigError(f"vision_encoder must be one of {ENCODER_TYPES}, got {kind!r}")
-    freeze = config.resolved_vision_freeze
-    if kind == "vit":
-        from models.vit import VisTransformer
-
-        encoder: nn.Module = VisTransformer(
-            img_size=config.img_size, p_size=config.patch_size, in_chans=config.in_chans,
-            emb_dim=config.emb_dim, num_layers=config.vit_num_layers, num_heads=config.vit_num_heads,
-            mlp_dim=config.vit_mlp_dim, drop_fact=config.vit_drop,
-        )
-        if freeze:
-            encoder.requires_grad_(False)
-        return encoder, VisionEncoderInfo(config.emb_dim, (config.img_size // config.patch_size) ** 2)
-    if kind in ("siglip", "clip"):
-        model_id = config.vision_model_id or DEFAULT_HF_ENCODERS[kind]
-        encoder = HFVisionEncoder(kind, model_id, config.img_size, freeze)
-    else:
-        from models.vision_backbone import HaloVisionBackbone
-
-        encoder = HaloVisionBackbone(
-            backbone_name=config.vision_backbone, img_size=config.img_size, freeze_encoder=freeze,
-            freeze_up_to_stage=config.vision_freeze_up_to_stage,
-            pretrained_path=config.vision_pretrained_path,
-        )
+    try:
+        builder = VISION_ENCODERS.get(kind)
+    except RegistryError as err:
+        raise HaloVLAConfigError(f"vision_encoder must be one of {ENCODER_TYPES}, got {kind!r}") from err
+    encoder, info = builder(config)
+    if info is not None:
+        return encoder, info
     with torch.no_grad():
         was_training = encoder.training
         encoder.eval()
