@@ -10,6 +10,22 @@ A run is configured in two layers:
 
 ## YAML run configs
 
+```mermaid
+flowchart LR
+  Y["YAML (inherits: parent)"] -->|"hale_core load_registered_config"| V["VLARunConfig (pydantic)"]
+  V -->|"train_arguments()"| P["argparse defaults"]
+  V -->|"model_overrides()"| O["overrides of HaloVLMConfig"]
+  F["CLI flags"] -->|"win over YAML"| P
+  P --> B["build_model_config(args)"]
+  O --> B
+  B --> M["HaloVLMConfig (dataclass)"]
+```
+
+The YAML is validated into typed pydantic sections at the boundary; the rest of the code sees
+`argparse.Namespace` and `HaloVLMConfig`, never the raw dictionary. Run configs inherit with
+`inherits:`; deploy configs (`configs/deploy/`) use `_base_:` and the HaleBlocks `ConfigLoader`
+with `--cfg-options key=value` overrides.
+
 ```bash
 python scripts/train.py --config configs/base.yaml                      # every default, spelled out
 python scripts/train.py --config configs/overfit.yaml                   # CPU smoke test

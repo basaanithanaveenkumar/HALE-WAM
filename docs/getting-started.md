@@ -2,6 +2,19 @@
 
 ## Install
 
+```mermaid
+flowchart LR
+  A["uv pip install -e ."] --> B["smoke test (CPU)"]
+  B --> C["train: scripts/train.py"]
+  C --> D["checkpoints/ + runs/"]
+  D --> E["visualize.py / inference.py"]
+  D --> F["hale-wam-deploy"]
+```
+
+Extras: `.[config]` (YAML run configs), `.[finetune]` (pretrained LLM, LoRA), `.[distributed]`
+(Ray Train + WebDataset), `.[deploy]` and the vendor sets `.[deploy-nvidia]`,
+`.[deploy-apple]`, `.[deploy-amd]`, `.[deploy-qualcomm]`, `.[dev]` (pytest, ruff).
+
 ```bash
 git clone https://github.com/basaanithanaveenkumar/HALE-WAM && cd HALE-WAM
 uv venv && source .venv/bin/activate

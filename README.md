@@ -130,33 +130,27 @@ Training uses three auxiliary losses on top of the flow-matching MSE to combat b
 ## Project structure
 
 ```
-Han-WAM/
-├── src/Halo_VLA/models/
-│   ├── halo_vla.py              # Main model: forward, action loss, visual loss
-│   ├── vit.py                   # Vision Transformer encoder
-│   ├── image_proj.py            # Vision -> decoder projector (MLP / Q-Former / gated cross-attention)
-│   ├── qformer.py               # Q-Former (BLIP-2 style learned queries)
-│   ├── gated_cross_attention.py # Gated cross-attention (Flamingo style)
-│   ├── transformer.py           # Decoder transformer blocks
-│   ├── moe.py                   # DeepSeek Mixture-of-Experts FFN
-│   ├── flow_action_decoder.py   # Flow matching action decoder
-│   ├── dit_frame_prediction.py  # DiT world model (future frame prediction)
-│   ├── DiT.py                   # Core Diffusion Transformer with adaLN
-│   ├── lm_head.py               # Language model head
-│   └── state_encoder.py         # Proprioceptive state encoder
-├── config/
-│   ├── model_config.py          # HaloVLMConfig dataclass (all hyperparameters)
-│   ├── tokens.py                # Special token definitions
-│   └── special_tokens.json      # Token IDs for <image>, <action>, <state>, <world_video>
-├── dataloader/
-│   ├── airoa_moma_dataset.py    # AiroaMoMa video dataset (lerobot parquet format)
-│   └── eo_dataset.py            # EO dataset loader
-├── scripts/
-│   ├── train.py                 # Training loop with visualisation
-│   └── visualize.py             # Standalone inference visualiser
-└── assets/
-    ├── training_viz.gif         # Training visualisation example
-    └── diffusion_viz.gif        # DiT denoising example
+HALE-WAM/
+├── src/Halo_VLA/                  # library (import roots: repo root and src/Halo_VLA, see docs/getting-started.md)
+│   ├── models/                    # HaloVLM, vit/, transformer/, moe/, qformer/, gated_cross_attention/,
+│   │                              #   image_proj/ (IMAGE_PROJECTORS), vision_encoders/ (VISION_ENCODERS),
+│   │                              #   DiT/, flow_action_decoder/, video_vae/, state_encoder.py
+│   ├── dual_system/               # presets (DUAL_SYSTEM_PRESETS), latent/ (LATENT_EXTRACTORS),
+│   │                              #   system1/ (SYSTEM1_POLICIES), model/, system2.py, controller.py
+│   ├── training/                  # DDPSession, CheckpointManager, TRAIN_DATASETS, steps, Ray / WebDataset CLI
+│   ├── rl/                        # GRPO, DPO, REINFORCE, Dreamer, actor_critic/, rewards/
+│   ├── metrics/                   # action/, generation/, policy/ evaluation metrics
+│   ├── visualization/             # frames, action plots, DiT GIFs, videos
+│   ├── profiling/                 # architecture-equivalent stubs, PROFILE_COMPONENTS
+│   ├── deploy/                    # hale-wam-deploy adapters (HALO_VLA_ADAPTERS) and export graphs
+│   └── exceptions/                # HaloVLAError hierarchy rooted in hale_core.HaleCoreError
+├── config/                        # HaloVLMConfig, VLARunConfig and its pydantic sections
+├── dataloader/                    # EO-Data1.5M, DROID, AIRoA MoMa and the staged pre/mid/post-train loaders
+├── configs/                       # YAML run configs (base, examples/, dual_system/) and deploy/ pipelines
+├── scripts/                       # train.py, visualize*.py, inference.py, train_{grpo,dpo,reinforce,dreamer}.py
+├── tests/{unit,integration}/      # pytest suites (fast unit tests; end-to-end flows on real configs)
+├── docs/                          # architecture (mermaid), configuration, registries, deploy, ...
+└── assets/                        # example GIFs
 ```
 
 ---
@@ -164,13 +158,47 @@ Han-WAM/
 ## Installation
 
 ```bash
-git clone https://github.com/basaanithanaveenkumar/Han-WAM.git
-cd Han-WAM
+git clone https://github.com/basaanithanaveenkumar/HALE-WAM.git
+cd HALE-WAM
 uv pip install -e .          # recommended
 # or: pip install -e .
 ```
 
-**Requirements:** Python ≥ 3.10, PyTorch ≥ 2.0, CUDA GPU recommended.
+**Requirements:** Python >= 3.10, PyTorch >= 2.0, CUDA GPU recommended. The core install pulls in
+[HaleBlocks](https://github.com/basaanithanaveenkumar/HaleBlocks) (`hale_core`: registries, config loader, exceptions).
+
+Optional extras (the package imports without any of them):
+
+| Extra | Adds | Needed for |
+|---|---|---|
+| `.[config]` | pydantic schemas, YAML loader | `scripts/train.py --config run.yaml` |
+| `.[finetune]` | transformers, peft | `--llm_backbone`, SigLIP / CLIP encoders |
+| `.[ray]`, `.[webdataset]`, `.[distributed]` | Ray Train, WebDataset | `--ray`, `--webdataset` |
+| `.[deploy]` | ONNX, ONNX Runtime, safetensors | `hale-wam-deploy` (ONNX Runtime / CI configs) |
+| `.[deploy-nvidia]`, `.[deploy-apple]`, `.[deploy-amd]`, `.[deploy-qualcomm]` | vendor SDKs | TensorRT, MLX, Ryzen AI, QNN exports |
+| `.[dev]` | pytest, ruff, mypy | tests and linting |
+
+## Quick start
+
+```bash
+export PYTHONPATH=.:src/Halo_VLA                                  # the sources use flat import roots
+python scripts/train.py --config configs/overfit.yaml --device cpu   # CPU smoke test from a YAML run config
+python -m pytest tests/unit -q                                    # fast tests, no network or GPU
+```
+
+```python
+import torch
+from config import HaloVLMConfig
+from dual_system import DualSystemVLA, resolve_dual_system_config
+from models.halo_vla import HaloVLM
+
+model = HaloVLM(HaloVLMConfig(emb_dim=64, vit_num_layers=1, dec_num_layers=1, use_moe=False))
+dual = DualSystemVLA(model, resolve_dual_system_config("lcb"))      # any registered preset name
+```
+
+See [docs/getting-started.md](docs/getting-started.md) for the full smoke test, and
+[docs/registries.md](docs/registries.md) for adding presets, latents, policies, projectors,
+encoders, datasets or deploy adapters.
 
 ---
 
@@ -352,7 +380,8 @@ Detailed developer documentation lives in [`docs/`](docs/):
 |---|---|
 | [`docs/getting-started.md`](docs/getting-started.md) | Install, smoke test, first training runs |
 | [`docs/architecture.md`](docs/architecture.md) | Mermaid architecture diagrams (system, flow head, DiT conditioning, sampler, training step) |
-| [`docs/configuration.md`](docs/configuration.md) | Every `HaloVLMConfig` field and training flag |
+| [`docs/configuration.md`](docs/configuration.md) | Every `HaloVLMConfig` field, YAML run configs and training flag |
+| [`docs/registries.md`](docs/registries.md) | Extension points (registries), component / sequence diagrams, dependency versions |
 | [`docs/world_model.md`](docs/world_model.md) | Full technical write-up of the DiT world model — per-frame conditioning, CFG, Heun solver, auxiliary losses, and bug fixes |
 | [`docs/dual_system.md`](docs/dual_system.md) | Dual-system VLA from first principles (slow System 2 → latent → fast System 1) and the LCB / DP-VLA / HiRT / RoboDual / DexVLA / OpenHelix variants, each with a Mermaid diagram; `--dual_system none\|basic\|…\|custom` · notebook: [`notebooks/dual_system/`](notebooks/dual_system/dual_system_from_first_principles.ipynb) |
 | [`docs/llm_backbone.md`](docs/llm_backbone.md) | Pretrained, LoRA-finetunable LLM decoders (`--llm_backbone`) |

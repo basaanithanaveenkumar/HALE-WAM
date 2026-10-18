@@ -6,6 +6,71 @@ For the world model implementation details, see [world_model.md](world_model.md)
 
 ---
 
+## 0. Code structure and the main path
+
+The library is split by responsibility; pluggable parts (marked) are looked up by name in
+registries ([registries.md](registries.md)).
+
+```mermaid
+flowchart TB
+  subgraph entry["scripts/"]
+    TRAIN[train.py]
+    VIS[visualize.py]
+    DEP[hale-wam-deploy]
+  end
+  subgraph lib["src/Halo_VLA"]
+    TR["training/<br/>DDPSession, CheckpointManager, TRAIN_DATASETS*"]
+    MD["models/<br/>HaloVLM, IMAGE_PROJECTORS*, VISION_ENCODERS*"]
+    DS["dual_system/<br/>PRESETS*, LATENT_EXTRACTORS*, SYSTEM1_POLICIES*"]
+    RL["rl/<br/>GRPO, DPO, REINFORCE, Dreamer"]
+    DP["deploy/<br/>adapters*, graphs"]
+    VZ[visualization/]
+    EX[exceptions/]
+  end
+  CFG["config/<br/>HaloVLMConfig, VLARunConfig"]
+  CORE[("hale_core<br/>Registry, ConfigLoader, deploy")]
+  TRAIN --> TR --> MD
+  TR --> DS --> MD
+  TRAIN --> CFG
+  VIS --> VZ
+  DEP --> DP --> MD
+  DP --> DS
+  RL --> MD
+  MD --> EX
+  CFG --> CORE
+  DP --> CORE
+```
+
+`scripts/train.py` is a thin driver: it parses arguments (`training/train_arg_parser.py`,
+optionally seeded from a YAML run config), builds the model config
+(`training/model_config_builder.py`), the model, the train loader (`TRAIN_DATASETS`) and the
+optimiser, then loops over `HaloVLATrainingStep` / `DualSystemTrainingStep`.
+
+```mermaid
+sequenceDiagram
+  participant U as user
+  participant T as scripts/train.py
+  participant A as train_arg_parser
+  participant C as model_config_builder
+  participant D as TRAIN_DATASETS
+  participant S as DDPSession
+  participant K as CheckpointManager
+  U->>T: --config run.yaml --epochs 10
+  T->>A: parse_args()
+  A-->>T: Namespace (YAML defaults, flags win)
+  T->>C: build_model_config(args)
+  C-->>T: HaloVLMConfig
+  T->>D: build_train_loader(args, config, tokenizer)
+  D-->>T: DataLoader
+  T->>S: DDPSession.start(device)
+  loop epochs
+    T->>T: step(batch) -> StepOutput, backward, optimiser
+    T->>K: save(epoch, ...) on rank 0
+  end
+```
+
+---
+
 ## 1. End-to-end overview
 
 One causal decoder reads camera patches, proprioceptive state, and language tokens — then three independent heads read specific hidden states to produce text, actions, and future frames.
