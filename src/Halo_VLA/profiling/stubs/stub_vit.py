@@ -34,9 +34,9 @@ class StubViT(nn.Module):
         self.patch_emb = StubPatchEmbed(img_size, p_size, 3, emb_dim)
         n = self.patch_emb.num_patches
         self.pos_embed = nn.Embedding(n, emb_dim)
-        self.blocks    = nn.ModuleList([
-            StubTransformerBlock(emb_dim, n_heads, mlp_dim) for _ in range(n_layers)
-        ])
+        self.blocks = nn.ModuleList(
+            [StubTransformerBlock(emb_dim, n_heads, mlp_dim) for _ in range(n_layers)]
+        )
         self.norm = nn.LayerNorm(emb_dim)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -44,7 +44,7 @@ class StubViT(nn.Module):
         b, _, _, _ = x.shape
         p = self.patch_emb(x)
         ids = torch.arange(p.shape[1], device=x.device).unsqueeze(0).expand(b, -1)
-        p   = p + self.pos_embed(ids)
+        p = p + self.pos_embed(ids)
         for blk in self.blocks:
             p = blk(p)
         return self.norm(p)

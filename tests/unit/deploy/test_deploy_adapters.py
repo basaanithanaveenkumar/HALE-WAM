@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import pytest
 import torch
-from tests.support.deploy_support import TINY_DUAL, TINY_MODEL, TINY_PROMPT
-
 from hale_core.deploy.exceptions import ConfigError
 from hale_core.deploy.registry import ADAPTERS
+
 from Halo_VLA.deploy import HALO_VLA_ADAPTERS, PromptIOSignature
 from Halo_VLA.deploy.adapters import (
     DualSystem1ActionStepAdapter,
@@ -18,9 +17,15 @@ from Halo_VLA.deploy.adapters import (
     HaloLanguageModelAdapter,
     HaloPerceptionAdapter,
 )
+from tests.support.deploy_support import TINY_DUAL, TINY_MODEL, TINY_PROMPT
 
 SINGLE = {"model": TINY_MODEL, "max_batch": 2}
-DUAL = {"model": TINY_MODEL, "dual_system": "basic", "dual_system_options": TINY_DUAL, "max_batch": 2}
+DUAL = {
+    "model": TINY_MODEL,
+    "dual_system": "basic",
+    "dual_system_options": TINY_DUAL,
+    "max_batch": 2,
+}
 
 
 def run(adapter, which: str = "trace"):
@@ -34,7 +39,9 @@ def run(adapter, which: str = "trace"):
 def test_child_registry_scope() -> None:
     assert HALO_VLA_ADAPTERS.scope == "halo_vla" and HALO_VLA_ADAPTERS.parent is ADAPTERS
     assert ADAPTERS.get("halo_vla.HaloPerceptionAdapter") is HaloPerceptionAdapter
-    assert HALO_VLA_ADAPTERS.get("TorchModuleAdapter") is ADAPTERS.get("TorchModuleAdapter")  # parent fallback
+    assert HALO_VLA_ADAPTERS.get("TorchModuleAdapter") is ADAPTERS.get(
+        "TorchModuleAdapter"
+    )  # parent fallback
     assert len(HALO_VLA_ADAPTERS) == 9
     built = ADAPTERS.build({"type": "halo_vla.HaloFlowActionStepAdapter", **SINGLE})
     assert isinstance(built, HaloFlowActionStepAdapter)
@@ -52,7 +59,9 @@ def test_perception_signature_samples_follow_the_prompt_template() -> None:
     assert row[1:4] == [cfg.image_token_id, cfg.image_token_id, cfg.state_token_id]
     assert row[-2:] == [cfg.world_video_token_id, cfg.action_token_id]
     _, (context,) = run(adapter)
-    assert context.shape == (2, 1, cfg.emb_dim) and context.abs().sum() > 0  # the action token was found
+    assert (
+        context.shape == (2, 1, cfg.emb_dim) and context.abs().sum() > 0
+    )  # the action token was found
 
 
 def test_step_and_policy_shapes() -> None:
@@ -73,7 +82,10 @@ def test_step_and_policy_shapes() -> None:
 
 def test_regression_policy_has_no_noise_input_and_no_step() -> None:
     reg = {**DUAL, "dual_system": "dp_vla"}
-    assert "noise" not in DualSystem1PolicyAdapter(**reg, latent_tokens=[1, 4, 16]).signature().input_names
+    assert (
+        "noise"
+        not in DualSystem1PolicyAdapter(**reg, latent_tokens=[1, 4, 16]).signature().input_names
+    )
     with pytest.raises(ConfigError, match="regression"):
         DualSystem1ActionStepAdapter(**reg).signature()
 
@@ -116,9 +128,21 @@ def test_language_model_adapter_exports_a_merged_hf_checkpoint(monkeypatch) -> N
 
     from tests.support.llm_support import tiny_llama, tiny_tokenizer
 
-    with patch.object(transformers.AutoModelForCausalLM, "from_pretrained", side_effect=lambda *a, **k: tiny_llama()), \
-         patch.object(transformers.AutoTokenizer, "from_pretrained", side_effect=lambda *a, **k: tiny_tokenizer()):
-        adapter = HaloLanguageModelAdapter(model={**TINY_MODEL, "llm_backbone": "smollm2-135m", "llm_dtype": "float32"})
+    with (
+        patch.object(
+            transformers.AutoModelForCausalLM,
+            "from_pretrained",
+            side_effect=lambda *a, **k: tiny_llama(),
+        ),
+        patch.object(
+            transformers.AutoTokenizer,
+            "from_pretrained",
+            side_effect=lambda *a, **k: tiny_tokenizer(),
+        ),
+    ):
+        adapter = HaloLanguageModelAdapter(
+            model={**TINY_MODEL, "llm_backbone": "smollm2-135m", "llm_dtype": "float32"}
+        )
         model = adapter.load()
         hf, tokenizer = adapter.hf_checkpoint(model)
         assert not hasattr(hf, "peft_config")  # LoRA merged

@@ -35,8 +35,14 @@ class ActionPolicyStrategy(nn.Module, ABC):
         self.config = config
 
     @abstractmethod
-    def loss(self, head: nn.Module, cond: torch.Tensor, cond_mask: torch.Tensor, actions: torch.Tensor,
-             weight: torch.Tensor) -> torch.Tensor:
+    def loss(
+        self,
+        head: nn.Module,
+        cond: torch.Tensor,
+        cond_mask: torch.Tensor,
+        actions: torch.Tensor,
+        weight: torch.Tensor,
+    ) -> torch.Tensor:
         """Training loss on a target chunk.
 
         Args:
@@ -51,8 +57,14 @@ class ActionPolicyStrategy(nn.Module, ABC):
         """
 
     @abstractmethod
-    def sample_from_noise(self, head: nn.Module, cond: torch.Tensor, cond_mask: torch.Tensor,
-                          noise: torch.Tensor | None, steps: int) -> torch.Tensor:
+    def sample_from_noise(
+        self,
+        head: nn.Module,
+        cond: torch.Tensor,
+        cond_mask: torch.Tensor,
+        noise: torch.Tensor | None,
+        steps: int,
+    ) -> torch.Tensor:
         """Deterministic sampler given the initial noise (what deployment unrolls).
 
         Args:
@@ -70,8 +82,15 @@ class ActionPolicyStrategy(nn.Module, ABC):
         """Resolve anything that must be concrete before export tracing (default: nothing)."""
 
     @torch.no_grad()
-    def sample(self, head: nn.Module, cond: torch.Tensor, cond_mask: torch.Tensor, chunk: int,
-               action_dim: int, steps: int) -> torch.Tensor:
+    def sample(
+        self,
+        head: nn.Module,
+        cond: torch.Tensor,
+        cond_mask: torch.Tensor,
+        chunk: int,
+        action_dim: int,
+        steps: int,
+    ) -> torch.Tensor:
         """Draw noise (if the policy needs it) and sample an action chunk.
 
         Args:
@@ -85,7 +104,11 @@ class ActionPolicyStrategy(nn.Module, ABC):
         Returns:
             The action chunk ``(B, chunk, action_dim)``.
         """
-        noise = torch.randn(cond.size(0), chunk, action_dim, device=cond.device) if self.needs_noise else None
+        noise = (
+            torch.randn(cond.size(0), chunk, action_dim, device=cond.device)
+            if self.needs_noise
+            else None
+        )
         return self.sample_from_noise(head, cond, cond_mask, noise, steps)
 
     @staticmethod

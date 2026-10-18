@@ -18,8 +18,8 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src" / "Halo_VLA"))
 
-from rl.policy import GaussianActionPolicy
 from rl.dpo import compute_dpo_loss
+from rl.policy import GaussianActionPolicy
 from rl.preference import build_preference_pairs, sample_preference_pairs
 from rl.rewards import negative_distance_reward
 
@@ -33,8 +33,8 @@ def _fresh_ref(policy):
 
 def test_build_preference_pairs_picks_best_and_worst():
     """Highest-reward candidate becomes chosen; lowest becomes rejected."""
-    cand = torch.tensor([[[0.0], [1.0], [2.0]]])      # [B=1, K=3, A=1]
-    rewards = torch.tensor([[0.5, 9.0, -3.0]])        # best=idx1, worst=idx2
+    cand = torch.tensor([[[0.0], [1.0], [2.0]]])  # [B=1, K=3, A=1]
+    rewards = torch.tensor([[0.5, 9.0, -3.0]])  # best=idx1, worst=idx2
     chosen, rejected = build_preference_pairs(cand, rewards)
     assert torch.allclose(chosen, torch.tensor([[1.0]]))
     assert torch.allclose(rejected, torch.tensor([[2.0]]))
@@ -83,7 +83,7 @@ def test_dpo_training_increases_preference_margin():
     policy = GaussianActionPolicy(cond_dim, A, hidden_dim=32)
     ref = _fresh_ref(policy)
     cond = torch.randn(B, cond_dim)
-    chosen = torch.full((B, A), 0.2)     # distinct, fixed winner/loser
+    chosen = torch.full((B, A), 0.2)  # distinct, fixed winner/loser
     rejected = torch.full((B, A), 2.5)
 
     def margin():
@@ -98,8 +98,7 @@ def test_dpo_training_increases_preference_margin():
         opt.step()
     after = margin()
     assert after > before, f"margin should grow: before={before:.3f} after={after:.3f}"
-    print(f"test_dpo_training_increases_preference_margin passed "
-          f"({before:.3f} -> {after:.3f}).")
+    print(f"test_dpo_training_increases_preference_margin passed ({before:.3f} -> {after:.3f}).")
 
 
 def test_dpo_swapping_labels_flips_preference():

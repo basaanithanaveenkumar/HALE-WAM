@@ -17,14 +17,14 @@ class ImageProjector(nn.Module):
     def __init__(self, vision_dim: int = 512, llm_dim: int = 4096) -> None:
         super().__init__()
         self.proj = nn.Sequential(
-                nn.Linear(vision_dim, llm_dim // 4),
-                nn.LayerNorm(llm_dim // 4),
-                nn.GELU(),
-                nn.Linear(llm_dim//4, llm_dim // 2),
-                nn.LayerNorm(llm_dim // 2),
-                nn.GELU(),
-                nn.Linear(llm_dim//2,llm_dim )
-            )
+            nn.Linear(vision_dim, llm_dim // 4),
+            nn.LayerNorm(llm_dim // 4),
+            nn.GELU(),
+            nn.Linear(llm_dim // 4, llm_dim // 2),
+            nn.LayerNorm(llm_dim // 2),
+            nn.GELU(),
+            nn.Linear(llm_dim // 2, llm_dim),
+        )
 
     def forward(self, img_features: torch.Tensor) -> torch.Tensor:
         """Project ``(B, N, vision_dim)`` features to ``(B, N, llm_dim)``."""

@@ -30,9 +30,9 @@ class StubActionDecoder(nn.Module):
             layers.append(nn.Linear(di, do))
             if i < len(dims) - 2:
                 layers.extend([nn.LayerNorm(do), nn.GELU()])
-        self.net       = nn.Sequential(*layers)
-        self.action_dim   = action_dim
-        self.chunk_size   = chunk_size
+        self.net = nn.Sequential(*layers)
+        self.action_dim = action_dim
+        self.chunk_size = chunk_size
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Predict an action chunk.

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import List
-
 import torch
 from torch import Tensor
 
@@ -34,12 +32,12 @@ class GoalReachingMetric(RoboticsMetricBase):
 
     def reset(self) -> None:
         """Forget the recorded distances."""
-        self._distances: List[float] = []
+        self._distances: list[float] = []
 
     def update(
         self,
         final_pos: Tensor,  # [3] — final end-effector XYZ in world frame (metres)
-        goal_pos: Tensor,   # [3] — goal XYZ in world frame (metres)
+        goal_pos: Tensor,  # [3] — goal XYZ in world frame (metres)
     ) -> None:  # type: ignore[override]
         """Record one episode.
 
@@ -65,7 +63,7 @@ class GoalReachingMetric(RoboticsMetricBase):
         d = torch.tensor(self._distances)
         out: dict[str, float] = {
             "goal_dist_mean": float(d.mean().item()),
-            "goal_dist_std":  float(d.std(correction=0).item()),
+            "goal_dist_std": float(d.std(correction=0).item()),
         }
         for t in self.thresholds_m:
             rate = float((d < t).float().mean().item())

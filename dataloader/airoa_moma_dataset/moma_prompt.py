@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import torch
 
@@ -28,14 +28,12 @@ class MomaPromptMixin:
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        additional_special: List[str] = []
+        additional_special: list[str] = []
         for tok in get_all_custom_tokens():
             if tok not in self.tokenizer.get_vocab():
                 additional_special.append(tok)
         if additional_special:
-            self.tokenizer.add_special_tokens(
-                {"additional_special_tokens": additional_special}
-            )
+            self.tokenizer.add_special_tokens({"additional_special_tokens": additional_special})
 
         from config.tokens import get_token
 
@@ -45,7 +43,7 @@ class MomaPromptMixin:
         self._world_video_tok = get_token("world_video_token")
         self.pad_token_id = self.tokenizer.pad_token_id
 
-    def _build_text(self, meta: Dict[str, Any], num_images: int) -> Tuple[str, str]:
+    def _build_text(self, meta: dict[str, Any], num_images: int) -> tuple[str, str]:
         """User string (with placeholders) and assistant string."""
         tasks = meta.get("tasks") or []
         task_txt = tasks[0] if tasks else meta.get("short_horizon_task", "manipulation")
@@ -60,19 +58,14 @@ class MomaPromptMixin:
         # One <halo_world_video> token per future frame to predict, so the transformer
         # emits exactly num_predict_frames query vectors for the DiT conditioning.
         wv_tokens = self._world_video_tok * self.cfg.num_predict_frames
-        assistant_body = (
-            f"I will execute the task: {task_txt}\n"
-            f"{wv_tokens}{self._action_tok}"
-        )
+        assistant_body = f"I will execute the task: {task_txt}\n{wv_tokens}{self._action_tok}"
         return user_body, assistant_body
 
     def _tokenise_turns(self, user_body: str, assistant_body: str):
         from config import HaloVLMConfig
 
         model_cfg = HaloVLMConfig()
-        system_msg = (
-            f"{self.cfg.system_prefix}{model_cfg.system_prompt}{self.cfg.turn_end}"
-        )
+        system_msg = f"{self.cfg.system_prefix}{model_cfg.system_prompt}{self.cfg.turn_end}"
         human_msg = f"{self.cfg.human_prefix}{user_body}{self.cfg.turn_end}"
         asst_msg = f"{self.cfg.assistant_prefix}{assistant_body}{self.cfg.turn_end}"
         full_text = system_msg + human_msg + asst_msg
@@ -98,8 +91,8 @@ class MomaPromptMixin:
     def _mask_non_assistant(
         self,
         full_text: str,
-        text_parts: List[str],
-        role_is_assistant: List[bool],
+        text_parts: list[str],
+        role_is_assistant: list[bool],
         labels: torch.Tensor,
     ) -> torch.Tensor:
         cursor = 0

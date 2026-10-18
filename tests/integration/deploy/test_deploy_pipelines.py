@@ -5,9 +5,9 @@ from __future__ import annotations
 import json
 
 import pytest
-from tests.support.deploy_support import CONFIGS
-
 from hale_core.deploy import DeployRunner
+
+from tests.support.deploy_support import CONFIGS
 
 pytestmark = pytest.mark.integration
 
@@ -43,7 +43,9 @@ def test_mlx_parity(path, tmp_path) -> None:
 
 def test_exported_perception_package_records_the_prompt_contract(tmp_path) -> None:
     pytest.importorskip("onnxruntime")
-    report = DeployRunner.from_file(CONFIGS / "ci_perception_onnx_ort.yaml", work_dir=tmp_path).run()
+    report = DeployRunner.from_file(
+        CONFIGS / "ci_perception_onnx_ort.yaml", work_dir=tmp_path
+    ).run()
     onnx = next(a for r in report.results for a in r.artifacts if a.kind == "onnx")
     assert onnx.metadata["inputs"] == ["images", "input_ids", "attention_mask", "states"]
     assert onnx.metadata["outputs"] == ["action_context"]

@@ -97,13 +97,15 @@ class RSSM(nn.Module):
 
         # Heads read from feature = [h, z].
         self.reward_head = _mlp([self.feature_dim, hidden_dim, 1])
-        self.continue_head = _mlp([self.feature_dim, hidden_dim, 1])      # logit
+        self.continue_head = _mlp([self.feature_dim, hidden_dim, 1])  # logit
         self.decoder = _mlp([self.feature_dim, hidden_dim, obs_embed_dim])
 
     # ------------------------------------------------------------------ #
     # State helpers
     # ------------------------------------------------------------------ #
-    def initial_state(self, batch_size: int, device: torch.device | str | None = None) -> LatentState:
+    def initial_state(
+        self, batch_size: int, device: torch.device | str | None = None
+    ) -> LatentState:
         """Zero (h, z) initial latent state."""
         device = device or next(self.parameters()).device
         h = torch.zeros(batch_size, self.deter_dim, device=device)
@@ -135,13 +137,14 @@ class RSSM(nn.Module):
         """
         h_prev, z_prev = state
         x = self.pre_gru(torch.cat([z_prev, action], dim=-1))
-        h = self.gru(x, h_prev)                       # deterministic recurrence
-        prior = self._dist(self.prior_net(h))         # p(z_t | h_t)
-        z = prior.rsample()                           # reparameterised sample
+        h = self.gru(x, h_prev)  # deterministic recurrence
+        prior = self._dist(self.prior_net(h))  # p(z_t | h_t)
+        z = prior.rsample()  # reparameterised sample
         return (h, z), prior
 
-    def obs_step(self, state: LatentState, action: torch.Tensor,
-                 obs_embed: torch.Tensor) -> tuple[LatentState, Independent, Independent]:
+    def obs_step(
+        self, state: LatentState, action: torch.Tensor, obs_embed: torch.Tensor
+    ) -> tuple[LatentState, Independent, Independent]:
         """Filtering step on real data: advance ``h`` via the prior, then form
         the *posterior* latent corrected by the observation embedding.
 
@@ -158,8 +161,9 @@ class RSSM(nn.Module):
     # ------------------------------------------------------------------ #
     # Sequence rollout on real data
     # ------------------------------------------------------------------ #
-    def observe(self, obs_embeds: torch.Tensor, actions: torch.Tensor,
-                state: LatentState | None = None) -> dict[str, Any]:
+    def observe(
+        self, obs_embeds: torch.Tensor, actions: torch.Tensor, state: LatentState | None = None
+    ) -> dict[str, Any]:
         """Run the posterior filter over a sequence of observations/actions.
 
         Args:
@@ -183,8 +187,8 @@ class RSSM(nn.Module):
             posts.append(post)
 
         return {
-            "features": torch.stack(feats, dim=1),    # [B, T, F]
-            "priors": priors,                          # list[T] of dists
-            "posteriors": posts,                       # list[T] of dists
+            "features": torch.stack(feats, dim=1),  # [B, T, F]
+            "priors": priors,  # list[T] of dists
+            "posteriors": posts,  # list[T] of dists
             "state": state,
         }

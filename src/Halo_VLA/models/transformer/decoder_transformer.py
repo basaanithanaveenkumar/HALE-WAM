@@ -26,24 +26,39 @@ class DecoderTransformer(nn.Module):
         gradient_checkpointing: recompute activations in backward to save memory.
     """
 
-    def __init__(self, num_layers: int = 16, emb_dim: int = 1024, num_heads: int = 32, mlp_dim: int = 512,
-                 drop_fact: float = 0.0, use_moe: bool = True, moe_hid_scale: float = 1.2,
-                 moe_num_routed_experts: int = 16, moe_top_k: int = 4,
-                 moe_num_shared_experts: int = 2, gradient_checkpointing: bool = False) -> None:
+    def __init__(
+        self,
+        num_layers: int = 16,
+        emb_dim: int = 1024,
+        num_heads: int = 32,
+        mlp_dim: int = 512,
+        drop_fact: float = 0.0,
+        use_moe: bool = True,
+        moe_hid_scale: float = 1.2,
+        moe_num_routed_experts: int = 16,
+        moe_top_k: int = 4,
+        moe_num_shared_experts: int = 2,
+        gradient_checkpointing: bool = False,
+    ) -> None:
         super().__init__()
         self.gradient_checkpointing = gradient_checkpointing
-        self.layers = nn.ModuleList([
-            TransformerBlock(
-                emb_dim=emb_dim, num_heads=num_heads, mlp_dim=mlp_dim,
-                drop_fact=drop_fact, causal_mask=True,
-                use_moe=use_moe,
-                moe_hid_scale=moe_hid_scale,
-                moe_num_routed_experts=moe_num_routed_experts,
-                moe_top_k=moe_top_k,
-                moe_num_shared_experts=moe_num_shared_experts,
-            )
-            for _ in range(num_layers)
-        ])
+        self.layers = nn.ModuleList(
+            [
+                TransformerBlock(
+                    emb_dim=emb_dim,
+                    num_heads=num_heads,
+                    mlp_dim=mlp_dim,
+                    drop_fact=drop_fact,
+                    causal_mask=True,
+                    use_moe=use_moe,
+                    moe_hid_scale=moe_hid_scale,
+                    moe_num_routed_experts=moe_num_routed_experts,
+                    moe_top_k=moe_top_k,
+                    moe_num_shared_experts=moe_num_shared_experts,
+                )
+                for _ in range(num_layers)
+            ]
+        )
         self.norm = nn.LayerNorm(emb_dim)
 
     def forward(self, inputs: torch.Tensor, pad_mask: torch.Tensor | None = None) -> torch.Tensor:

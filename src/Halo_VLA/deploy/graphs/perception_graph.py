@@ -25,8 +25,13 @@ class PerceptionGraph(nn.Module):
         self.encoder = VLMSequenceEncoder(vlm)
         self.select = TokenStateSelector(vlm.config.action_token_id, num_action_tokens)
 
-    def forward(self, images: torch.Tensor, input_ids: torch.Tensor, attention_mask: torch.Tensor,
-                states: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self,
+        images: torch.Tensor,
+        input_ids: torch.Tensor,
+        attention_mask: torch.Tensor,
+        states: torch.Tensor,
+    ) -> torch.Tensor:
         """Encode the observation and select the action-token states.
 
         Args:

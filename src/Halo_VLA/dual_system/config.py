@@ -96,20 +96,37 @@ class DualSystemConfig:
     notes: str = field(default="", compare=False)
 
     def __post_init__(self) -> None:
-        checks = (("latent", LATENT_TYPES), ("system2_training", SYSTEM2_TRAINING), ("policy", POLICY_TYPES))
+        checks = (
+            ("latent", LATENT_TYPES),
+            ("system2_training", SYSTEM2_TRAINING),
+            ("policy", POLICY_TYPES),
+        )
         for attr, allowed in checks:
             if getattr(self, attr) not in allowed:
-                raise HaloVLAConfigError(f"dual_system.{attr} must be one of {allowed}, got {getattr(self, attr)!r}")
+                raise HaloVLAConfigError(
+                    f"dual_system.{attr} must be one of {allowed}, got {getattr(self, attr)!r}"
+                )
         if self.projector not in ("linear", "mlp"):
-            raise HaloVLAConfigError(f"dual_system.projector must be linear or mlp, got {self.projector!r}")
+            raise HaloVLAConfigError(
+                f"dual_system.projector must be linear or mlp, got {self.projector!r}"
+            )
         if self.num_act_tokens < 1 or self.async_steps < 1 or self.system2_frame_delay < 0:
-            raise HaloVLAConfigError("num_act_tokens and async_steps must be >= 1, system2_frame_delay >= 0")
+            raise HaloVLAConfigError(
+                "num_act_tokens and async_steps must be >= 1, system2_frame_delay >= 0"
+            )
         if self.latent == "act_token":
             self.num_act_tokens = 1
-        if self.system2_training == "prompt_tuning" and self.latent not in ("act_token", "multi_act"):
-            raise HaloVLAConfigError("prompt_tuning trains the <ACT> queries: use latent act_token or multi_act")
+        if self.system2_training == "prompt_tuning" and self.latent not in (
+            "act_token",
+            "multi_act",
+        ):
+            raise HaloVLAConfigError(
+                "prompt_tuning trains the <ACT> queries: use latent act_token or multi_act"
+            )
         if self.align_weight > 0 and self.latent == "middle_layer":
-            raise HaloVLAConfigError("align_weight needs a latent in the model's embedding space (not middle_layer)")
+            raise HaloVLAConfigError(
+                "align_weight needs a latent in the model's embedding space (not middle_layer)"
+            )
 
     @property
     def uses_act_queries(self) -> bool:

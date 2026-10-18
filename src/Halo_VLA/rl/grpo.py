@@ -83,24 +83,24 @@ def compute_grpo_loss(
     # Expand each state into G rows: [N, D] -> [N*G, D]. repeat_interleave keeps
     # all G copies of a state contiguous, which we rely on when reshaping to
     # [N, G] for the group statistics.
-    cond_rep = cond.repeat_interleave(G, dim=0)                  # [N*G, D]
+    cond_rep = cond.repeat_interleave(G, dim=0)  # [N*G, D]
 
     # 1. Sample a group of actions from the (frozen) behaviour policy.
     with torch.no_grad():
         dist_old = ref_policy.distribution(cond_rep)
-        actions = dist_old.sample()                             # [N*G, A]
-        log_prob_old = dist_old.log_prob(actions)              # [N*G]
+        actions = dist_old.sample()  # [N*G, A]
+        log_prob_old = dist_old.log_prob(actions)  # [N*G]
 
     # 2. Reward every sampled action.
     with torch.no_grad():
-        rewards = reward_fn(actions)                           # [N*G]
+        rewards = reward_fn(actions)  # [N*G]
 
     # 3. Group-relative advantages (critic-free baseline).
     adv = group_relative_advantage(rewards.view(N, G)).view(N * G)  # [N*G]
 
     # 4. New-policy log-prob of the same actions → importance ratio.
-    log_prob_new = policy.log_prob(cond_rep, actions)          # [N*G], grad in θ
-    ratio = torch.exp(log_prob_new - log_prob_old)            # [N*G]
+    log_prob_new = policy.log_prob(cond_rep, actions)  # [N*G], grad in θ
+    ratio = torch.exp(log_prob_new - log_prob_old)  # [N*G]
 
     # Clipped surrogate: take the pessimistic (min) of clipped vs unclipped so a
     # too-large policy update on a positive advantage is not rewarded.
@@ -109,9 +109,7 @@ def compute_grpo_loss(
     surrogate = torch.min(unclipped, clipped).mean()
 
     # 5. KL(π_θ ‖ π_ref): exact for two diagonal Gaussians.
-    kl = kl_divergence(
-        policy.distribution(cond_rep), ref_policy.distribution(cond_rep)
-    ).mean()
+    kl = kl_divergence(policy.distribution(cond_rep), ref_policy.distribution(cond_rep)).mean()
 
     loss = -surrogate + kl_beta * kl
 

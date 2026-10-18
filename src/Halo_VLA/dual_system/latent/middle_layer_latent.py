@@ -5,9 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 import torch
-from exceptions import ModelStateError
 
 from dual_system.config import DualSystemConfig
+from exceptions import ModelStateError
 
 from .latent_extractor import LatentExtractor
 from .latent_registry import LATENT_EXTRACTORS
@@ -20,7 +20,9 @@ class MiddleLayerLatent(LatentExtractor):
     needs_layer_capture = True
 
     @classmethod
-    def from_config(cls, config: DualSystemConfig, emb_dim: int, layer_width: int) -> MiddleLayerLatent:
+    def from_config(
+        cls, config: DualSystemConfig, emb_dim: int, layer_width: int
+    ) -> MiddleLayerLatent:
         """The latent lives in the decoder's raw width, not ``emb_dim``."""
         return cls(layer_width)
 

@@ -12,7 +12,9 @@ import torch.nn.functional as F
 def timestep_embedding(t: torch.Tensor, dim: int) -> torch.Tensor:
     """Sinusoidal embedding of a continuous / integer timestep ``t`` (``(B,)`` -> ``(B, dim)``)."""
     half = dim // 2
-    freqs = torch.exp(-math.log(10000.0) * torch.arange(half, device=t.device, dtype=torch.float32) / half)
+    freqs = torch.exp(
+        -math.log(10000.0) * torch.arange(half, device=t.device, dtype=torch.float32) / half
+    )
     args = t.float()[:, None] * freqs[None]
     emb = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
     return F.pad(emb, (0, dim % 2))
@@ -33,13 +35,20 @@ class ActionTransformer(nn.Module):
         self.queries = nn.Parameter(torch.randn(1, chunk, dim) * 0.02)
         self.time = nn.Sequential(nn.Linear(dim, dim), nn.SiLU(), nn.Linear(dim, dim))
         self.pos = nn.Parameter(torch.zeros(1, chunk, dim))
-        layer = nn.TransformerDecoderLayer(dim, heads, 4 * dim, dropout=0.0, batch_first=True, norm_first=True)
+        layer = nn.TransformerDecoderLayer(
+            dim, heads, 4 * dim, dropout=0.0, batch_first=True, norm_first=True
+        )
         self.decoder = nn.TransformerDecoder(layer, layers)
         self.out = nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, action_dim))
         self.dim = dim
 
-    def forward(self, cond: torch.Tensor, cond_mask: torch.Tensor, noisy: torch.Tensor | None = None,
-                t: torch.Tensor | None = None) -> torch.Tensor:
+    def forward(
+        self,
+        cond: torch.Tensor,
+        cond_mask: torch.Tensor,
+        noisy: torch.Tensor | None = None,
+        t: torch.Tensor | None = None,
+    ) -> torch.Tensor:
         """Predict the action chunk (regression) or its velocity / noise (generative policies).
 
         Args:

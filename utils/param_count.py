@@ -2,10 +2,7 @@
 Utility functions for counting and logging model parameters.
 """
 
-from typing import Optional
-
 import torch.nn as nn
-
 from loguru import logger
 
 
@@ -19,7 +16,7 @@ def count_parameters(module: nn.Module, trainable_only: bool = True) -> int:
 def log_module_parameters(
     model: nn.Module,
     model_name: str = "Model",
-    logger_fn = None,
+    logger_fn=None,
 ) -> dict[str, dict[str, int]]:
     """
     Log parameter counts for each top-level sub-module of a model.

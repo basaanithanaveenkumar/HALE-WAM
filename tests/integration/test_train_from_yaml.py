@@ -18,9 +18,8 @@ pytest.importorskip("hale_core")
 
 from config.run_config import load_vla_config  # noqa: E402
 from models.halo_vla import HaloVLM  # noqa: E402
-from training.train_datasets import TRAIN_DATASETS  # noqa: E402
-
 from tests.support.training_support import load_train_script  # noqa: E402
+from training.train_datasets import TRAIN_DATASETS  # noqa: E402
 
 CONFIGS = ROOT / "configs"
 
@@ -35,20 +34,31 @@ def test_train_runs_a_dual_system_from_yaml(script, tmp_path: Path, monkeypatch)
     script.HaloVLM = HaloVLM
 
     class Rows(list):
-        tokenizer = type("Tok", (), {"pad_token_id": 0, "decode": staticmethod(lambda *a, **k: "")})()
+        tokenizer = type(
+            "Tok", (), {"pad_token_id": 0, "decode": staticmethod(lambda *a, **k: "")}
+        )()
 
     def build_loader(img_size: int, **_kw):
         g = torch.Generator().manual_seed(0)
-        rows = Rows({"images": torch.rand(2, 3, img_size, img_size, generator=g),
-                     "input_ids": torch.randint(1, 50, (8,), generator=g),
-                     "attention_mask": torch.ones(8, dtype=torch.long),
-                     "labels": torch.randint(1, 50, (8,), generator=g), "actions": torch.randn(4, 4, generator=g),
-                     "action_mask": torch.ones(4), "states": torch.randn(1, 3, generator=g)} for _ in range(8))
+        rows = Rows(
+            {
+                "images": torch.rand(2, 3, img_size, img_size, generator=g),
+                "input_ids": torch.randint(1, 50, (8,), generator=g),
+                "attention_mask": torch.ones(8, dtype=torch.long),
+                "labels": torch.randint(1, 50, (8,), generator=g),
+                "actions": torch.randn(4, 4, generator=g),
+                "action_mask": torch.ones(4),
+                "states": torch.randn(1, 3, generator=g),
+            }
+            for _ in range(8)
+        )
         return DataLoader(rows, batch_size=2)
 
-    monkeypatch.setitem(TRAIN_DATASETS.items, "eo", lambda args, config, tokenizer: build_loader(config.img_size))
+    monkeypatch.setitem(
+        TRAIN_DATASETS.items, "eo", lambda args, config, tokenizer: build_loader(config.img_size)
+    )
     run = tmp_path / "run.yaml"
-    run.write_text(f"""inherits: {CONFIGS / 'overfit.yaml'}
+    run.write_text(f"""inherits: {CONFIGS / "overfit.yaml"}
 variant: tiny_openhelix
 device: cpu
 model:
@@ -65,10 +75,17 @@ eval: {{val_fraction: 0.25}}
     script.train(args)
     ckpt = torch.load(tmp_path / "halo_vla_epoch2.pt", weights_only=False)
     config = ckpt["config"]
-    assert (config.emb_dim, config.img_size, config.use_moe, config.dual_system) == (32, 32, False, "openhelix")
+    assert (config.emb_dim, config.img_size, config.use_moe, config.dual_system) == (
+        32,
+        32,
+        False,
+        "openhelix",
+    )
     assert config.dual_system_options["prealign_steps"] == 2
     assert any(k.startswith("system1.") for k in ckpt["model_state_dict"])
     assert f"# command-line overrides: --config {run}" in (tmp_path / "run_config.yaml").read_text()
-    saved = load_vla_config(tmp_path / "run_config.yaml")  # provenance: resolved YAML next to the checkpoints
+    saved = load_vla_config(
+        tmp_path / "run_config.yaml"
+    )  # provenance: resolved YAML next to the checkpoints
     assert saved.variant == "tiny_openhelix" and saved.model.dual_system.preset == "openhelix"
     assert saved.model.world_model.enabled is False  # inherited from overfit.yaml

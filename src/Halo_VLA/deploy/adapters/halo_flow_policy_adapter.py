@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from hale_core.deploy.core.io_signature import IOSignature
 from torch import nn
 
-from hale_core.deploy.core.io_signature import IOSignature
 from Halo_VLA.deploy.adapters.observation_prompt_adapter import ObservationPromptAdapter
 from Halo_VLA.deploy.graphs.flow_policy_graph import FlowPolicyGraph
 from Halo_VLA.deploy.registry import HALO_VLA_ADAPTERS
@@ -30,8 +30,12 @@ class HaloFlowPolicyAdapter(ObservationPromptAdapter):
     def default_signature(self) -> IOSignature:
         """Observation, prompt and noise in; the sampled action chunks out."""
         cfg = self.model_config()
-        noise = {"name": "noise", "shape": ["batch", self.num_action_tokens, cfg.action_chunk_size * cfg.action_dim],
-                 "dtype": "float32", "value_range": [-2.0, 2.0]}
+        noise = {
+            "name": "noise",
+            "shape": ["batch", self.num_action_tokens, cfg.action_chunk_size * cfg.action_dim],
+            "dtype": "float32",
+            "value_range": [-2.0, 2.0],
+        }
         return self.observation_signature(["actions"], [noise])
 
     def graph(self, model: nn.Module) -> nn.Module:

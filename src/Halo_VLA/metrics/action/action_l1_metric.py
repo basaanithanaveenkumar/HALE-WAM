@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 import torch
 from torch import Tensor
 
@@ -37,7 +35,7 @@ class ActionL1Metric(RoboticsMetricBase):
     def reset(self) -> None:
         """Clear the accumulated absolute-error sums."""
         # Total absolute error and count — used for the overall mean
-        self._total_err = torch.zeros(self.action_dim)   # [D]
+        self._total_err = torch.zeros(self.action_dim)  # [D]
         self._n = 0
 
         # Per-timestep accumulators (kept for up to 3 timesteps)
@@ -46,9 +44,9 @@ class ActionL1Metric(RoboticsMetricBase):
 
     def update(
         self,
-        pred: Tensor,           # [B, T, action_dim]
-        target: Tensor,         # [B, T, action_dim]
-        mask: Optional[Tensor] = None,  # [B, T] — True where timestep is valid
+        pred: Tensor,  # [B, T, action_dim]
+        target: Tensor,  # [B, T, action_dim]
+        mask: Tensor | None = None,  # [B, T] — True where timestep is valid
     ) -> None:
         """Accumulate one batch.
 
@@ -60,7 +58,7 @@ class ActionL1Metric(RoboticsMetricBase):
         err = (pred - target).abs().detach().cpu()  # [B, T, D]
 
         # ── overall ──────────────────────────────────────────────────────────
-        flat_err = _apply_mask(err, mask)           # [N_valid, D]
+        flat_err = _apply_mask(err, mask)  # [N_valid, D]
         self._total_err += flat_err.sum(0)
         self._n += flat_err.shape[0]
 
@@ -69,9 +67,9 @@ class ActionL1Metric(RoboticsMetricBase):
         for ti in range(min(T, 3)):
             if mask is not None:
                 step_mask = mask[:, ti].bool()
-                step_err = err[:, ti][step_mask]    # [N_valid_at_t, D]
+                step_err = err[:, ti][step_mask]  # [N_valid_at_t, D]
             else:
-                step_err = err[:, ti]               # [B, D]
+                step_err = err[:, ti]  # [B, D]
             self._t_err[ti] += step_err.sum(0)
             self._t_n[ti] += step_err.shape[0]
 
@@ -82,7 +80,7 @@ class ActionL1Metric(RoboticsMetricBase):
             the overall and per-dimension / per-timestep mean absolute errors under the ``action_l1`` prefix.
         """
         n = max(self._n, 1)
-        mean_per_dim = self._total_err / n           # [D]
+        mean_per_dim = self._total_err / n  # [D]
 
         out: dict[str, float] = {
             # Mean L1 over all timesteps and all dimensions

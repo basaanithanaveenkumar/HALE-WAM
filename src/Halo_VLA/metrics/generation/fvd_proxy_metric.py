@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import List
-
 import torch
 from torch import Tensor
 
@@ -41,8 +39,8 @@ class FVDProxyMetric(RoboticsMetricBase):
     def reset(self) -> None:
         """Clear the collected per-frame feature vectors."""
         # Accumulate (mean, std) feature vectors per frame across all update calls
-        self._pred_feats: List[Tensor] = []
-        self._tgt_feats: List[Tensor] = []
+        self._pred_feats: list[Tensor] = []
+        self._tgt_feats: list[Tensor] = []
 
     def _frame_features(self, frames: Tensor) -> Tensor:
         """Extract per-frame feature vector: [channel_mean × C, channel_std × C].
@@ -55,13 +53,13 @@ class FVDProxyMetric(RoboticsMetricBase):
         B, T, C, H, W = frames.shape
         f = frames.reshape(B * T, C, H, W)
         # Per-channel mean and std over spatial dimensions
-        mu  = f.mean(dim=(-2, -1))              # [B*T, C]
-        std = f.std(dim=(-2, -1), correction=0) # [B*T, C]
-        return torch.cat([mu, std], dim=1)       # [B*T, 2C]
+        mu = f.mean(dim=(-2, -1))  # [B*T, C]
+        std = f.std(dim=(-2, -1), correction=0)  # [B*T, C]
+        return torch.cat([mu, std], dim=1)  # [B*T, 2C]
 
     def update(
         self,
-        pred_frames: Tensor,    # [B, T, C, H, W]
+        pred_frames: Tensor,  # [B, T, C, H, W]
         target_frames: Tensor,  # [B, T, C, H, W]
     ) -> None:
         """Collect per-frame statistics of one batch of videos.
@@ -82,13 +80,13 @@ class FVDProxyMetric(RoboticsMetricBase):
         Returns:
             Scalar Fréchet distance.
         """
-        mu_x = x.mean(0)          # [D]
-        mu_y = y.mean(0)          # [D]
+        mu_x = x.mean(0)  # [D]
+        mu_y = y.mean(0)  # [D]
         # Covariances
         xc = x - mu_x
         yc = y - mu_y
         sig_x = (xc.T @ xc) / max(x.shape[0] - 1, 1)  # [D, D]
-        sig_y = (yc.T @ yc) / max(y.shape[0] - 1, 1)   # [D, D]
+        sig_y = (yc.T @ yc) / max(y.shape[0] - 1, 1)  # [D, D]
 
         # Matrix square root via eigendecomposition
         # √(Σ_x · Σ_y) ≈ √(Σ_x) · √(Σ_y)  (approximate, but stable)
@@ -110,7 +108,7 @@ class FVDProxyMetric(RoboticsMetricBase):
         """
         if not self._pred_feats:
             return {"pixel_fvd_proxy": 0.0}
-        pred_all = torch.cat(self._pred_feats, dim=0)   # [N_total, 2C]
-        tgt_all  = torch.cat(self._tgt_feats,  dim=0)   # [N_total, 2C]
+        pred_all = torch.cat(self._pred_feats, dim=0)  # [N_total, 2C]
+        tgt_all = torch.cat(self._tgt_feats, dim=0)  # [N_total, 2C]
         fd = self._frechet_distance(pred_all, tgt_all)
         return {"pixel_fvd_proxy": max(fd, 0.0)}  # clamp: numerical issues can give tiny negatives

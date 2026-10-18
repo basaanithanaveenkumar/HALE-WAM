@@ -104,7 +104,7 @@ class FirstTextTokenLatent(LatentExtractor):
 
     def forward(self, enc):
         start = enc["num_prefix"]
-        return enc["hidden"][:, start:start + 1], enc["mask"][:, start:start + 1]
+        return enc["hidden"][:, start : start + 1], enc["mask"][:, start : start + 1]
 ```
 
 `DualSystemConfig` validates `latent` against its own `LATENT_TYPES` tuple (the config module

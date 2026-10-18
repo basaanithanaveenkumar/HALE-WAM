@@ -1,6 +1,6 @@
 """Animated GIFs of the visual DiT: denoising snapshots, filmstrips and autoregressive rollouts."""
 
-from typing import Any, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 import torch
@@ -47,9 +47,9 @@ from visualization.text_generation import (  # noqa: F401 - moved; re-exported f
 
 # Map the phase_label used in compose_frame → PRAI index.
 _PHASE_LABEL_TO_PRAI = {
-    "CONTEXT":       0,
-    "ANSWER":        1,
-    "ACTION":        2,
+    "CONTEXT": 0,
+    "ANSWER": 1,
+    "ACTION": 2,
     "NOISE -> IMAGE": 3,
 }
 
@@ -67,8 +67,8 @@ def sample_dit_with_intermediates(
     num_frames: int = 1,
     num_steps: int = 30,
     num_snapshots: int = 24,
-    world_video_query_hiddens: Optional[torch.Tensor] = None,
-) -> Tuple[List[torch.Tensor], List[float]]:
+    world_video_query_hiddens: torch.Tensor | None = None,
+) -> tuple[list[torch.Tensor], list[float]]:
     """
     Mirror of ``RGBFramePredictor.predict_future_frames`` that records
     intermediate ``x`` values during Euler integration.
@@ -84,7 +84,9 @@ def sample_dit_with_intermediates(
     rgb_channels = getattr(predictor.config, "rgb_channels", 3)
 
     cond_all = predictor._create_all_frame_contexts(
-        text_emb, num_frames, world_video_query_hiddens,
+        text_emb,
+        num_frames,
+        world_video_query_hiddens,
     )  # [B*F, D]
 
     n = cond_all.size(0)
@@ -100,8 +102,8 @@ def sample_dit_with_intermediates(
         idxs = np.linspace(0, num_steps, num_snapshots).round().astype(int)
         keep = set(int(i) for i in idxs)
 
-    snapshots: List[torch.Tensor] = []
-    step_times: List[float] = []
+    snapshots: list[torch.Tensor] = []
+    step_times: list[float] = []
 
     def _record(step_idx: int, x_now: torch.Tensor) -> None:
         snap = x_now.view(B, num_frames, rgb_channels, height, width).cpu()
@@ -123,8 +125,8 @@ def sample_dit_with_intermediates(
 
 
 def save_diffusion_gif(
-    snapshots: List[torch.Tensor],
-    step_times: List[float],
+    snapshots: list[torch.Tensor],
+    step_times: list[float],
     output_path: str,
     frame_idx: int = 0,
     sample_idx: int = 0,
@@ -132,8 +134,8 @@ def save_diffusion_gif(
     canvas_h: int = 384,
     fps: int = 12,
     hold_final_seconds: float = 1.5,
-    img_mean: Tuple = (0.485, 0.456, 0.406),
-    img_std: Tuple = (0.229, 0.224, 0.225),
+    img_mean: tuple = (0.485, 0.456, 0.406),
+    img_std: tuple = (0.229, 0.224, 0.225),
 ) -> None:
     """
     Render the noise -> image diffusion trajectory for a single predicted
@@ -186,8 +188,10 @@ def save_diffusion_gif(
             int(255 - (255 - 100) * progress),
         )
         composed = compose_frame(
-            img, phase_label="NOISE -> IMAGE",
-            sub_label=sub, panel_lines=panel_lines,
+            img,
+            phase_label="NOISE -> IMAGE",
+            sub_label=sub,
+            panel_lines=panel_lines,
             accent=accent,
             active_phase=_PHASE_LABEL_TO_PRAI["NOISE -> IMAGE"],
         )
@@ -210,13 +214,3 @@ def save_diffusion_gif(
             loop=0,
         )
         logger.info("Saved diffusion GIF -> {}", output_path)
-
-
-
-
-
-
-
-
-
-

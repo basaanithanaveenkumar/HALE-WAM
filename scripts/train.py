@@ -88,11 +88,13 @@ def train(args: argparse.Namespace) -> None:
     log_module_parameters(model, model_name="HaloVLM", logger_fn=logger)
     dual_config = resolve_dual_system_config(config.dual_system, config.dual_system_options)
     dual = DualSystemVLA(model, dual_config).to(device) if dual_config is not None else None
-    network = dual if dual is not None else model   # what is optimised and checkpointed
+    network = dual if dual is not None else model  # what is optimised and checkpointed
     if dual is not None:
         logger.info("dual-system VLA: {} ({})", dual_config.name, dual_config.notes or "custom")
         if args.vis_every > 0:
-            logger.warning("training GIFs use Halo-VLA's own action / video heads; disabled for --dual_system")
+            logger.warning(
+                "training GIFs use Halo-VLA's own action / video heads; disabled for --dual_system"
+            )
             args.vis_every = 0
     # With a pretrained LLM its tokenizer (plus the VLA special tokens) defines every token id,
     # so the dataloaders must use it; None keeps the datasets' default cosmo2 tokenizer.
@@ -107,22 +109,36 @@ def train(args: argparse.Namespace) -> None:
     # ---- Optional held-out validation split (fixed permutation: same on every rank / resume) ----
     val_loader = None
     if args.val_fraction > 0:
-        train_loader, val_loader = split_validation(train_loader, args.val_fraction, seed=args.val_seed)
-        logger.info("validation split: {} train / {} val samples", len(train_loader.dataset), len(val_loader.dataset))
+        train_loader, val_loader = split_validation(
+            train_loader, args.val_fraction, seed=args.val_seed
+        )
+        logger.info(
+            "validation split: {} train / {} val samples",
+            len(train_loader.dataset),
+            len(val_loader.dataset),
+        )
     evaluator = VLAEvaluator(max_batches=args.eval_max_batches, flow_steps=args.eval_flow_steps)
 
     # ---- Optional WebDataset: write shards once (rank 0), then stream them on every rank ----
     train_loader = WebDatasetCliOptions.prepare_loader(train_loader, args)
     # ---- Each rank reads a disjoint shard of a map-style dataset (no-op single-process) ----
     train_loader = session.shard_loader(train_loader, shuffle=True)
-    logger.info("Dataset size: {}  |  Batches per rank: {}", len(train_loader.dataset), len(train_loader))
+    logger.info(
+        "Dataset size: {}  |  Batches per rank: {}", len(train_loader.dataset), len(train_loader)
+    )
 
     # ---- Optimizer & scheduler ----
     # Only trainable parameters: frozen encoders / LLM weights get no optimizer state.
-    trainable = (dual.optimizer_parameters() if dual is not None
-                 else [p for p in model.parameters() if p.requires_grad])
-    logger.info("trainable parameters: {:,} / {:,}", sum(p.numel() for p in trainable),
-                sum(p.numel() for p in network.parameters()))
+    trainable = (
+        dual.optimizer_parameters()
+        if dual is not None
+        else [p for p in model.parameters() if p.requires_grad]
+    )
+    logger.info(
+        "trainable parameters: {:,} / {:,}",
+        sum(p.numel() for p in trainable),
+        sum(p.numel() for p in network.parameters()),
+    )
     optimizer = AdamW(trainable, lr=args.lr, weight_decay=args.weight_decay)
     scheduler = CosineAnnealingLR(optimizer, T_max=max(1, args.epochs * len(train_loader)))
     scaler = GradScaler(device.type, enabled=amp_enabled)
@@ -135,7 +151,9 @@ def train(args: argparse.Namespace) -> None:
         # Provenance: the YAML as resolved (inheritance applied), plus the final command line.
         from config.run_config import save_resolved_config
 
-        save_resolved_config(args.config, ckpt_dir / "run_config.yaml", argv=getattr(args, "argv", None))
+        save_resolved_config(
+            args.config, ckpt_dir / "run_config.yaml", argv=getattr(args, "argv", None)
+        )
 
     # ---- Resume from checkpoint ----
     start_epoch = 1
@@ -147,7 +165,8 @@ def train(args: argparse.Namespace) -> None:
             args.resume = str(restored)
     if args.resume:
         start_epoch, global_step = CheckpointManager.restore(
-            Path(args.resume), network, optimizer, scheduler, scaler, device)
+            Path(args.resume), network, optimizer, scheduler, scaler, device
+        )
 
     # ---- Model forward + all three losses as one module, DDP-wrapped when distributed ----
     # (the action-flow and DiT losses use parameters outside HaloVLM.forward; wrapping the whole
@@ -155,7 +174,9 @@ def train(args: argparse.Namespace) -> None:
     if dual is not None:
         dual.set_training_step(global_step)  # OpenHelix pre-alignment stage after a resume
     train_step = session.wrap(
-        DualSystemTrainingStep(dual) if dual is not None else HaloVLATrainingStep(
+        DualSystemTrainingStep(dual)
+        if dual is not None
+        else HaloVLATrainingStep(
             model,
             action_loss_weight=args.action_loss_weight,
             visual_loss_weight=visual_loss_weight,
@@ -175,9 +196,7 @@ def train(args: argparse.Namespace) -> None:
     tb_writer = None
     if args.tensorboard_dir and session.is_main:
         if SummaryWriter is None:
-            logger.warning(
-                "tensorboard package missing; install with: pip install tensorboard"
-            )
+            logger.warning("tensorboard package missing; install with: pip install tensorboard")
         else:
             tb_root = Path(args.tensorboard_dir)
             if args.tb_run_name:
@@ -185,7 +204,9 @@ def train(args: argparse.Namespace) -> None:
             else:
                 tb_root = tb_root / datetime.now().strftime("%Y%m%d_%H%M%S")
             tb_writer = SummaryWriter(log_dir=str(tb_root))
-            logger.info("TensorBoard log dir: {}  (tensorboard --logdir {})", tb_root, tb_root.parent)
+            logger.info(
+                "TensorBoard log dir: {}  (tensorboard --logdir {})", tb_root, tb_root.parent
+            )
 
     # ---- Training ----
     model.train()
@@ -194,7 +215,8 @@ def train(args: argparse.Namespace) -> None:
     accum_steps = max(1, args.grad_accum_steps)
     logger.info(
         "Gradient accumulation: {} micro-steps  →  effective batch {}",
-        accum_steps, args.batch_size * accum_steps,
+        accum_steps,
+        args.batch_size * accum_steps,
     )
 
     for epoch in range(start_epoch, args.epochs + 1):
@@ -203,16 +225,16 @@ def train(args: argparse.Namespace) -> None:
         epoch_act_loss = 0.0
         epoch_vis_loss = 0.0
         epoch_total_loss = 0.0
-        n_micro = 0   # micro-steps this epoch (for epoch-average denominators)
+        n_micro = 0  # micro-steps this epoch (for epoch-average denominators)
         t0 = time.time()
 
-        optimizer.zero_grad()   # reset once before accumulation window begins
+        optimizer.zero_grad()  # reset once before accumulation window begins
 
         for step, batch in enumerate(train_loader, 1):
             # Every tensor of the collated batch to this rank's device (strings etc. stay as is).
             batch = {k: v.to(device) if torch.is_tensor(v) else v for k, v in batch.items()}
-            images = batch["images"]                         # [B, N, 3, H, W]
-            input_ids = batch["input_ids"]                   # [B, seq_len]
+            images = batch["images"]  # [B, N, 3, H, W]
+            input_ids = batch["input_ids"]  # [B, seq_len]
             attention_mask = batch["attention_mask"]
 
             # Debug: decode and print input_ids for the first sample in the batch
@@ -232,11 +254,15 @@ def train(args: argparse.Namespace) -> None:
                     "  Pad tokens   : {}  (attention_mask=0)\n"
                     "  pad_token_id={} count: {}\n"
                     "  Decoded text:\n{}",
-                    total_tokens, real_tokens, pad_tokens,
-                    pad_id, pad_id_count, decoded_text,
+                    total_tokens,
+                    real_tokens,
+                    pad_tokens,
+                    pad_id,
+                    pad_id_count,
+                    decoded_text,
                 )
 
-            is_last_batch = (step == len(train_loader))
+            is_last_batch = step == len(train_loader)
             will_step = step % accum_steps == 0 or is_last_batch
             # DDP: skip the gradient all-reduce on accumulation micro-steps; sync on the last one.
             sync = train_step.no_sync() if session.distributed and not will_step else nullcontext()
@@ -254,9 +280,9 @@ def train(args: argparse.Namespace) -> None:
 
             # Track per-micro-step stats (unscaled loss so epoch avg stays readable)
             n_micro += 1
-            epoch_lang_loss  += lang_loss.item()
-            epoch_act_loss   += act_loss.item()
-            epoch_vis_loss   += vis_loss.item()
+            epoch_lang_loss += lang_loss.item()
+            epoch_act_loss += act_loss.item()
+            epoch_vis_loss += vis_loss.item()
             epoch_total_loss += total_loss.item()
 
             # --- Optimizer step: only every accum_steps micro-steps (or at epoch end) ---
@@ -266,7 +292,7 @@ def train(args: argparse.Namespace) -> None:
                     scaler.unscale_(optimizer)
                     nn.utils.clip_grad_norm_(trainable, args.grad_clip)
                 if dual is not None:
-                    dual.mask_frozen_gradients()   # pre-alignment: System 1 does not move yet
+                    dual.mask_frozen_gradients()  # pre-alignment: System 1 does not move yet
 
                 scaler.step(optimizer)
                 scaler.update()
@@ -280,18 +306,26 @@ def train(args: argparse.Namespace) -> None:
                 # Logging (keyed to optimizer steps via global_step; rank 0's loader logs)
                 if global_step % args.log_every == 0 and session.is_main:
                     lr = optimizer.param_groups[0]["lr"]
-                    cfm  = vis_subloss.get("loss_rgb_cfm",        vis_loss).item()
-                    perc = vis_subloss.get("loss_rgb_perceptual",  torch.tensor(0.0)).item()
-                    ssim = vis_subloss.get("loss_rgb_ssim",        torch.tensor(0.0)).item()
-                    temp = vis_subloss.get("loss_rgb_temporal",    torch.tensor(0.0)).item()
+                    cfm = vis_subloss.get("loss_rgb_cfm", vis_loss).item()
+                    perc = vis_subloss.get("loss_rgb_perceptual", torch.tensor(0.0)).item()
+                    ssim = vis_subloss.get("loss_rgb_ssim", torch.tensor(0.0)).item()
+                    temp = vis_subloss.get("loss_rgb_temporal", torch.tensor(0.0)).item()
                     logger.info(
                         "Epoch {} | Step {}/{} | lang={:.4f}  act={:.4f}  "
                         "vis={:.4f}(cfm={:.4f} perc={:.4f} ssim={:.4f} temp={:.4f})  "
                         "total={:.4f} | lr={:.2e}",
-                        epoch, step, len(train_loader),
-                        lang_loss.item(), act_loss.item(),
-                        vis_loss.item(), cfm, perc, ssim, temp,
-                        total_loss.item(), lr,
+                        epoch,
+                        step,
+                        len(train_loader),
+                        lang_loss.item(),
+                        act_loss.item(),
+                        vis_loss.item(),
+                        cfm,
+                        perc,
+                        ssim,
+                        temp,
+                        total_loss.item(),
+                        lr,
                     )
 
                 if tb_writer is not None:
@@ -316,13 +350,18 @@ def train(args: argparse.Namespace) -> None:
                 # Visualisation GIFs (rank 0 only; uses the unwrapped model, no collectives)
                 if args.vis_every > 0 and global_step % args.vis_every == 0 and session.is_main:
                     generate_training_visualization(
-                        model=model, batch=batch, tokenizer=tokenizer, config=config,
-                        device=device, output_dir=ckpt_dir, global_step=global_step,
-                        epoch=epoch, max_videos=args.vis_max_videos, min_frames=args.vis_min_frames,
+                        model=model,
+                        batch=batch,
+                        tokenizer=tokenizer,
+                        config=config,
+                        device=device,
+                        output_dir=ckpt_dir,
+                        global_step=global_step,
+                        epoch=epoch,
+                        max_videos=args.vis_max_videos,
+                        min_frames=args.vis_min_frames,
                         fps_future_frames=args.vis_fps_future_frames,
                     )
-
-
 
         # End of epoch summary (averaged over all ranks; every rank must take part)
         n = max(n_micro, 1)
@@ -333,7 +372,14 @@ def train(args: argparse.Namespace) -> None:
         avg_total = session.mean(epoch_total_loss / n)
         logger.info(
             "=== Epoch {} done in {:.1f}s  micro-steps={}  opt-steps={}  | avg lang={:.4f}  act={:.4f}  vis={:.4f}  total={:.4f} ===",
-            epoch, elapsed, n_micro, global_step, avg_lang, avg_act, avg_vis, avg_total,
+            epoch,
+            elapsed,
+            n_micro,
+            global_step,
+            avg_lang,
+            avg_act,
+            avg_vis,
+            avg_total,
         )
 
         if tb_writer is not None:
@@ -348,8 +394,11 @@ def train(args: argparse.Namespace) -> None:
             if session.is_main:
                 plain_step = getattr(train_step, "module", train_step)
                 eval_metrics = evaluator.run(plain_step, val_loader, device, amp=amp_enabled)
-                logger.info("=== Epoch {} validation | {} ===", epoch,
-                            "  ".join(f"{k.removeprefix('val/')}={v:.4f}" for k, v in eval_metrics.items()))
+                logger.info(
+                    "=== Epoch {} validation | {} ===",
+                    epoch,
+                    "  ".join(f"{k.removeprefix('val/')}={v:.4f}" for k, v in eval_metrics.items()),
+                )
                 if tb_writer is not None:
                     for k, v in eval_metrics.items():
                         tb_writer.add_scalar(k, v, epoch)
@@ -365,9 +414,15 @@ def train(args: argparse.Namespace) -> None:
             # persists under --ray_storage_path and restores from after a worker failure.
             session.barrier()  # the checkpoint is fully written before Ray copies it
             reporter.report(
-                {"epoch": epoch, "global_step": global_step, "loss/total": avg_total,
-                 "loss/lang": avg_lang, "loss/action_flow": avg_act, "loss/visual_dit": avg_vis,
-                 **eval_metrics},
+                {
+                    "epoch": epoch,
+                    "global_step": global_step,
+                    "loss/total": avg_total,
+                    "loss/lang": avg_lang,
+                    "loss/action_flow": avg_act,
+                    "loss/visual_dit": avg_vis,
+                    **eval_metrics,
+                },
                 checkpoint_dir=ckpt_dir if save_now else None,
             )
 
@@ -380,15 +435,15 @@ def train(args: argparse.Namespace) -> None:
     session.close()
 
 
-
-
 def main() -> None:
     """Train locally / under torchrun, or launch the same ``train`` on Ray Train with ``--ray``."""
     args = parse_args()
     if args.ray:
         # Workers import this file and call its train(); nothing of this process is pickled.
         result = launch_train_on_ray(f"{Path(__file__).resolve()}:train", args)
-        logger.info("Ray run finished: metrics={} checkpoint={}", result.metrics, result.checkpoint_path)
+        logger.info(
+            "Ray run finished: metrics={} checkpoint={}", result.metrics, result.checkpoint_path
+        )
     else:
         train(args)
 

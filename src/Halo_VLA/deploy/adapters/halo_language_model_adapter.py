@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from hale_core.deploy.core.io_signature import IOSignature
+from hale_core.deploy.exceptions import ConfigError
 from loguru import logger
 from torch import nn
 
-from hale_core.deploy.core.io_signature import IOSignature
-from hale_core.deploy.exceptions import ConfigError
 from Halo_VLA.deploy.adapters.halo_adapter_base import HaloAdapterBase
 from Halo_VLA.deploy.graphs.text_tower_graph import TextTowerGraph
 from Halo_VLA.deploy.registry import HALO_VLA_ADAPTERS
@@ -33,8 +33,10 @@ class HaloLanguageModelAdapter(HaloAdapterBase):
     def __init__(self, max_seq: int = 512, opt_seq: int = 32, **base: Any) -> None:
         super().__init__(**base)
         if not self.factory.model_kwargs.get("llm_backbone"):
-            raise ConfigError("HaloLanguageModelAdapter needs model.llm_backbone (a pretrained HF LLM); the "
-                              "built-in decoder has no Hugging Face form")
+            raise ConfigError(
+                "HaloLanguageModelAdapter needs model.llm_backbone (a pretrained HF LLM); the "
+                "built-in decoder has no Hugging Face form"
+            )
         self.max_seq, self.opt_seq = int(max_seq), int(opt_seq)
 
     def language(self, model: nn.Module) -> nn.Module:
@@ -44,13 +46,26 @@ class HaloLanguageModelAdapter(HaloAdapterBase):
     def default_signature(self) -> IOSignature:
         """Token ids and mask in; next-token logits out."""
         cfg = self.model_config()
-        return self.build_signature({
-            "inputs": [{"name": "input_ids", "shape": ["batch", "seq"], "dtype": "int64",
-                        "value_range": [3, cfg.vocab_size]},
-                       {"name": "attention_mask", "shape": ["batch", "seq"], "dtype": "int64", "value_range": [1, 2]}],
-            "outputs": ["logits"],
-            "dims": {"batch": self.batch_dim(), "seq": [1, self.opt_seq, self.max_seq]},
-        })
+        return self.build_signature(
+            {
+                "inputs": [
+                    {
+                        "name": "input_ids",
+                        "shape": ["batch", "seq"],
+                        "dtype": "int64",
+                        "value_range": [3, cfg.vocab_size],
+                    },
+                    {
+                        "name": "attention_mask",
+                        "shape": ["batch", "seq"],
+                        "dtype": "int64",
+                        "value_range": [1, 2],
+                    },
+                ],
+                "outputs": ["logits"],
+                "dims": {"batch": self.batch_dim(), "seq": [1, self.opt_seq, self.max_seq]},
+            }
+        )
 
     def graph(self, model: nn.Module) -> nn.Module:
         """The text tower (embedding, LLM, LM head) without the vision prefix."""

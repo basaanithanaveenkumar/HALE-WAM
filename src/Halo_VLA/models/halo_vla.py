@@ -6,10 +6,10 @@ from typing import Any
 
 import torch
 import torch.nn as nn
-from exceptions import ModelStateError
 from loguru import logger
 
 from config import HaloVLMConfig
+from exceptions import ModelStateError
 from models.dit_frame_prediction import VisualDiTPredictor
 
 # --- Flow matching action decoder replaces MLP ActionDecoder ---
@@ -100,24 +100,36 @@ class HaloVLM(VisualPredictionMixin, FlowActionHeadMixin, nn.Module):
         # Language decoder: a registered pretrained LLM (config.llm_backbone), or the built-in one.
         # The pretrained path is built first: it rewrites the special-token ids / vocab size in
         # ``config`` from the LLM's tokenizer, which every other component then reads.
-        self.language = PretrainedLanguageDecoder(network_config) if network_config.uses_pretrained_llm else None
-        self.decoder_transformer = None if self.language is not None else DecoderTransformer(
-            num_layers=network_config.dec_num_layers,
-            emb_dim=network_config.emb_dim,
-            num_heads=network_config.dec_num_heads,
-            mlp_dim=network_config.dec_mlp_dim,
-            drop_fact=network_config.dec_drop,
-            use_moe=network_config.use_moe,
-            moe_hid_scale=network_config.moe_hid_scale,
-            moe_num_routed_experts=network_config.moe_num_routed_experts,
-            moe_top_k=network_config.moe_top_k,
-            moe_num_shared_experts=network_config.moe_num_shared_experts,
-            gradient_checkpointing=getattr(network_config, "gradient_checkpointing", True),
+        self.language = (
+            PretrainedLanguageDecoder(network_config)
+            if network_config.uses_pretrained_llm
+            else None
+        )
+        self.decoder_transformer = (
+            None
+            if self.language is not None
+            else DecoderTransformer(
+                num_layers=network_config.dec_num_layers,
+                emb_dim=network_config.emb_dim,
+                num_heads=network_config.dec_num_heads,
+                mlp_dim=network_config.dec_mlp_dim,
+                drop_fact=network_config.dec_drop,
+                use_moe=network_config.use_moe,
+                moe_hid_scale=network_config.moe_hid_scale,
+                moe_num_routed_experts=network_config.moe_num_routed_experts,
+                moe_top_k=network_config.moe_top_k,
+                moe_num_shared_experts=network_config.moe_num_shared_experts,
+                gradient_checkpointing=getattr(network_config, "gradient_checkpointing", True),
+            )
         )
         if self.language is None:
             self.token_emb = nn.Embedding(network_config.vocab_size, network_config.emb_dim)
-            self.pos_embed = nn.Embedding(network_config.max_position_embeddings, network_config.emb_dim)
-            self.lm_head = LMHead(hidden_size=network_config.emb_dim, vocab_size=network_config.vocab_size)
+            self.pos_embed = nn.Embedding(
+                network_config.max_position_embeddings, network_config.emb_dim
+            )
+            self.lm_head = LMHead(
+                hidden_size=network_config.emb_dim, vocab_size=network_config.vocab_size
+            )
         self.image_projector = build_image_projector(network_config)
         self.state_encoder = StateEncoder(config=network_config)
 
@@ -183,20 +195,20 @@ class HaloVLM(VisualPredictionMixin, FlowActionHeadMixin, nn.Module):
         #    img_proj → [B, N_img * num_patches, emb_dim]
         # ------------------------------------------------------------------ #
         num_images = (input_ids == image_token_id).sum(dim=1)  # [B]
-        N_img = num_images.max().item()                        # scalar
+        N_img = num_images.max().item()  # scalar
 
         all_img_proj = []
         for i in range(N_img):
-            img_i = images[:, i]                               # [B, 3, H, W]
-            feat_i = self.vis_enc(img_i)                       # [B, num_patches, emb_dim]
-            proj_i = self.image_projector(feat_i)              # [B, num_patches, emb_dim]
+            img_i = images[:, i]  # [B, 3, H, W]
+            feat_i = self.vis_enc(img_i)  # [B, num_patches, emb_dim]
+            proj_i = self.image_projector(feat_i)  # [B, num_patches, emb_dim]
             all_img_proj.append(proj_i)
 
         if all_img_proj:
-            img_proj = torch.cat(all_img_proj, dim=1)          # [B, N_img*num_patches, emb_dim]
+            img_proj = torch.cat(all_img_proj, dim=1)  # [B, N_img*num_patches, emb_dim]
         else:
             img_proj = torch.empty(B, 0, network_config.emb_dim, device=device)
-        num_prepended = img_proj.size(1)                       # image tokens before text
+        num_prepended = img_proj.size(1)  # image tokens before text
 
         # ------------------------------------------------------------------ #
         # 2. STATES — count <state> tokens, encode each state vector through
@@ -204,13 +216,13 @@ class HaloVLM(VisualPredictionMixin, FlowActionHeadMixin, nn.Module):
         #    state_embeds → [B, N_state, emb_dim]
         # ------------------------------------------------------------------ #
         num_states = (input_ids == state_token_id).sum(dim=1)  # [B]
-        N_state = num_states.max().item()                      # scalar
+        N_state = num_states.max().item()  # scalar
 
         all_state_embeds = []
         for i in range(N_state):
-            state_i = states[:, i]                             # [B, state_dim]
-            emb_i = self.state_encoder(state_i)                # [B, emb_dim]
-            all_state_embeds.append(emb_i.unsqueeze(1))        # [B, 1, emb_dim]
+            state_i = states[:, i]  # [B, state_dim]
+            emb_i = self.state_encoder(state_i)  # [B, emb_dim]
+            all_state_embeds.append(emb_i.unsqueeze(1))  # [B, 1, emb_dim]
 
         if all_state_embeds:
             state_embeds = torch.cat(all_state_embeds, dim=1)  # [B, N_state, emb_dim]
@@ -224,17 +236,14 @@ class HaloVLM(VisualPredictionMixin, FlowActionHeadMixin, nn.Module):
         # ------------------------------------------------------------------ #
         # Zero out image and state placeholder positions; action and world_video tokens
         # keep their vocab embeddings so the transformer sees a meaningful signal there.
-        special_mask = (
-            (input_ids != image_token_id)
-            & (input_ids != state_token_id)
-        )
+        special_mask = (input_ids != image_token_id) & (input_ids != state_token_id)
         if self.language is not None:
             # LLM space: text from the LLM's embeddings; images / states projected into it.
             text_embeds = self.language.embed_text(input_ids).to(img_proj.dtype)  # [B, seq_len, H]
             img_proj = self.language.project_in(img_proj)
             state_embeds = self.language.project_in(state_embeds)
         else:
-            text_embeds = self.token_emb(input_ids)            # [B, seq_len, emb_dim]
+            text_embeds = self.token_emb(input_ids)  # [B, seq_len, emb_dim]
         text_embeds = text_embeds * special_mask.unsqueeze(-1)  # zero out placeholders
 
         # ------------------------------------------------------------------ #
@@ -265,7 +274,9 @@ class HaloVLM(VisualPredictionMixin, FlowActionHeadMixin, nn.Module):
         """Width of the decoder's hidden states (``emb_dim`` or the LLM's hidden size)."""
         return self.language.hidden_size if self.language is not None else self.config.emb_dim
 
-    def sequence_token_ids(self, input_ids: torch.Tensor, num_prefix: int, num_extra: int = 0) -> torch.Tensor:
+    def sequence_token_ids(
+        self, input_ids: torch.Tensor, num_prefix: int, num_extra: int = 0
+    ) -> torch.Tensor:
         """Token ids aligned with the decoder sequence ``[image prefix, text/states, extra]``.
 
         Image slots carry the image token id and appended queries the pad id. A pretrained LLM
@@ -275,7 +286,11 @@ class HaloVLM(VisualPredictionMixin, FlowActionHeadMixin, nn.Module):
         B = input_ids.size(0)
         parts = [input_ids.new_full((B, num_prefix), self.config.image_token_id), input_ids]
         if num_extra:
-            pad = getattr(self.language.tokenizer, "pad_token_id", None) if self.language is not None else None
+            pad = (
+                getattr(self.language.tokenizer, "pad_token_id", None)
+                if self.language is not None
+                else None
+            )
             parts.append(input_ids.new_full((B, num_extra), pad or 0))
         return torch.cat(parts, dim=1)
 
@@ -283,15 +298,25 @@ class HaloVLM(VisualPredictionMixin, FlowActionHeadMixin, nn.Module):
         """The decoder's transformer blocks (built-in or pretrained LLM), in order."""
         if self.language is None:
             return self.decoder_transformer.layers
-        candidates = [m for n, m in self.language.llm.named_modules()
-                      if isinstance(m, nn.ModuleList) and n.endswith("layers") and len(m) > 0]
+        candidates = [
+            m
+            for n, m in self.language.llm.named_modules()
+            if isinstance(m, nn.ModuleList) and n.endswith("layers") and len(m) > 0
+        ]
         if not candidates:
             raise ModelStateError("could not locate the LLM backbone's decoder layers")
         return max(candidates, key=len)
 
-    def encode_sequence(self, images: torch.Tensor, input_ids: torch.Tensor, attention_mask: torch.Tensor,
-                        states: torch.Tensor, *, extra_embeds: torch.Tensor | None = None,
-                        capture_layer: int | None = None) -> dict[str, Any]:
+    def encode_sequence(
+        self,
+        images: torch.Tensor,
+        input_ids: torch.Tensor,
+        attention_mask: torch.Tensor,
+        states: torch.Tensor,
+        *,
+        extra_embeds: torch.Tensor | None = None,
+        capture_layer: int | None = None,
+    ) -> dict[str, Any]:
         """Run the vision-language decoder and return its hidden states (no task heads).
 
         Args:
@@ -308,13 +333,21 @@ class HaloVLM(VisualPredictionMixin, FlowActionHeadMixin, nn.Module):
         """
         B, device = input_ids.size(0), input_ids.device
         combined, num_prefix, _ = self._embed_inputs(images, input_ids, states)
-        mask = torch.cat([torch.ones(B, num_prefix, device=device, dtype=attention_mask.dtype),
-                          attention_mask], dim=1)
+        mask = torch.cat(
+            [torch.ones(B, num_prefix, device=device, dtype=attention_mask.dtype), attention_mask],
+            dim=1,
+        )
         num_extra = 0
         if extra_embeds is not None:
-            extra = self.language.project_in(extra_embeds) if self.language is not None else extra_embeds
+            extra = (
+                self.language.project_in(extra_embeds)
+                if self.language is not None
+                else extra_embeds
+            )
             combined = torch.cat([combined, extra.to(combined.dtype)], dim=1)
-            mask = torch.cat([mask, torch.ones(B, extra.size(1), device=device, dtype=mask.dtype)], dim=1)
+            mask = torch.cat(
+                [mask, torch.ones(B, extra.size(1), device=device, dtype=mask.dtype)], dim=1
+            )
             num_extra = extra.size(1)
         input_embeds = combined
         if self.language is None:
@@ -324,13 +357,17 @@ class HaloVLM(VisualPredictionMixin, FlowActionHeadMixin, nn.Module):
         captured = {}
         handle = None
         if capture_layer is not None:
+
             def grab(_module: nn.Module, _inputs: tuple, output: Any) -> None:
                 """Forward hook: remember the captured layer's output."""
                 captured["h"] = output[0] if isinstance(output, tuple) else output
+
             handle = self.decoder_layers()[capture_layer].register_forward_hook(grab)
         try:
             if self.language is not None:
-                logits, hidden = self.language(combined, mask, self.sequence_token_ids(input_ids, num_prefix, num_extra))
+                logits, hidden = self.language(
+                    combined, mask, self.sequence_token_ids(input_ids, num_prefix, num_extra)
+                )
             else:
                 hidden = self.decoder_transformer(combined, pad_mask=mask)
                 logits = self.lm_head(hidden)
@@ -338,14 +375,24 @@ class HaloVLM(VisualPredictionMixin, FlowActionHeadMixin, nn.Module):
             if handle is not None:
                 handle.remove()
         return {
-            "hidden": hidden, "mask": mask, "logits": logits, "num_prefix": num_prefix,
-            "text_len": input_ids.size(1), "num_extra": num_extra, "input_embeds": input_embeds,
+            "hidden": hidden,
+            "mask": mask,
+            "logits": logits,
+            "num_prefix": num_prefix,
+            "text_len": input_ids.size(1),
+            "num_extra": num_extra,
+            "input_embeds": input_embeds,
             "layer_hidden": captured.get("h"),
         }
 
-    def forward(self, images: torch.Tensor, input_ids: torch.Tensor, attention_mask: torch.Tensor,
-                states: torch.Tensor, image_mask: torch.Tensor | None = None,
-                ) -> tuple[torch.Tensor, torch.Tensor | None, torch.Tensor | None, torch.Tensor | None]:
+    def forward(
+        self,
+        images: torch.Tensor,
+        input_ids: torch.Tensor,
+        attention_mask: torch.Tensor,
+        states: torch.Tensor,
+        image_mask: torch.Tensor | None = None,
+    ) -> tuple[torch.Tensor, torch.Tensor | None, torch.Tensor | None, torch.Tensor | None]:
         """
         Forward pass with interleaved multi-image, state-injection, and
         action-decoding support.
@@ -388,7 +435,7 @@ class HaloVLM(VisualPredictionMixin, FlowActionHeadMixin, nn.Module):
         B = input_ids.size(0)
         device = input_ids.device
         network_config = self.config
-        action_token_id = network_config.action_token_id        # e.g. 151666
+        action_token_id = network_config.action_token_id  # e.g. 151666
         world_video_token_id = network_config.world_video_token_id  # e.g. 151668
 
         # Steps 1-5 (images, states, text, state injection, concatenation): shared with
@@ -415,7 +462,8 @@ class HaloVLM(VisualPredictionMixin, FlowActionHeadMixin, nn.Module):
         if self.language is not None:
             # logits from the LLM's head; hidden states mapped back to emb_dim for the heads below.
             logits, transformer_out = self.language(
-                combined_embeds, pad_mask_full, self.sequence_token_ids(input_ids, num_prepended))
+                combined_embeds, pad_mask_full, self.sequence_token_ids(input_ids, num_prepended)
+            )
         else:
             transformer_out = self.decoder_transformer(combined_embeds, pad_mask=pad_mask_full)
 
@@ -426,9 +474,7 @@ class HaloVLM(VisualPredictionMixin, FlowActionHeadMixin, nn.Module):
             patches_per_img = num_prepended // N_img
             img_dec = transformer_out[:, :num_prepended, :]  # [B, N_img * P, D]
             frame_stack = img_dec.view(B, N_img, patches_per_img, -1).mean(dim=2)
-            visual_context_emb = pool_past_frame_embeddings_for_visual_dit(
-                frame_stack, image_mask
-            )
+            visual_context_emb = pool_past_frame_embeddings_for_visual_dit(frame_stack, image_mask)
 
         # ------------------------------------------------------------------ #
         # 8. LANGUAGE HEAD — project every position to vocab logits.
@@ -446,7 +492,7 @@ class HaloVLM(VisualPredictionMixin, FlowActionHeadMixin, nn.Module):
         #    action_hiddens → [B, n_action_tokens, emb_dim]
         #    Returns None if no <halo_action> tokens are present.
         # ------------------------------------------------------------------ #
-        action_mask = (input_ids == action_token_id)                # [B, seq_len]
+        action_mask = input_ids == action_token_id  # [B, seq_len]
         n_action_tokens = action_mask.sum(dim=1).max().item()  # scalar
 
         # ------------------------------------------------------------------ #
@@ -464,11 +510,12 @@ class HaloVLM(VisualPredictionMixin, FlowActionHeadMixin, nn.Module):
                 action_positions = action_mask[b].nonzero(as_tuple=True)[0]  # in input_ids
                 # Offset by prepended image patches to index into transformer_out
                 action_positions = action_positions + num_prepended
-                hiddens = transformer_out[b, action_positions]              # [n_act, emb_dim]
+                hiddens = transformer_out[b, action_positions]  # [n_act, emb_dim]
                 # Pad if this sample has fewer <halo_action> tokens than the batch max
                 if hiddens.size(0) < n_action_tokens:
                     pad = torch.zeros(
-                        n_action_tokens - hiddens.size(0), network_config.emb_dim,
+                        n_action_tokens - hiddens.size(0),
+                        network_config.emb_dim,
                         device=device,
                     )
                     hiddens = torch.cat([hiddens, pad], dim=0)
@@ -490,7 +537,7 @@ class HaloVLM(VisualPredictionMixin, FlowActionHeadMixin, nn.Module):
         #     world_video_query_hiddens → [B, n_world_video_tokens, emb_dim]
         #     Returns None if no <halo_world_video> tokens are present.
         # ------------------------------------------------------------------ #
-        world_video_mask = (input_ids == world_video_token_id)      # [B, seq_len]
+        world_video_mask = input_ids == world_video_token_id  # [B, seq_len]
         n_world_video_tokens = world_video_mask.sum(dim=1).max().item()
 
         world_video_query_hiddens = None
@@ -499,10 +546,11 @@ class HaloVLM(VisualPredictionMixin, FlowActionHeadMixin, nn.Module):
             for b in range(B):
                 wv_positions = world_video_mask[b].nonzero(as_tuple=True)[0]
                 wv_positions = wv_positions + num_prepended
-                hiddens = transformer_out[b, wv_positions]          # [n_wv, emb_dim]
+                hiddens = transformer_out[b, wv_positions]  # [n_wv, emb_dim]
                 if hiddens.size(0) < n_world_video_tokens:
                     pad = torch.zeros(
-                        n_world_video_tokens - hiddens.size(0), network_config.emb_dim,
+                        n_world_video_tokens - hiddens.size(0),
+                        network_config.emb_dim,
                         device=device,
                     )
                     hiddens = torch.cat([hiddens, pad], dim=0)
@@ -512,7 +560,3 @@ class HaloVLM(VisualPredictionMixin, FlowActionHeadMixin, nn.Module):
             world_video_query_hiddens = torch.stack(wv_hidden_list, dim=0)
 
         return logits, action_hiddens, visual_context_emb, world_video_query_hiddens
-
-
-
-

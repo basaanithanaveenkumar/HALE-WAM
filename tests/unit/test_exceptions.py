@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import pytest
+from hale_core.exceptions import ConfigError, HaleCoreError
+
 from exceptions import (
     CheckpointNotFoundError,
     DatasetError,
@@ -14,16 +16,27 @@ from exceptions import (
     ModelStateError,
     TrainingEntryError,
 )
-from hale_core.exceptions import ConfigError, HaleCoreError
 
 
-@pytest.mark.parametrize("error, builtin", [
-    (HaloVLAConfigError, ValueError), (ModelInputError, ValueError), (ModelStateError, RuntimeError),
-    (DatasetError, RuntimeError), (DatasetNotFoundError, FileNotFoundError),
-    (CheckpointNotFoundError, FileNotFoundError), (EvaluationError, ValueError), (TrainingEntryError, ImportError),
-])
+@pytest.mark.parametrize(
+    "error, builtin",
+    [
+        (HaloVLAConfigError, ValueError),
+        (ModelInputError, ValueError),
+        (ModelStateError, RuntimeError),
+        (DatasetError, RuntimeError),
+        (DatasetNotFoundError, FileNotFoundError),
+        (CheckpointNotFoundError, FileNotFoundError),
+        (EvaluationError, ValueError),
+        (TrainingEntryError, ImportError),
+    ],
+)
 def test_every_error_is_a_halo_vla_error_and_its_old_builtin(error: type, builtin: type) -> None:
-    assert issubclass(error, HaloVLAError) and issubclass(error, HaleCoreError) and issubclass(error, builtin)
+    assert (
+        issubclass(error, HaloVLAError)
+        and issubclass(error, HaleCoreError)
+        and issubclass(error, builtin)
+    )
 
 
 def test_config_errors_are_also_hale_core_config_errors() -> None:

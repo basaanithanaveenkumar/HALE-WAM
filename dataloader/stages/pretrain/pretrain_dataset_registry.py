@@ -5,9 +5,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import torch
-from exceptions import DatasetError
 from loguru import logger
 from torch.utils.data import ConcatDataset, DataLoader
+
+from exceptions import DatasetError
 
 if TYPE_CHECKING:  # annotation only; the runtime import is lazy (import cycle)
     from .pretrain_dataset_config import PretrainDatasetConfig
@@ -303,6 +304,7 @@ class PretrainDatasetRegistry:
 
     def __init__(self, **config_overrides) -> None:
         from .pretrain_dataset_config import PretrainDatasetConfig  # lazy: avoids an import cycle
+
         self.cfg = PretrainDatasetConfig(**config_overrides)
 
     def build(self) -> DataLoader:
@@ -324,7 +326,7 @@ class PretrainDatasetRegistry:
 
             if name == "eo-data-interleave":
                 # EO-Data has its own loader; build one per requested subset
-                for subset in (spec["subsets"] or ["interleave-temporal"]):
+                for subset in spec["subsets"] or ["interleave-temporal"]:
                     cfg = EODatasetConfig(
                         dataset_name=spec["hf_path"],
                         subset=subset,

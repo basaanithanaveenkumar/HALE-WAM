@@ -14,12 +14,12 @@ import argparse
 from collections.abc import Callable
 from typing import Any
 
-from exceptions import HaloVLAConfigError
 from hale_core.exceptions import RegistryError
 from hale_core.registry import NamedRegistry
 from torch.utils.data import DataLoader
 
 from config import HaloVLMConfig
+from exceptions import HaloVLAConfigError
 
 #: ``dataset`` name -> ``(args, config, tokenizer) -> DataLoader``.
 TRAIN_DATASETS = NamedRegistry("training dataset")
@@ -28,7 +28,9 @@ TrainDatasetBuilder = Callable[[argparse.Namespace, HaloVLMConfig, Any], DataLoa
 
 
 @TRAIN_DATASETS.register_module(name="eo")
-def build_eo_train_loader(args: argparse.Namespace, config: HaloVLMConfig, tokenizer: Any) -> DataLoader:
+def build_eo_train_loader(
+    args: argparse.Namespace, config: HaloVLMConfig, tokenizer: Any
+) -> DataLoader:
     """IPEC-COMMUNITY/EO-Data1.5M (``--subset``)."""
     from dataloader.eo_dataset import build_eo_dataloader  # lazy: datasets / video decoders
 
@@ -49,7 +51,9 @@ def build_eo_train_loader(args: argparse.Namespace, config: HaloVLMConfig, token
 
 
 @TRAIN_DATASETS.register_module(name="droid")
-def build_droid_train_loader(args: argparse.Namespace, config: HaloVLMConfig, tokenizer: Any) -> DataLoader:
+def build_droid_train_loader(
+    args: argparse.Namespace, config: HaloVLMConfig, tokenizer: Any
+) -> DataLoader:
     """DROID episodes under ``--droid_data_root``."""
     from dataloader.droid_dataset import build_droid_dataloader  # lazy
 
@@ -75,7 +79,9 @@ def build_droid_train_loader(args: argparse.Namespace, config: HaloVLMConfig, to
 
 
 @TRAIN_DATASETS.register_module(name="moma")
-def build_moma_train_loader(args: argparse.Namespace, config: HaloVLMConfig, tokenizer: Any) -> DataLoader:
+def build_moma_train_loader(
+    args: argparse.Namespace, config: HaloVLMConfig, tokenizer: Any
+) -> DataLoader:
     """AIROA MoMa episodes under ``--moma_data_root``."""
     from dataloader.airoa_moma_dataset import build_airoa_moma_dataloader  # lazy
 
@@ -100,7 +106,9 @@ def build_moma_train_loader(args: argparse.Namespace, config: HaloVLMConfig, tok
     )
 
 
-def build_train_loader(args: argparse.Namespace, config: HaloVLMConfig, tokenizer: Any) -> DataLoader:
+def build_train_loader(
+    args: argparse.Namespace, config: HaloVLMConfig, tokenizer: Any
+) -> DataLoader:
     """The train loader of ``args.dataset``.
 
     Args:

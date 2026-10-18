@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 from loguru import logger
 
@@ -37,29 +37,26 @@ class DroidEpisodeIndexMixin:
                 )
                 self.cfg.camera = cam_keys[0]
         else:
-            logger.warning("meta/info.json not found — using defaults (fps={}).",
-                           self.cfg.fps)
+            logger.warning("meta/info.json not found — using defaults (fps={}).", self.cfg.fps)
 
         # tasks.parquet — task_index → task string
-        self._task_map: Dict[int, str] = self._load_task_map(meta_dir)
+        self._task_map: dict[int, str] = self._load_task_map(meta_dir)
 
         # episodes.parquet — episode_index, length, task_index
-        self._episode_meta: List[Dict[str, Any]] = self._load_episodes_parquet(meta_dir)
+        self._episode_meta: list[dict[str, Any]] = self._load_episodes_parquet(meta_dir)
 
-    def _load_task_map(self, meta_dir: Path) -> Dict[int, str]:
+    def _load_task_map(self, meta_dir: Path) -> dict[int, str]:
         tasks_pq = meta_dir / "tasks.parquet"
         if not tasks_pq.is_file():
             return {}
         try:
             import pyarrow.parquet as pq
+
             table = pq.read_table(tasks_pq)
             names = table.schema.names
-            idx_col = next(
-                (c for c in ("task_index", "index") if c in names), None
-            )
+            idx_col = next((c for c in ("task_index", "index") if c in names), None)
             txt_col = next(
-                (c for c in ("task", "task_description", "short_horizon_task")
-                 if c in names),
+                (c for c in ("task", "task_description", "short_horizon_task") if c in names),
                 None,
             )
             if not idx_col or not txt_col:
@@ -72,18 +69,19 @@ class DroidEpisodeIndexMixin:
             logger.warning("Could not load tasks.parquet: {}", exc)
             return {}
 
-    def _load_episodes_parquet(self, meta_dir: Path) -> List[Dict[str, Any]]:
+    def _load_episodes_parquet(self, meta_dir: Path) -> list[dict[str, Any]]:
         eps_pq = meta_dir / "episodes.parquet"
         if not eps_pq.is_file():
             logger.warning("meta/episodes.parquet not found — will discover from data/.")
             return []
         try:
             import pyarrow.parquet as pq
+
             table = pq.read_table(eps_pq)
             names = table.schema.names
             rows = []
             for i in range(table.num_rows):
-                rec: Dict[str, Any] = {col: table[col][i].as_py() for col in names}
+                rec: dict[str, Any] = {col: table[col][i].as_py() for col in names}
                 if "episode_index" not in rec:
                     rec["episode_index"] = rec.get("index", i)
                 rows.append(rec)
@@ -93,7 +91,7 @@ class DroidEpisodeIndexMixin:
             logger.warning("Could not load episodes.parquet: {}", exc)
             return []
 
-    def _build_episode_list(self) -> List[Dict[str, Any]]:
+    def _build_episode_list(self) -> list[dict[str, Any]]:
         """
         Merge parquet metadata with filesystem discovery.
 
@@ -128,20 +126,23 @@ class DroidEpisodeIndexMixin:
             if length > 0 and length < self.cfg.min_episode_length:
                 continue
 
-            episodes.append({
-                "episode_index": ep_idx,
-                "length": length,
-                "task": task,
-                "data_path": data_path,
-                "video_path": video_path,
-            })
+            episodes.append(
+                {
+                    "episode_index": ep_idx,
+                    "length": length,
+                    "task": task,
+                    "data_path": data_path,
+                    "video_path": video_path,
+                }
+            )
 
         logger.info("DROIDDataset: {} usable episodes after filtering.", len(episodes))
         return episodes
 
-    def _scan_data_dir(self) -> List[Dict[str, Any]]:
+    def _scan_data_dir(self) -> list[dict[str, Any]]:
         """Fallback: discover episodes by scanning data/chunk-*/ parquet files."""
         import re
+
         data_root = self.root / "data"
         if not data_root.is_dir():
             return []
@@ -157,12 +158,7 @@ class DroidEpisodeIndexMixin:
     def _data_path(self, episode_index: int) -> Path:
         """Path to the per-episode parquet file under data/chunk-XXX/."""
         chunk = episode_index // self.cfg.episodes_per_chunk
-        return (
-            self.root
-            / "data"
-            / f"chunk-{chunk:03d}"
-            / f"episode_{episode_index:06d}.parquet"
-        )
+        return self.root / "data" / f"chunk-{chunk:03d}" / f"episode_{episode_index:06d}.parquet"
 
     def _video_path(self, episode_index: int) -> Path:
         """Path to the MP4 for the configured camera view."""

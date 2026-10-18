@@ -1,6 +1,7 @@
 """Visual DiT world-model head of HaloVLM: frame-prediction loss and future-frame sampling."""
 
 import torch
+
 from exceptions import ModelInputError
 
 
@@ -59,7 +60,8 @@ class VisualPredictionMixin:
             last_ctx = images[:, -1]  # [B, 3, H, W]
 
         out = self.visual_predictor.compute_loss(
-            future_targets, visual_context_emb,
+            future_targets,
+            visual_context_emb,
             num_frames=p_predict,
             world_video_query_hiddens=world_video_query_hiddens,
             perceptual_weight=perceptual_weight,
@@ -124,7 +126,9 @@ class VisualPredictionMixin:
 
             # Returns [B, 1, C, H, W]; take frame 0
             pred_frame = vp.predict_future_frames(
-                H, W, ctx_emb,
+                H,
+                W,
+                ctx_emb,
                 num_frames=1,
                 num_steps=num_ode_steps,
                 world_video_query_hiddens=wv_step,

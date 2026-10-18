@@ -22,12 +22,14 @@ from rl import (  # noqa: E402
     compute_reinforce_loss,
     world_model_loss,
 )
-
 from tests.support.llm_support import batch_for, hf_patched, small_config  # noqa: E402,F401
 
 
 def test_every_algorithm_is_exported() -> None:
-    assert all(callable(f) for f in (compute_dpo_loss, compute_grpo_loss, compute_reinforce_loss, world_model_loss))
+    assert all(
+        callable(f)
+        for f in (compute_dpo_loss, compute_grpo_loss, compute_reinforce_loss, world_model_loss)
+    )
     assert RSSM is not None
 
 
@@ -39,7 +41,9 @@ def test_policy_conditioning_from_the_current_model(llm, request) -> None:
     model = HaloVLM(cfg).eval()
     cond = GaussianActionPolicy.conditioning_from_halo(model, batch_for(cfg))
     assert cond.shape == (2, cfg.emb_dim) and torch.isfinite(cond).all()
-    policy = GaussianActionPolicy(cond_dim=cfg.emb_dim, action_dim_flat=cfg.action_chunk_size * cfg.action_dim)
+    policy = GaussianActionPolicy(
+        cond_dim=cfg.emb_dim, action_dim_flat=cfg.action_chunk_size * cfg.action_dim
+    )
     actions, log_prob = policy.sample(cond)
     assert actions.shape == (2, cfg.action_chunk_size * cfg.action_dim) and log_prob.shape == (2,)
 

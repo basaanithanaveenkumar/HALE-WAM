@@ -20,8 +20,14 @@ class FlowMatchingStrategy(ActionPolicyStrategy):
     evaluations.
     """
 
-    def loss(self, head: nn.Module, cond: torch.Tensor, cond_mask: torch.Tensor, actions: torch.Tensor,
-             weight: torch.Tensor) -> torch.Tensor:
+    def loss(
+        self,
+        head: nn.Module,
+        cond: torch.Tensor,
+        cond_mask: torch.Tensor,
+        actions: torch.Tensor,
+        weight: torch.Tensor,
+    ) -> torch.Tensor:
         """Mean squared error of the predicted velocity."""
         b = actions.size(0)
         noise = torch.randn_like(actions)
@@ -30,8 +36,14 @@ class FlowMatchingStrategy(ActionPolicyStrategy):
         pred = head(cond, cond_mask, noisy, t * TIME_SCALE)
         return self.masked_mean((pred - (actions - noise)) ** 2, weight)
 
-    def sample_from_noise(self, head: nn.Module, cond: torch.Tensor, cond_mask: torch.Tensor,
-                          noise: torch.Tensor | None, steps: int) -> torch.Tensor:
+    def sample_from_noise(
+        self,
+        head: nn.Module,
+        cond: torch.Tensor,
+        cond_mask: torch.Tensor,
+        noise: torch.Tensor | None,
+        steps: int,
+    ) -> torch.Tensor:
         """Euler integration of the learned velocity field from ``t = 0`` to ``1``."""
         x = noise
         for i in range(steps):

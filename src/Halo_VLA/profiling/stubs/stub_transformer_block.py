@@ -18,9 +18,9 @@ class StubTransformerBlock(nn.Module):
     def __init__(self, emb_dim: int, n_heads: int, mlp_dim: int) -> None:
         super().__init__()
         self.norm1 = nn.LayerNorm(emb_dim)
-        self.attn  = nn.MultiheadAttention(emb_dim, n_heads, batch_first=True)
+        self.attn = nn.MultiheadAttention(emb_dim, n_heads, batch_first=True)
         self.norm2 = nn.LayerNorm(emb_dim)
-        self.ff    = nn.Sequential(
+        self.ff = nn.Sequential(
             nn.Linear(emb_dim, mlp_dim),
             nn.GELU(),
             nn.Linear(mlp_dim, emb_dim),

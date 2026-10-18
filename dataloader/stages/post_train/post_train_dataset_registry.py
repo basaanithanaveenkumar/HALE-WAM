@@ -5,9 +5,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import torch
-from exceptions import DatasetError
 from loguru import logger
 from torch.utils.data import ConcatDataset, DataLoader
+
+from exceptions import DatasetError
 
 if TYPE_CHECKING:  # annotation only; the runtime import is lazy (import cycle)
     from .post_train_dataset_config import PostTrainDatasetConfig
@@ -95,8 +96,7 @@ POST_TRAIN_DATASETS: dict[str, dict[str, Any]] = {
     "airoa-task": {
         "hf_path": "airoa-org/airoa-moma",
         "description": (
-            "AIRoA-MoMA task-filtered episodes. "
-            "Set airoa_data_root to local LFS clone path."
+            "AIRoA-MoMA task-filtered episodes. Set airoa_data_root to local LFS clone path."
         ),
         "paper_reference": "AIRoA-MoMA (2024)",
         "n_episodes_approx": None,
@@ -218,6 +218,7 @@ class PostTrainDatasetRegistry:
         from .post_train_dataset_config import (
             PostTrainDatasetConfig,  # lazy: avoids an import cycle
         )
+
         self.cfg = PostTrainDatasetConfig(**config_overrides)
 
     def build(self) -> DataLoader:
@@ -238,8 +239,7 @@ class PostTrainDatasetRegistry:
                 local_root = getattr(self.cfg, local_path_key, None)
                 if not local_root:
                     logger.debug(
-                        "skipping local-collection dataset {!r} — "
-                        "set {} to enable it",
+                        "skipping local-collection dataset {!r} — set {} to enable it",
                         name,
                         local_path_key,
                     )
@@ -313,9 +313,7 @@ class PostTrainDatasetRegistry:
 class _HFRobotDataset(torch.utils.data.Dataset):
     """Thin wrapper that lazy-loads a HuggingFace robot dataset."""
 
-    def __init__(
-        self, *, name: str, spec: dict[str, Any], cfg: PostTrainDatasetConfig
-    ) -> None:
+    def __init__(self, *, name: str, spec: dict[str, Any], cfg: PostTrainDatasetConfig) -> None:
         self.name = name
         self.spec = spec
         self.cfg = cfg

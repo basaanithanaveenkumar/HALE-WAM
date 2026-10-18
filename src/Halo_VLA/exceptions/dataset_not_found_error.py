@@ -6,5 +6,4 @@ from exceptions.halo_vla_error import HaloVLAError
 
 
 class DatasetNotFoundError(HaloVLAError, FileNotFoundError):
-    """``data_root`` (or a dataset sub-path) does not exist or is not a directory.
-    """
+    """``data_root`` (or a dataset sub-path) does not exist or is not a directory."""

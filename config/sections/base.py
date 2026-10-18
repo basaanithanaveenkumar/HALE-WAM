@@ -24,7 +24,11 @@ class VLASection(StrictModel):
 
     def explicitly_set(self) -> dict[str, Any]:
         """Fields given in the YAML (or constructor), excluding nested sections."""
-        return {k: getattr(self, k) for k in self.model_fields_set if not isinstance(getattr(self, k), VLASection)}
+        return {
+            k: getattr(self, k)
+            for k in self.model_fields_set
+            if not isinstance(getattr(self, k), VLASection)
+        }
 
     def train_arguments(self) -> dict[str, Any]:
         """``{argparse dest: value}`` for this section and its nested sections."""
@@ -35,7 +39,9 @@ class VLASection(StrictModel):
 
     def model_overrides(self) -> dict[str, Any]:
         """``{HaloVLMConfig field: value}`` for this section and its nested sections."""
-        out = {self.OVERRIDES[k]: v for k, v in self.explicitly_set().items() if k in self.OVERRIDES}
+        out = {
+            self.OVERRIDES[k]: v for k, v in self.explicitly_set().items() if k in self.OVERRIDES
+        }
         for child in self._children():
             out.update(child.model_overrides())
         return out

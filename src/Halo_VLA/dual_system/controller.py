@@ -27,7 +27,9 @@ class DualSystemController:
         threaded: overlap System 2 with System 1 in a background thread.
     """
 
-    def __init__(self, model: DualSystemVLA, async_steps: int | None = None, threaded: bool = False) -> None:
+    def __init__(
+        self, model: DualSystemVLA, async_steps: int | None = None, threaded: bool = False
+    ) -> None:
         self.model = model.eval()
         self.async_steps = async_steps or model.config.async_steps
         self.threaded = threaded

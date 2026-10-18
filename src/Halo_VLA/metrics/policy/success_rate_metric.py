@@ -50,6 +50,6 @@ class SuccessRateMetric(RoboticsMetricBase):
         """
         return {
             "success_rate": self._n_success / max(self._n_total, 1),
-            "n_episodes":   float(self._n_total),
-            "n_success":    float(self._n_success),
+            "n_episodes": float(self._n_total),
+            "n_success": float(self._n_success),
         }

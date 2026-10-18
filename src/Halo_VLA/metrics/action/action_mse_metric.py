@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import math
-from typing import Optional
 
 import torch
 from torch import Tensor
@@ -39,9 +38,9 @@ class ActionMSEMetric(RoboticsMetricBase):
 
     def update(
         self,
-        pred: Tensor,                   # [B, T, action_dim]
-        target: Tensor,                 # [B, T, action_dim]
-        mask: Optional[Tensor] = None,  # [B, T]
+        pred: Tensor,  # [B, T, action_dim]
+        target: Tensor,  # [B, T, action_dim]
+        mask: Tensor | None = None,  # [B, T]
     ) -> None:
         """Accumulate one batch.
 
@@ -51,7 +50,7 @@ class ActionMSEMetric(RoboticsMetricBase):
             mask: ``[B, T]``, True where the timestep is valid (default: all valid).
         """
         sq_err = ((pred - target) ** 2).detach().cpu()  # [B, T, D]
-        flat = _apply_mask(sq_err, mask)                 # [N_valid, D]
+        flat = _apply_mask(sq_err, mask)  # [N_valid, D]
         self._total_sq += flat.sum(0)
         self._n += flat.shape[0]
 
@@ -62,7 +61,7 @@ class ActionMSEMetric(RoboticsMetricBase):
             ``action_mse`` and ``action_rmse``.
         """
         n = max(self._n, 1)
-        mean_sq = self._total_sq / n        # [D]
+        mean_sq = self._total_sq / n  # [D]
         mse = float(mean_sq.mean())
         rmse = math.sqrt(mse)
         return {

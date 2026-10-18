@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+
 import torch
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -75,11 +76,17 @@ def test_halo_vlm_multi_step_prediction_loss():
     visual_context_emb = torch.randn(B, cfg.emb_dim)
 
     # Without future frames there is nothing to predict.
-    zero, parts = model.compute_visual_prediction_loss(images, visual_context_emb=visual_context_emb)
+    zero, parts = model.compute_visual_prediction_loss(
+        images, visual_context_emb=visual_context_emb
+    )
     assert zero.item() == 0.0 and parts == {}
     # With 3 future frames the loss is a finite scalar over the predicted frames.
     loss, parts = model.compute_visual_prediction_loss(
-        images, visual_context_emb=visual_context_emb, future_frames=future_frames, perceptual_weight=0.0)
+        images,
+        visual_context_emb=visual_context_emb,
+        future_frames=future_frames,
+        perceptual_weight=0.0,
+    )
     assert isinstance(loss, torch.Tensor) and loss.dim() == 0 and torch.isfinite(loss) and loss > 0
     assert "loss_rgb_cfm" in parts
     print("test_halo_vlm_multi_step_prediction_loss passed.")
@@ -104,7 +111,9 @@ def test_halo_vlm_predict_visual_future_autoregressive():
     visual_context_emb = torch.randn(B, cfg.emb_dim)
 
     # Autoregressively predict 3 frames
-    preds = model.predict_visual_future(past_rgb, visual_context_emb=visual_context_emb, num_frames=3)
+    preds = model.predict_visual_future(
+        past_rgb, visual_context_emb=visual_context_emb, num_frames=3
+    )
     assert "rgb" in preds
     assert "depth" not in preds
     assert "flow" not in preds

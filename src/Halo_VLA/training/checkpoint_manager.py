@@ -7,13 +7,13 @@ from typing import Any
 
 import torch
 import torch.nn as nn
-from exceptions import CheckpointNotFoundError
 from loguru import logger
 from torch.amp import GradScaler
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
 from config import HaloVLMConfig
+from exceptions import CheckpointNotFoundError
 
 #: Checkpoint file stem; the epoch number follows (``halo_vla_epoch12.pt``).
 CHECKPOINT_PREFIX = "halo_vla_epoch"
@@ -55,8 +55,16 @@ class CheckpointManager:
         found = self.existing()
         return found[-1] if found else None
 
-    def save(self, epoch: int, global_step: int, network: nn.Module, optimizer: Optimizer,
-             scheduler: LRScheduler, scaler: GradScaler, config: HaloVLMConfig) -> Path:
+    def save(
+        self,
+        epoch: int,
+        global_step: int,
+        network: nn.Module,
+        optimizer: Optimizer,
+        scheduler: LRScheduler,
+        scaler: GradScaler,
+        config: HaloVLMConfig,
+    ) -> Path:
         """Write the checkpoint for ``epoch`` and prune old ones.
 
         Args:
@@ -100,8 +108,14 @@ class CheckpointManager:
             logger.info("Removed old checkpoint {}", old)
 
     @staticmethod
-    def restore(path: Path, network: nn.Module, optimizer: Optimizer, scheduler: LRScheduler,
-                scaler: GradScaler, device: torch.device) -> tuple[int, int]:
+    def restore(
+        path: Path,
+        network: nn.Module,
+        optimizer: Optimizer,
+        scheduler: LRScheduler,
+        scaler: GradScaler,
+        device: torch.device,
+    ) -> tuple[int, int]:
         """Load a checkpoint into the training objects.
 
         Args:
@@ -135,6 +149,10 @@ class CheckpointManager:
             scaler.load_state_dict(ckpt["scaler_state_dict"])
         global_step = ckpt.get("global_step", 0)
         start_epoch = ckpt.get("epoch", 0) + 1
-        logger.info("Resumed at epoch {} / global_step {}  (training from epoch {})",
-                    ckpt.get("epoch"), global_step, start_epoch)
+        logger.info(
+            "Resumed at epoch {} / global_step {}  (training from epoch {})",
+            ckpt.get("epoch"),
+            global_step,
+            start_epoch,
+        )
         return start_epoch, global_step

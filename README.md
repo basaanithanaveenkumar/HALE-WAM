@@ -193,7 +193,7 @@ from dual_system import DualSystemVLA, resolve_dual_system_config
 from models.halo_vla import HaloVLM
 
 model = HaloVLM(HaloVLMConfig(emb_dim=64, vit_num_layers=1, dec_num_layers=1, use_moe=False))
-dual = DualSystemVLA(model, resolve_dual_system_config("lcb"))      # any registered preset name
+dual = DualSystemVLA(model, resolve_dual_system_config("lcb"))  # any registered preset name
 ```
 
 See [docs/getting-started.md](docs/getting-started.md) for the full smoke test, and
@@ -332,7 +332,9 @@ config = HaloVLMConfig(
 
 ```python
 config = HaloVLMConfig(proj_type="qformer", qformer_num_queries=32, qformer_num_layers=2)
-config = HaloVLMConfig(proj_type="gated_cross_attention", gated_xattn_num_latents=32, gated_xattn_gate_init=0.0)
+config = HaloVLMConfig(
+    proj_type="gated_cross_attention", gated_xattn_num_latents=32, gated_xattn_gate_init=0.0
+)
 ```
 
 * **Q-Former** — learned queries self-attend and cross-attend to the patch features (every `qformer_cross_attention_freq`-th layer).

@@ -55,5 +55,5 @@ class TaskCompletionMetric(RoboticsMetricBase):
         n = max(self._n_episodes, 1)
         return {
             "task_completion_rate": self._total_completion / n,
-            "mean_subtasks_done":   self._total_subtasks_done / n,
+            "mean_subtasks_done": self._total_subtasks_done / n,
         }

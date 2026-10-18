@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import torch
 import torch.nn as nn
+
 from exceptions import HaloVLAConfigError
 
 from .qformer_layer import QFormerLayer
@@ -41,7 +42,9 @@ class QFormer(nn.Module):
         super().__init__()
         hidden_dim = hidden_dim or min(llm_dim, 768)
         if hidden_dim % num_heads:
-            raise HaloVLAConfigError(f"hidden_dim={hidden_dim} must be divisible by num_heads={num_heads}")
+            raise HaloVLAConfigError(
+                f"hidden_dim={hidden_dim} must be divisible by num_heads={num_heads}"
+            )
         if cross_attention_freq < 1:
             raise HaloVLAConfigError("cross_attention_freq must be >= 1")
         self.num_queries = num_queries

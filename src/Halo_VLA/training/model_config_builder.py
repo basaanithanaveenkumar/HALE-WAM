@@ -59,7 +59,10 @@ def build_model_config(args: argparse.Namespace) -> HaloVLMConfig:
     config.dual_system = args.dual_system
     config.dual_system_options = parse_overrides(args.dual_system_option) or None
     config.llm_attn_implementation = args.llm_attn_implementation
-    model_overrides = {**getattr(args, "model_overrides", {}), **parse_model_options(args.model_option)}
+    model_overrides = {
+        **getattr(args, "model_overrides", {}),
+        **parse_model_options(args.model_option),
+    }
     if model_overrides:
         apply_model_overrides(config, model_overrides)
         logger.info("HaloVLMConfig overrides: {}", model_overrides)

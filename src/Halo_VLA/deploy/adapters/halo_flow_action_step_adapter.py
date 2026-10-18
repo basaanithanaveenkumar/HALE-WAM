@@ -5,9 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 import torch
+from hale_core.deploy.core.io_signature import IOSignature
 from torch import nn
 
-from hale_core.deploy.core.io_signature import IOSignature
 from Halo_VLA.deploy.adapters.halo_adapter_base import HaloAdapterBase
 from Halo_VLA.deploy.registry import HALO_VLA_ADAPTERS
 
@@ -31,15 +31,27 @@ class HaloFlowActionStepAdapter(HaloAdapterBase):
         """Noisy action rows, time and context in; the velocity out."""
         cfg = self.model_config()
         flat = cfg.action_chunk_size * cfg.action_dim
-        return self.build_signature({
-            "inputs": [
-                {"name": "noisy_actions", "shape": ["rows", flat], "dtype": "float32", "value_range": [-2.0, 2.0]},
-                {"name": "t", "shape": ["rows"], "dtype": "float32", "value_range": [0.0, 1.0]},
-                {"name": "context", "shape": ["rows", cfg.emb_dim], "dtype": "float32", "value_range": [-1.0, 1.0]},
-            ],
-            "outputs": ["velocity"],
-            "dims": {"rows": [1, 1, self.max_rows]},
-        })
+        return self.build_signature(
+            {
+                "inputs": [
+                    {
+                        "name": "noisy_actions",
+                        "shape": ["rows", flat],
+                        "dtype": "float32",
+                        "value_range": [-2.0, 2.0],
+                    },
+                    {"name": "t", "shape": ["rows"], "dtype": "float32", "value_range": [0.0, 1.0]},
+                    {
+                        "name": "context",
+                        "shape": ["rows", cfg.emb_dim],
+                        "dtype": "float32",
+                        "value_range": [-1.0, 1.0],
+                    },
+                ],
+                "outputs": ["velocity"],
+                "dims": {"rows": [1, 1, self.max_rows]},
+            }
+        )
 
     def graph(self, model: nn.Module) -> nn.Module:
         """The flow-matching decoder."""

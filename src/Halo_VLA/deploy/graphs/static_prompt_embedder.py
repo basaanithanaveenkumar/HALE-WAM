@@ -43,8 +43,9 @@ class StaticPromptEmbedder(nn.Module):
         self.image_token_id = int(cfg.image_token_id)
         self.state_token_id = int(cfg.state_token_id)
 
-    def forward(self, images: torch.Tensor, input_ids: torch.Tensor,
-                states: torch.Tensor) -> tuple[torch.Tensor, int]:
+    def forward(
+        self, images: torch.Tensor, input_ids: torch.Tensor, states: torch.Tensor
+    ) -> tuple[torch.Tensor, int]:
         """Embed images, states and text into one sequence.
 
         Args:
@@ -77,11 +78,13 @@ class StaticPromptEmbedder(nn.Module):
         keep = (~(is_image | is_state)).unsqueeze(-1).to(text.dtype)
         text = text * keep
         # 4. state injection: k-th <state> token <- k-th state embedding (k < N_state).
-        rank = torch.cumsum(is_state.to(torch.int64), dim=1)                       # [B, L]
+        rank = torch.cumsum(is_state.to(torch.int64), dim=1)  # [B, L]
         slots = torch.arange(1, n_state + 1, device=input_ids.device).view(1, 1, n_state)
-        one_hot = ((rank.unsqueeze(-1) == slots) & is_state.unsqueeze(-1)).to(state_embeds.dtype)  # [B, L, S]
-        injected = torch.matmul(one_hot, state_embeds)                               # [B, L, D]
-        filled = one_hot.sum(-1, keepdim=True)                                       # 1 where injected
+        one_hot = ((rank.unsqueeze(-1) == slots) & is_state.unsqueeze(-1)).to(
+            state_embeds.dtype
+        )  # [B, L, S]
+        injected = torch.matmul(one_hot, state_embeds)  # [B, L, D]
+        filled = one_hot.sum(-1, keepdim=True)  # 1 where injected
         text = text * (1 - filled) + injected
         # 5. image patches prepended to the text / state sequence.
         return torch.cat([img_proj, text], dim=1), num_prefix

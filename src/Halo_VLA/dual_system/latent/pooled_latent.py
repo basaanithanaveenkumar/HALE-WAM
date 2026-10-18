@@ -39,4 +39,6 @@ class PooledLatent(LatentExtractor):
         hidden, mask = enc["hidden"], enc["mask"]
         probe = self.probe.expand(hidden.size(0), -1, -1)
         pooled, _ = self.attn(probe, hidden, hidden, key_padding_mask=mask == 0)
-        return self.norm(pooled), torch.ones(hidden.size(0), 1, device=hidden.device, dtype=mask.dtype)
+        return self.norm(pooled), torch.ones(
+            hidden.size(0), 1, device=hidden.device, dtype=mask.dtype
+        )

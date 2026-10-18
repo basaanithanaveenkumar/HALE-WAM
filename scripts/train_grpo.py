@@ -40,8 +40,8 @@ from loguru import logger
 
 from config import HaloVLMConfig
 from models.halo_vla import HaloVLM
-from rl.policy import GaussianActionPolicy
 from rl.grpo import compute_grpo_loss
+from rl.policy import GaussianActionPolicy
 from rl.rewards import negative_distance_reward
 
 
@@ -79,7 +79,8 @@ def main() -> None:
     logger.info("Device: {}", device)
 
     config = HaloVLMConfig(
-        action_dim=args.action_dim, state_dim=args.state_dim,
+        action_dim=args.action_dim,
+        state_dim=args.state_dim,
         action_chunk_size=args.action_chunk_size,
     )
 
@@ -104,7 +105,7 @@ def main() -> None:
             cond = GaussianActionPolicy.conditioning_from_halo(model, batch, device=device)
 
             actions = batch["actions"].to(device)
-            target = actions[:, :config.action_chunk_size].reshape(actions.size(0), -1)
+            target = actions[:, : config.action_chunk_size].reshape(actions.size(0), -1)
             if target.size(1) < flat_dim:
                 pad = torch.zeros(target.size(0), flat_dim - target.size(1), device=device)
                 target = torch.cat([target, pad], dim=1)
@@ -112,14 +113,21 @@ def main() -> None:
 
             # reward_fn must broadcast the per-state target across the G group
             # samples; group i shares target row i.
-            def reward_fn(a: torch.Tensor, _t: torch.Tensor = target, _g: int = args.group_size) -> torch.Tensor:
+            def reward_fn(
+                a: torch.Tensor, _t: torch.Tensor = target, _g: int = args.group_size
+            ) -> torch.Tensor:
                 """Negative distance of each sampled action to its state's target (``_g`` per state)."""
                 tgt = _t.repeat_interleave(_g, dim=0)
                 return negative_distance_reward(a, tgt, offset=args.reward_offset)
 
             loss, metrics = compute_grpo_loss(
-                policy, ref_policy, cond, reward_fn,
-                group_size=args.group_size, clip_eps=args.clip_eps, kl_beta=args.kl_beta,
+                policy,
+                ref_policy,
+                cond,
+                reward_fn,
+                group_size=args.group_size,
+                clip_eps=args.clip_eps,
+                kl_beta=args.kl_beta,
             )
             optim.zero_grad()
             loss.backward()
@@ -133,8 +141,12 @@ def main() -> None:
                 logger.info(
                     "step {} | loss {:.4f} | surrogate {:.4f} | kl {:.5f} | "
                     "ratio {:.3f} | reward {:.3f}",
-                    step, metrics["loss"], metrics["surrogate"], metrics["kl"],
-                    metrics["ratio_mean"], metrics["reward_mean"],
+                    step,
+                    metrics["loss"],
+                    metrics["surrogate"],
+                    metrics["kl"],
+                    metrics["ratio_mean"],
+                    metrics["reward_mean"],
                 )
             if step >= args.steps:
                 logger.info("Reached --steps={}; stopping.", args.steps)
@@ -165,8 +177,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--group_size", type=int, default=8, help="Samples G per state")
     p.add_argument("--clip_eps", type=float, default=0.2)
     p.add_argument("--kl_beta", type=float, default=0.04)
-    p.add_argument("--ref_refresh", type=int, default=20,
-                   help="Sync the reference policy to the current policy every N steps")
+    p.add_argument(
+        "--ref_refresh",
+        type=int,
+        default=20,
+        help="Sync the reference policy to the current policy every N steps",
+    )
     p.add_argument("--reward_offset", type=float, default=0.0)
     p.add_argument("--log_every", type=int, default=5)
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")

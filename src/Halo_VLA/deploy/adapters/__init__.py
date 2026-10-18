@@ -28,7 +28,15 @@ from Halo_VLA.deploy.adapters.halo_perception_adapter import HaloPerceptionAdapt
 from Halo_VLA.deploy.adapters.observation_prompt_adapter import ObservationPromptAdapter
 
 __all__ = [
-    "DualSystem1ActionStepAdapter", "DualSystem1ObserverAdapter", "DualSystem1PolicyAdapter",
-    "DualSystem2EncoderAdapter", "DualSystemPolicyAdapter", "HaloAdapterBase", "HaloFlowActionStepAdapter",
-    "HaloFlowPolicyAdapter", "HaloLanguageModelAdapter", "HaloPerceptionAdapter", "ObservationPromptAdapter",
+    "DualSystem1ActionStepAdapter",
+    "DualSystem1ObserverAdapter",
+    "DualSystem1PolicyAdapter",
+    "DualSystem2EncoderAdapter",
+    "DualSystemPolicyAdapter",
+    "HaloAdapterBase",
+    "HaloFlowActionStepAdapter",
+    "HaloFlowPolicyAdapter",
+    "HaloLanguageModelAdapter",
+    "HaloPerceptionAdapter",
+    "ObservationPromptAdapter",
 ]

@@ -23,13 +23,13 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src" / "Halo_VLA"))
 
+import torch.nn as nn
+from loguru import logger
+
 from config import HaloVLMConfig
 from dataloader.eo_dataset import build_eo_dataloader
 from models.dit_frame_prediction import VisualDiTPredictor
 
-
-import torch.nn as nn
-from loguru import logger
 
 class FrameContextEncoder(nn.Module):
     """
@@ -80,7 +80,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     p.add_argument("--batch_size", type=int, default=2)
     p.add_argument("--lr", type=float, default=3e-4)
-    p.add_argument("--steps", type=int, default=50, help="Max optimisation steps (early stop if dataset ends)")
+    p.add_argument(
+        "--steps", type=int, default=50, help="Max optimisation steps (early stop if dataset ends)"
+    )
     p.add_argument("--subset", default="interleave-temporal")
     p.add_argument("--max_samples", type=int, default=64)
     return p.parse_args()
@@ -91,11 +93,11 @@ def main() -> None:
     args = parse_args()
     device = torch.device(args.device)
     cfg = HaloVLMConfig()
-    
+
     # Standalone context encoder
     context_encoder = FrameContextEncoder(emb_dim=cfg.emb_dim).to(device)
     model = VisualDiTPredictor(cfg).to(device)
-    
+
     # Train both the predictor and the context encoder
     opt = AdamW(list(model.parameters()) + list(context_encoder.parameters()), lr=args.lr)
 
@@ -122,7 +124,7 @@ def main() -> None:
                 continue
             past = images[:, :-1]
             future = images[:, -1]
-            
+
             # Encode context standalone and compute losses
             ctx = context_encoder(past)
             losses = model.compute_losses(past, future, ctx)

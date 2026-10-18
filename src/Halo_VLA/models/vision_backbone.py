@@ -43,8 +43,6 @@ Config-driven:
 
 from __future__ import annotations
 
-from typing import Optional
-
 import torch
 import torch.nn as nn
 from torch import Tensor
@@ -86,13 +84,13 @@ class HaloVisionBackbone(nn.Module):
 
     def __init__(
         self,
-        backbone_name:       str          = "convnext_base",
-        img_size:            int          = 224,
-        freeze_encoder:      bool         = True,
-        freeze_up_to_stage:  int          = -1,
-        pretrained_path:     Optional[str] = None,
-        return_patch_tokens: bool          = True,
-        proj_dim:            Optional[int] = None,
+        backbone_name: str = "convnext_base",
+        img_size: int = 224,
+        freeze_encoder: bool = True,
+        freeze_up_to_stage: int = -1,
+        pretrained_path: str | None = None,
+        return_patch_tokens: bool = True,
+        proj_dim: int | None = None,
     ) -> None:
         super().__init__()
 
@@ -104,13 +102,14 @@ class HaloVisionBackbone(nn.Module):
             img_size=img_size,
             in_chans=3,
         )
-        self.backbone_name       = backbone_name
+        self.backbone_name = backbone_name
         self.return_patch_tokens = return_patch_tokens
-        self._freeze_encoder     = freeze_encoder
+        self._freeze_encoder = freeze_encoder
 
         # Load custom weights if provided
         if pretrained_path:
             from hale_core.config.sections.backbone import _load_pretrained
+
             _load_pretrained(self.backbone, pretrained_path)
 
         # Freezing
@@ -123,7 +122,7 @@ class HaloVisionBackbone(nn.Module):
         # ── Optional projection layer ─────────────────────────────────────────
         # Projects backbone token dimension to a target LLM dimension.
         # E.g., ConvNeXt-base has embed_dim=1024; LLM might expect 2048 → use proj_dim=2048.
-        self.proj: Optional[nn.Linear]
+        self.proj: nn.Linear | None
         if proj_dim is not None:
             self.proj = nn.Linear(self.backbone.embed_dim, proj_dim, bias=False)
             self._out_dim = proj_dim
@@ -136,7 +135,7 @@ class HaloVisionBackbone(nn.Module):
         """Dimension of each output token."""
         return self._out_dim
 
-    def train(self, mode: bool = True) -> "HaloVisionBackbone":
+    def train(self, mode: bool = True) -> HaloVisionBackbone:
         """Switch train / eval; a frozen backbone stays in eval mode."""
         super().train(mode)
         if self._freeze_encoder:
@@ -158,11 +157,11 @@ class HaloVisionBackbone(nn.Module):
             # Multi-frame: flatten B and T, process independently, then restore
             B, T, C, H, W = images.shape
             images_flat = images.view(B * T, C, H, W)
-            tokens_flat = self._encode_single(images_flat)   # [B*T, N, D]
+            tokens_flat = self._encode_single(images_flat)  # [B*T, N, D]
             N, D = tokens_flat.shape[1], tokens_flat.shape[2]
-            tokens = tokens_flat.view(B, T * N, D)           # [B, T*N, D]
+            tokens = tokens_flat.view(B, T * N, D)  # [B, T*N, D]
         else:
-            tokens = self._encode_single(images)             # [B, N, D]
+            tokens = self._encode_single(images)  # [B, N, D]
 
         if self.proj is not None:
             tokens = self.proj(tokens)
@@ -185,16 +184,16 @@ class HaloVisionBackbone(nn.Module):
 
         # ViT / DINOv2 / EVA-02 / DeiT-III: patch tokens available directly
         if self.return_patch_tokens and out.patch_tokens is not None:
-            return out.patch_tokens                          # [B, N, D]
+            return out.patch_tokens  # [B, N, D]
 
         # CNN backbones: use finest feature map as token grid
         if out.feature_maps:
-            feat = out.feature_maps[0]                      # [B, C, H', W']
+            feat = out.feature_maps[0]  # [B, C, H', W']
             B, C, H, W = feat.shape
-            return feat.flatten(2).transpose(1, 2)          # [B, H'*W', C]
+            return feat.flatten(2).transpose(1, 2)  # [B, H'*W', C]
 
         # Fallback: single pooled token
-        return out.pooled_output.unsqueeze(1)                # [B, 1, D]
+        return out.pooled_output.unsqueeze(1)  # [B, 1, D]
 
     def __repr__(self) -> str:
         return (
@@ -206,13 +205,13 @@ class HaloVisionBackbone(nn.Module):
 
 
 def build_halo_vision_backbone(
-    backbone_name:       str          = "convnext_base",
-    img_size:            int          = 224,
-    freeze_encoder:      bool         = True,
-    freeze_up_to_stage:  int          = -1,
-    pretrained_path:     Optional[str] = None,
-    return_patch_tokens: bool          = True,
-    proj_dim:            Optional[int] = None,
+    backbone_name: str = "convnext_base",
+    img_size: int = 224,
+    freeze_encoder: bool = True,
+    freeze_up_to_stage: int = -1,
+    pretrained_path: str | None = None,
+    return_patch_tokens: bool = True,
+    proj_dim: int | None = None,
 ) -> HaloVisionBackbone:
     """Factory function for HaloVisionBackbone.
 

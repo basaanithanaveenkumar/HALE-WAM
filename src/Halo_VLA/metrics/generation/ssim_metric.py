@@ -12,15 +12,15 @@ from ..base import RoboticsMetricBase
 def _gaussian_kernel(kernel_size: int = 11, sigma: float = 1.5) -> Tensor:
     """1D Gaussian weights → outer-product to get 2D kernel."""
     coords = torch.arange(kernel_size, dtype=torch.float32) - kernel_size // 2
-    g = torch.exp(-(coords ** 2) / (2 * sigma ** 2))
+    g = torch.exp(-(coords**2) / (2 * sigma**2))
     g = g / g.sum()
     return g.outer(g)  # [K, K]
 
 
 def _ssim_map(
-    pred: Tensor,   # [B, C, H, W]
-    target: Tensor, # [B, C, H, W]
-    kernel: Tensor, # [K, K]
+    pred: Tensor,  # [B, C, H, W]
+    target: Tensor,  # [B, C, H, W]
+    kernel: Tensor,  # [K, K]
 ) -> Tensor:
     """Compute per-pixel SSIM map and return the mean over spatial dims."""
     B, C, H, W = pred.shape
@@ -36,21 +36,21 @@ def _ssim_map(
 
     mu1 = smooth(pred)
     mu2 = smooth(target)
-    mu1_sq = mu1 ** 2
-    mu2_sq = mu2 ** 2
+    mu1_sq = mu1**2
+    mu2_sq = mu2**2
     mu1_mu2 = mu1 * mu2
 
-    sigma1_sq = smooth(pred ** 2) - mu1_sq
-    sigma2_sq = smooth(target ** 2) - mu2_sq
-    sigma12   = smooth(pred * target) - mu1_mu2
+    sigma1_sq = smooth(pred**2) - mu1_sq
+    sigma2_sq = smooth(target**2) - mu2_sq
+    sigma12 = smooth(pred * target) - mu1_mu2
 
     # SSIM constants (Luminance/Contrast stabilisation; Wang et al. 2004)
-    C1 = (0.01 * 1.0) ** 2   # k1=0.01, L=1
-    C2 = (0.03 * 1.0) ** 2   # k2=0.03
+    C1 = (0.01 * 1.0) ** 2  # k1=0.01, L=1
+    C2 = (0.03 * 1.0) ** 2  # k2=0.03
 
-    numerator   = (2 * mu1_mu2 + C1) * (2 * sigma12 + C2)
+    numerator = (2 * mu1_mu2 + C1) * (2 * sigma12 + C2)
     denominator = (mu1_sq + mu2_sq + C1) * (sigma1_sq + sigma2_sq + C2)
-    ssim_map    = numerator / denominator.clamp(min=1e-8)
+    ssim_map = numerator / denominator.clamp(min=1e-8)
     return ssim_map.mean()
 
 

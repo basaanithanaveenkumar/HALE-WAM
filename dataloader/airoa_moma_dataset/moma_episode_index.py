@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from loguru import logger
 
@@ -15,7 +15,7 @@ class MomaEpisodeIndexMixin:
     Mixed into :class:`AiroaMomaDataset`; relies on the attributes its ``__init__`` sets.
     """
 
-    def _load_episodes(self) -> List[Dict[str, Any]]:
+    def _load_episodes(self) -> list[dict[str, Any]]:
         """Return a list of episode dicts, trying sources in priority order."""
         # 1. Try lerobot-format parquet under meta/episodes/
         parquet_dir = self.root / "meta" / "episodes"
@@ -52,7 +52,7 @@ class MomaEpisodeIndexMixin:
         )
         return []
 
-    def _load_episodes_parquet(self, parquet_dir: Path) -> List[Dict[str, Any]]:
+    def _load_episodes_parquet(self, parquet_dir: Path) -> list[dict[str, Any]]:
         """Read all parquet files under meta/episodes/ using pyarrow (no pandas)."""
         try:
             import pyarrow.parquet as pq  # type: ignore
@@ -61,9 +61,9 @@ class MomaEpisodeIndexMixin:
             return []
 
         # Load optional task index → task string mapping
-        task_map: Dict[int, str] = self._load_task_map()
+        task_map: dict[int, str] = self._load_task_map()
 
-        rows: List[Dict[str, Any]] = []
+        rows: list[dict[str, Any]] = []
         for pq_file in sorted(parquet_dir.rglob("*.parquet")):
             try:
                 table = pq.read_table(pq_file)
@@ -72,7 +72,7 @@ class MomaEpisodeIndexMixin:
                 continue
             names = table.schema.names
             for i in range(table.num_rows):
-                rec: Dict[str, Any] = {}
+                rec: dict[str, Any] = {}
                 for col in names:
                     val = table[col][i].as_py()
                     rec[col] = val
@@ -99,20 +99,23 @@ class MomaEpisodeIndexMixin:
         rows.sort(key=lambda r: int(r.get("episode_index", 0)))
         return rows
 
-    def _load_task_map(self) -> Dict[int, str]:
+    def _load_task_map(self) -> dict[int, str]:
         """Load meta/tasks.parquet → {task_index: task_string}. Best-effort."""
         tasks_pq = self.root / "meta" / "tasks.parquet"
         if not tasks_pq.is_file():
             return {}
         try:
             import pyarrow.parquet as pq  # type: ignore
+
             table = pq.read_table(tasks_pq)
-            task_map: Dict[int, str] = {}
+            task_map: dict[int, str] = {}
             names = table.schema.names
             idx_col = "task_index" if "task_index" in names else (names[0] if names else None)
             txt_col = (
-                "task" if "task" in names
-                else "short_horizon_task" if "short_horizon_task" in names
+                "task"
+                if "task" in names
+                else "short_horizon_task"
+                if "short_horizon_task" in names
                 else (names[1] if len(names) > 1 else None)
             )
             if idx_col and txt_col:
@@ -126,13 +129,14 @@ class MomaEpisodeIndexMixin:
             logger.warning("Could not load tasks.parquet: {}", exc)
             return {}
 
-    def _scan_video_files(self) -> List[Dict[str, Any]]:
+    def _scan_video_files(self) -> list[dict[str, Any]]:
         """Pure-stdlib fallback: discover episodes from video files on disk."""
         import re
+
         videos_root = self.root / "videos" / f"observation.image.{self.cfg.camera}"
         if not videos_root.is_dir():
             return []
-        rows: List[Dict[str, Any]] = []
+        rows: list[dict[str, Any]] = []
         for chunk_dir in sorted(videos_root.glob("chunk-*")):
             m = re.search(r"chunk-(\d+)", chunk_dir.name)
             if not m:
@@ -144,19 +148,21 @@ class MomaEpisodeIndexMixin:
                     continue
                 file_num = int(fm.group(1))
                 ep_idx = chunk_idx * self.cfg.episodes_per_chunk + file_num
-                rows.append({
-                    "episode_index": ep_idx,
-                    "length": 0,
-                    "tasks": ["manipulation"],
-                    "video_rel_path": str(mp4.relative_to(self.root)),
-                })
+                rows.append(
+                    {
+                        "episode_index": ep_idx,
+                        "length": 0,
+                        "tasks": ["manipulation"],
+                        "video_rel_path": str(mp4.relative_to(self.root)),
+                    }
+                )
         rows.sort(key=lambda r: r["episode_index"])
         return rows
 
-    def _load_episodes_jsonl(self, path: Path) -> List[Dict[str, Any]]:
+    def _load_episodes_jsonl(self, path: Path) -> list[dict[str, Any]]:
         """Legacy loader for episodes.jsonl."""
-        rows: List[Dict[str, Any]] = []
-        with open(path, "r", encoding="utf-8") as f:
+        rows: list[dict[str, Any]] = []
+        with open(path, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if not line:
@@ -165,7 +171,7 @@ class MomaEpisodeIndexMixin:
         rows.sort(key=lambda r: int(r.get("episode_index", 0)))
         return rows
 
-    def _filter_episodes(self, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _filter_episodes(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         ok = []
         for m in rows:
             ep = int(m.get("episode_index", -1))
@@ -183,13 +189,13 @@ class MomaEpisodeIndexMixin:
             logger.info(f"Loaded {len(ok)} episodes with verified video paths.")
         return ok
 
-    def _video_path(self, episode_index: int, meta: Optional[Dict[str, Any]] = None) -> Path:
+    def _video_path(self, episode_index: int, meta: dict[str, Any] | None = None) -> Path:
         # Prefer the explicit relative path written by generate_episodes_jsonl.py
         if meta is not None and meta.get("video_rel_path"):
             return self.root / meta["video_rel_path"]
         # Fallback: reconstruct from episode_index using the template
         chunk = int(episode_index) // self.cfg.episodes_per_chunk
-        file_num = int(episode_index) % self.cfg.episodes_per_chunk   # 0–999 per chunk
+        file_num = int(episode_index) % self.cfg.episodes_per_chunk  # 0–999 per chunk
         rel = self.cfg.video_rel_template.format(
             chunk=chunk,
             camera=self.cfg.camera,

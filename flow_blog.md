@@ -17,7 +17,7 @@ This pairing sets up the endpoints of the straight path the model will learn to 
 ```python
 # Sample a noise point and a real data point
 x0 = sample_gaussian_noise(shape)  # e.g., np.random.randn(*shape)
-x1 = sample_from_dataset()         # e.g., next(iter(dataloader))
+x1 = sample_from_dataset()  # e.g., next(iter(dataloader))
 ```
 
 ---

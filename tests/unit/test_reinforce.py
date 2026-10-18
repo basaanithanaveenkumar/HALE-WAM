@@ -18,9 +18,9 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src" / "Halo_VLA"))
 
 from rl.policy import GaussianActionPolicy
-from rl.value_baseline import ValueBaseline
 from rl.reinforce import compute_reinforce_loss
 from rl.rewards import negative_distance_reward
+from rl.value_baseline import ValueBaseline
 
 
 def test_policy_shapes_and_gradients():
@@ -120,8 +120,13 @@ def test_baseline_reduces_gradient_variance():
         policy.zero_grad()
         value.zero_grad()
         loss, _ = compute_reinforce_loss(
-            policy, value, cond, reward_fn,
-            use_baseline=use_baseline, entropy_coef=0.0, value_coef=0.0,
+            policy,
+            value,
+            cond,
+            reward_fn,
+            use_baseline=use_baseline,
+            entropy_coef=0.0,
+            value_coef=0.0,
         )
         loss.backward()
         return torch.cat([p.grad.flatten() for p in policy.parameters()])
@@ -133,8 +138,10 @@ def test_baseline_reduces_gradient_variance():
     var_with = grad_variance(True)
     var_without = grad_variance(False)
     assert var_with < var_without, f"with={var_with} should be < without={var_without}"
-    print(f"test_baseline_reduces_gradient_variance passed "
-          f"(with={var_with:.3g} < without={var_without:.3g}).")
+    print(
+        f"test_baseline_reduces_gradient_variance passed "
+        f"(with={var_with:.3g} < without={var_without:.3g})."
+    )
 
 
 def test_advantage_sign_matches_reward_ordering():
@@ -142,8 +149,8 @@ def test_advantage_sign_matches_reward_ordering():
     torch.manual_seed(0)
     A = 4
     target = torch.zeros(A)
-    good = torch.full((1, A), 0.1)   # near target -> high reward
-    bad = torch.full((1, A), 5.0)    # far  target -> low  reward
+    good = torch.full((1, A), 0.1)  # near target -> high reward
+    bad = torch.full((1, A), 5.0)  # far  target -> low  reward
     r_good = negative_distance_reward(good, target)
     r_bad = negative_distance_reward(bad, target)
     assert r_good.item() > r_bad.item()

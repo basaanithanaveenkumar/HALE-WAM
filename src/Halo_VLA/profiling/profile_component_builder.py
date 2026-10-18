@@ -68,8 +68,11 @@ def _build_decoder(b: ProfileComponentBuilder):
 @PROFILE_COMPONENTS.register_module(name="vla")
 def _build_vla(b: ProfileComponentBuilder):
     model = StubHaloVLA(
-        emb_dim=b.emb_dim, n_vit_layers=b.n_layers, n_dec_layers=b.n_layers,
-        n_heads=b.n_heads, mlp_dim=b.mlp_dim,
+        emb_dim=b.emb_dim,
+        n_vit_layers=b.n_layers,
+        n_dec_layers=b.n_layers,
+        n_heads=b.n_heads,
+        mlp_dim=b.mlp_dim,
     )
     images = torch.randn(b.batch_size, 3, IMAGE_SIZE, IMAGE_SIZE)
     return model, (images, torch.randn(b.batch_size, b.emb_dim))

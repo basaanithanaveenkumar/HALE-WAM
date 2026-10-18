@@ -10,8 +10,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from training.ray_cli import RayCliOptions
 from exceptions import HaloVLAConfigError, TrainingEntryError
+from training.ray_cli import RayCliOptions
 
 #: Module name under which a training *script* (``path/to/train.py``) is imported in a worker.
 _SCRIPT_MODULE = "halo_vla_ray_entry"
@@ -26,7 +26,9 @@ def resolve_entry(entry: str) -> Callable[[argparse.Namespace], Any]:
     """
     target, sep, name = entry.rpartition(":")
     if not sep or not target or not name:
-        raise HaloVLAConfigError(f"entry must look like 'path/to/script.py:train' or 'pkg.mod:train', got {entry!r}")
+        raise HaloVLAConfigError(
+            f"entry must look like 'path/to/script.py:train' or 'pkg.mod:train', got {entry!r}"
+        )
     if target.endswith(".py"):
         module = sys.modules.get(_SCRIPT_MODULE)
         if module is None or getattr(module, "__file__", None) != str(Path(target).resolve()):

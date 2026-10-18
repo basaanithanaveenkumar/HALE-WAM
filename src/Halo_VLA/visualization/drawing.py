@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import textwrap
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from loguru import logger
@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 def _import_cv2():
     try:
         import cv2
+
         return cv2
     except ImportError as exc:
         from hale_core.exceptions import MissingDependencyError
@@ -28,13 +29,16 @@ def _import_cv2():
 
 def _import_matplotlib():
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+
     return plt
 
 
 def _import_pil():
     from PIL import Image, ImageDraw, ImageFont
+
     return Image, ImageDraw, ImageFont
 
 
@@ -43,7 +47,7 @@ def _import_pil():
 # supports Latin + extended characters, so curly-quotes, em-dashes, arrows
 # etc. render properly instead of as ??? boxes.
 # ---------------------------------------------------------------------------
-_FONT_CACHE: Dict[Tuple[str, int], "object"] = {}
+_FONT_CACHE: dict[tuple[str, int], object] = {}
 
 
 _FONT_CANDIDATES_REGULAR = [
@@ -83,7 +87,7 @@ def get_font(size: int, bold: bool = False) -> Any:
     return font
 
 
-def wrap_text(text: str, max_chars: int = 60) -> List[str]:
+def wrap_text(text: str, max_chars: int = 60) -> list[str]:
     """Wrap ``text`` to lines of at most ``max_chars`` characters (an empty text gives ``[""]``)."""
     return textwrap.wrap(text, width=max_chars) or [""]
 
@@ -105,8 +109,9 @@ def _pil_to_bgr(img: PILImage) -> np.ndarray:
     return arr[:, :, ::-1].copy()
 
 
-def draw_header(img: PILImage, phase: str, sub: str = "",
-                accent: Tuple[int, int, int] = (96, 200, 255)) -> None:
+def draw_header(
+    img: PILImage, phase: str, sub: str = "", accent: tuple[int, int, int] = (96, 200, 255)
+) -> None:
     """Draw a slim gradient header strip with phase label and an optional sub-label."""
     Image, ImageDraw, _ = _import_pil()
     W, H = img.size
@@ -137,17 +142,16 @@ def draw_header(img: PILImage, phase: str, sub: str = "",
         right_pad = 16
         bbox = draw.textbbox((0, 0), sub, font=sub_font)
         tw = bbox[2] - bbox[0]
-        draw.text((W - tw - right_pad, 11), sub, font=sub_font,
-                  fill=(220, 230, 245))
+        draw.text((W - tw - right_pad, 11), sub, font=sub_font, fill=(220, 230, 245))
     return bar_h
 
 
 # Ordered phase labels and their accent colours for the PRAI bar.
 _PRAI_PHASES = [
-    ("01", "PERCEIVE", (96, 200, 255)),    # cyan
-    ("02", "REASON",   (160, 120, 255)),   # purple
-    ("03", "ACT",      (255, 180, 80)),    # orange
-    ("04", "IMAGINE",  (130, 235, 170)),   # green
+    ("01", "PERCEIVE", (96, 200, 255)),  # cyan
+    ("02", "REASON", (160, 120, 255)),  # purple
+    ("03", "ACT", (255, 180, 80)),  # orange
+    ("04", "IMAGINE", (130, 235, 170)),  # green
 ]
 
 
@@ -172,13 +176,13 @@ def draw_prai_bar(img: PILImage, active_phase: int = 0) -> None:
     n = len(_PRAI_PHASES)
     seg_w = W // n
 
-    num_font   = get_font(9,  bold=True)
+    num_font = get_font(9, bold=True)
     label_font = get_font(12, bold=True)
 
     for i, (num, label, accent) in enumerate(_PRAI_PHASES):
         x0 = i * seg_w
         x1 = (i + 1) * seg_w if i < n - 1 else W
-        is_active = (i == active_phase)
+        is_active = i == active_phase
 
         if is_active:
             # Subtle tinted fill
@@ -195,23 +199,22 @@ def draw_prai_bar(img: PILImage, active_phase: int = 0) -> None:
             img.paste(tint, (x0, bar_y), tint)
 
             text_col = accent + (255,)
-            num_col  = (accent[0], accent[1], accent[2], 170)
+            num_col = (accent[0], accent[1], accent[2], 170)
         else:
             text_col = (75, 85, 110, 255)
-            num_col  = (50, 60, 80, 255)
+            num_col = (50, 60, 80, 255)
 
         # Small "01" number in top-left of segment
         draw.text((x0 + 8, bar_y + 3), num, font=num_font, fill=num_col)
 
         # Centred phase label
-        bb  = draw.textbbox((0, 0), label, font=label_font)
+        bb = draw.textbbox((0, 0), label, font=label_font)
         tw, th = bb[2] - bb[0], bb[3] - bb[1]
         cx = x0 + (x1 - x0) // 2 - tw // 2
         cy = bar_y + (bar_h - th) // 2
 
         if is_active:
-            draw.text((cx + 1, cy + 1), label, font=label_font,
-                      fill=(0, 0, 0, 160))
+            draw.text((cx + 1, cy + 1), label, font=label_font, fill=(0, 0, 0, 160))
         draw.text((cx, cy), label, font=label_font, fill=text_col)
 
         # Chevron separator
@@ -224,14 +227,20 @@ def draw_prai_bar(img: PILImage, active_phase: int = 0) -> None:
             )
 
     # Bottom divider hairline
-    draw.line((0, bar_y + bar_h - 1, W, bar_y + bar_h - 1),
-              fill=(35, 50, 75, 200), width=1)
+    draw.line((0, bar_y + bar_h - 1, W, bar_y + bar_h - 1), fill=(35, 50, 75, 200), width=1)
 
 
-def draw_panel(img: PILImage, lines: List[Tuple[str, Tuple[int, int, int], bool]],
-               anchor: str = "bottom", padding: int = 14, line_gap: int = 6,
-               font_size: int = 17, label_font_size: int = 15,
-               max_chars: int = 70, min_top: int = 44) -> None:
+def draw_panel(
+    img: PILImage,
+    lines: list[tuple[str, tuple[int, int, int], bool]],
+    anchor: str = "bottom",
+    padding: int = 14,
+    line_gap: int = 6,
+    font_size: int = 17,
+    label_font_size: int = 15,
+    max_chars: int = 70,
+    min_top: int = 44,
+) -> None:
     """
     Draw a translucent rounded panel containing labelled text lines.
 
@@ -245,7 +254,7 @@ def draw_panel(img: PILImage, lines: List[Tuple[str, Tuple[int, int, int], bool]
     label_font = get_font(label_font_size, bold=True)
 
     # Resolve wrapped text rows up-front so we can size the panel.
-    rendered_rows: List[Tuple[str, Tuple[int, int, int], object, int]] = []
+    rendered_rows: list[tuple[str, tuple[int, int, int], object, int]] = []
     for text, colour, is_label in lines:
         font = label_font if is_label else body_font
         for chunk in wrap_text(text, max_chars=max_chars):
@@ -302,21 +311,19 @@ def draw_correctness_badge(img: PILImage, is_correct: bool, top: int) -> None:
     y0 = top + 2
     y1 = y0 + th + pad_y * 2
     try:
-        draw.rounded_rectangle((x0, y0, x1, y1), radius=10,
-                               fill=colour + (220,))
+        draw.rounded_rectangle((x0, y0, x1, y1), radius=10, fill=colour + (220,))
     except AttributeError:
         draw.rectangle((x0, y0, x1, y1), fill=colour + (220,))
-    draw.text((x0 + pad_x, y0 + pad_y - 1), label, font=font,
-              fill=(255, 255, 255, 255))
+    draw.text((x0 + pad_x, y0 + pad_y - 1), label, font=font, fill=(255, 255, 255, 255))
 
 
 def compose_frame(
     bgr_frame: np.ndarray,
     phase_label: str,
     sub_label: str,
-    panel_lines: List[Tuple[str, Tuple[int, int, int], bool]],
-    is_correct: Optional[bool] = None,
-    accent: Tuple[int, int, int] = (96, 200, 255),
+    panel_lines: list[tuple[str, tuple[int, int, int], bool]],
+    is_correct: bool | None = None,
+    accent: tuple[int, int, int] = (96, 200, 255),
     active_phase: int = 0,
 ) -> np.ndarray:
     """Render header + PRAI bar + bottom info panel onto an image frame. Returns BGR uint8."""
@@ -330,8 +337,7 @@ def compose_frame(
     return _pil_to_bgr(img)
 
 
-def add_divider(top_img: np.ndarray, bottom_img: np.ndarray,
-                divider_height: int = 6) -> np.ndarray:
+def add_divider(top_img: np.ndarray, bottom_img: np.ndarray, divider_height: int = 6) -> np.ndarray:
     """Stack two BGR images with a thin gradient divider in between."""
     _, w, _ = top_img.shape
     divider = np.zeros((divider_height, w, 3), dtype=np.uint8)

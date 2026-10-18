@@ -23,8 +23,14 @@ class HeadAttn(nn.Module):
         return_attn_weights: also return the ``[B, L, L]`` attention weights.
     """
 
-    def __init__(self, emb_dim: int = 256, head_size: int = 16, drop_fact: float = 0.0, causal_mask: bool = False,
-                 return_attn_weights: bool = False) -> None:
+    def __init__(
+        self,
+        emb_dim: int = 256,
+        head_size: int = 16,
+        drop_fact: float = 0.0,
+        causal_mask: bool = False,
+        return_attn_weights: bool = False,
+    ) -> None:
         super().__init__()
         self.em_dim = emb_dim
 
@@ -37,8 +43,9 @@ class HeadAttn(nn.Module):
         self.dropout = nn.Dropout(drop_fact)
         self.return_attn_weights = return_attn_weights
 
-    def forward(self, inputs: torch.Tensor,
-                pad_mask: torch.Tensor | None = None) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self, inputs: torch.Tensor, pad_mask: torch.Tensor | None = None
+    ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
         """Attend over ``inputs``.
 
         Args:
@@ -51,18 +58,20 @@ class HeadAttn(nn.Module):
         """
         B, seq_len, D = inputs.shape
         Query = self.query_proj(inputs)  # [B, Seq_len, head_size]
-        Key = self.key_proj(inputs)      # [B, Seq_len, head_size]
-        Val = self.val_proj(inputs)      # [B, Seq_len, head_size]
+        Key = self.key_proj(inputs)  # [B, Seq_len, head_size]
+        Val = self.val_proj(inputs)  # [B, Seq_len, head_size]
 
         scores = torch.matmul(Query, Key.transpose(-2, -1)) * self.scale  # [B, Seq_len, Seq_len]
 
         if self.causal_mask:
-            causal_tril = torch.tril(torch.ones(seq_len, seq_len, dtype=torch.bool, device=inputs.device))
-            scores = scores.masked_fill(causal_tril == 0, float('-inf'))
+            causal_tril = torch.tril(
+                torch.ones(seq_len, seq_len, dtype=torch.bool, device=inputs.device)
+            )
+            scores = scores.masked_fill(causal_tril == 0, float("-inf"))
 
         # pad_mask: [B, Seq_len] with 1=real, 0=pad; mask out pad key positions
         if pad_mask is not None:
-            scores = scores.masked_fill(pad_mask.unsqueeze(1) == 0, float('-inf'))
+            scores = scores.masked_fill(pad_mask.unsqueeze(1) == 0, float("-inf"))
 
         attn_weights = F.softmax(scores, dim=-1)  # [B, Seq_len, Seq_len]
         attn_weights = self.dropout(attn_weights)

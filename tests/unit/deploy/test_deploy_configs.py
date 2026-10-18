@@ -3,17 +3,23 @@
 from __future__ import annotations
 
 import pytest
-from tests.support.deploy_support import CONFIGS
-
 from hale_core.deploy import DeployRunner
 from hale_core.deploy.config import Config
+
+from tests.support.deploy_support import CONFIGS
 
 TARGETS = sorted(p for p in CONFIGS.glob("*.yaml"))
 
 
 def test_there_are_targets_for_every_vendor() -> None:
     vendors = {Config.fromfile(p).get_path("device.vendor") for p in TARGETS}
-    assert vendors == {"nvidia", "apple", "amd", "qualcomm", None}  # None: vendor-neutral ONNX Runtime CI configs
+    assert vendors == {
+        "nvidia",
+        "apple",
+        "amd",
+        "qualcomm",
+        None,
+    }  # None: vendor-neutral ONNX Runtime CI configs
     assert len(TARGETS) >= 30
 
 

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from hale_core.deploy.core.io_signature import IOSignature
 from torch import nn
 
-from hale_core.deploy.core.io_signature import IOSignature
 from Halo_VLA.deploy.adapters.observation_prompt_adapter import ObservationPromptAdapter
 from Halo_VLA.deploy.graphs.system2_latent_graph import System2LatentGraph
 from Halo_VLA.deploy.registry import HALO_VLA_ADAPTERS

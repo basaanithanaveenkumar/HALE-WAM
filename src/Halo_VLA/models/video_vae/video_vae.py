@@ -44,13 +44,13 @@ class VideoVAE(nn.Module):
         frame = vae.decode(z_gen)                      # back to pixels
     """
 
-    SCALE_FACTOR: float = 0.18215   # keeps latent std ≈ 1 (same as SD)
-    LATENT_CH:    int   = 4
+    SCALE_FACTOR: float = 0.18215  # keeps latent std ≈ 1 (same as SD)
+    LATENT_CH: int = 4
 
     def __init__(self, in_ch: int = 3, out_ch: int = 3, base_ch: int = 128) -> None:
         super().__init__()
-        self.encoder = VAEEncoder(in_ch=in_ch,              latent_ch=self.LATENT_CH, base_ch=base_ch)
-        self.decoder = VAEDecoder(latent_ch=self.LATENT_CH, out_ch=out_ch,            base_ch=base_ch)
+        self.encoder = VAEEncoder(in_ch=in_ch, latent_ch=self.LATENT_CH, base_ch=base_ch)
+        self.decoder = VAEDecoder(latent_ch=self.LATENT_CH, out_ch=out_ch, base_ch=base_ch)
 
     # ------------------------------------------------------------------ #
     # Internal helpers
@@ -87,9 +87,9 @@ class VideoVAE(nn.Module):
         Returns:
             [B, 4, H/8, W/8] scaled by SCALE_FACTOR.
         """
-        h              = self.encoder(x)
-        mean, logvar   = self._split(h)
-        z              = self.reparameterize(mean, logvar) if sample else mean
+        h = self.encoder(x)
+        mean, logvar = self._split(h)
+        z = self.reparameterize(mean, logvar) if sample else mean
         return z * self.SCALE_FACTOR
 
     def decode(self, z: torch.Tensor) -> torch.Tensor:
@@ -112,14 +112,14 @@ class VideoVAE(nn.Module):
         Returns:
             VAEOutput containing reconstruction, latent, and KL loss.
         """
-        h              = self.encoder(x)
-        mean, logvar   = self._split(h)
-        z              = self.reparameterize(mean, logvar)
-        x_recon        = self.decoder(z)
+        h = self.encoder(x)
+        mean, logvar = self._split(h)
+        z = self.reparameterize(mean, logvar)
+        x_recon = self.decoder(z)
         return VAEOutput(
-            x_recon = x_recon,
-            z       = z * self.SCALE_FACTOR,
-            mean    = mean,
-            logvar  = logvar,
-            kl_loss = self.kl_divergence(mean, logvar),
+            x_recon=x_recon,
+            z=z * self.SCALE_FACTOR,
+            mean=mean,
+            logvar=logvar,
+            kl_loss=self.kl_divergence(mean, logvar),
         )

@@ -22,7 +22,7 @@ class EncoderBlock(nn.Module):
         blocks: list[nn.Module] = [ResBlock(in_ch, out_ch)]
         blocks += [ResBlock(out_ch, out_ch) for _ in range(num_res - 1)]
         self.resblocks = nn.Sequential(*blocks)
-        self.down      = Downsample(out_ch) if downsample else nn.Identity()
+        self.down = Downsample(out_ch) if downsample else nn.Identity()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Apply the residual blocks then the optional 2x downsampling.

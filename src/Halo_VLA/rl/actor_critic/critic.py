@@ -17,8 +17,10 @@ class Critic(nn.Module):
     def __init__(self, feature_dim: int, hidden_dim: int = 128) -> None:
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(feature_dim, hidden_dim), nn.ELU(),
-            nn.Linear(hidden_dim, hidden_dim), nn.ELU(),
+            nn.Linear(feature_dim, hidden_dim),
+            nn.ELU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ELU(),
             nn.Linear(hidden_dim, 1),
         )
 

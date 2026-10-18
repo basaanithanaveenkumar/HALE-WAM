@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import torch
 from torch.utils.data import DataLoader
@@ -44,7 +44,7 @@ ALL_SUBSETS = INTERLEAVE_SUBSETS + QA_SUBSETS
 # ---------------------------------------------------------------------------
 # Collate function for variable-length image sequences
 # ---------------------------------------------------------------------------
-def eo_collate_fn(batch: List[Dict[str, Any]]) -> Dict[str, Any]:
+def eo_collate_fn(batch: list[dict[str, Any]]) -> dict[str, Any]:
     """
     Custom collate that pads images, actions, and states to the
     per-batch maximum (no fixed padding).
@@ -124,15 +124,15 @@ def eo_collate_fn(batch: List[Dict[str, Any]]) -> Dict[str, Any]:
         padded_labels[i, :L] = labels_list[i]
 
     out = {
-        "images": padded_images,                          # [B, max_N, 3, H, W]
-        "image_mask": image_mask,                         # [B, max_N]
-        "input_ids": padded_input_ids,                    # [B, max_text_len]
-        "attention_mask": padded_attention_mask,           # [B, max_text_len]
-        "labels": padded_labels,                          # [B, max_text_len]
-        "actions": padded_actions,                        # [B, max_T_act, action_dim]
-        "action_mask": padded_action_mask,                # [B, max_T_act]
-        "states": padded_states,                          # [B, max_T_state, state_dim]
-        "state_mask": padded_state_mask,                  # [B, max_T_state]
+        "images": padded_images,  # [B, max_N, 3, H, W]
+        "image_mask": image_mask,  # [B, max_N]
+        "input_ids": padded_input_ids,  # [B, max_text_len]
+        "attention_mask": padded_attention_mask,  # [B, max_text_len]
+        "labels": padded_labels,  # [B, max_text_len]
+        "actions": padded_actions,  # [B, max_T_act, action_dim]
+        "action_mask": padded_action_mask,  # [B, max_T_act]
+        "states": padded_states,  # [B, max_T_state, state_dim]
+        "state_mask": padded_state_mask,  # [B, max_T_state]
     }
 
     # Optional: future_frames from datasets that provide ground-truth prediction targets.
@@ -160,7 +160,7 @@ def build_eo_dataloader(
     state_dim: int = 32,
     num_predict_frames: int = 1,
     streaming: bool = False,
-    cache_dir: Optional[str] = None,
+    cache_dir: str | None = None,
     shuffle: bool = True,
     pin_memory: bool = True,
     **kwargs: Any,

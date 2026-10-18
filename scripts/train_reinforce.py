@@ -43,9 +43,9 @@ from loguru import logger
 from config import HaloVLMConfig
 from models.halo_vla import HaloVLM
 from rl.policy import GaussianActionPolicy
-from rl.value_baseline import ValueBaseline
 from rl.reinforce import compute_reinforce_loss
 from rl.rewards import negative_distance_reward
+from rl.value_baseline import ValueBaseline
 
 
 def build_loader(args: argparse.Namespace, config: HaloVLMConfig) -> DataLoader:
@@ -102,9 +102,9 @@ def main() -> None:
 
             # 2. Reward target = the demonstrated action chunk, flattened to match
             #    the policy's flat action space.
-            actions = batch["actions"].to(device)                # [B, T, act_dim]
-            target = actions[:, :config.action_chunk_size].reshape(actions.size(0), -1)
-            if target.size(1) < flat_dim:                        # pad short demos
+            actions = batch["actions"].to(device)  # [B, T, act_dim]
+            target = actions[:, : config.action_chunk_size].reshape(actions.size(0), -1)
+            if target.size(1) < flat_dim:  # pad short demos
                 pad = torch.zeros(target.size(0), flat_dim - target.size(1), device=device)
                 target = torch.cat([target, pad], dim=1)
             target = target[:, :flat_dim]
@@ -115,7 +115,10 @@ def main() -> None:
 
             # 3. RL update.
             loss, metrics = compute_reinforce_loss(
-                policy, value, cond, reward_fn,
+                policy,
+                value,
+                cond,
+                reward_fn,
                 use_baseline=not args.no_baseline,
                 entropy_coef=args.entropy_coef,
                 value_coef=args.value_coef,
@@ -132,8 +135,12 @@ def main() -> None:
                 logger.info(
                     "step {} | loss {:.4f} | policy {:.4f} | value {:.4f} | "
                     "reward {:.3f} | entropy {:.3f}",
-                    step, metrics["loss"], metrics["policy_loss"],
-                    metrics["value_loss"], metrics["reward_mean"], metrics["entropy"],
+                    step,
+                    metrics["loss"],
+                    metrics["policy_loss"],
+                    metrics["value_loss"],
+                    metrics["reward_mean"],
+                    metrics["entropy"],
                 )
             if step >= args.steps:
                 logger.info("Reached --steps={}; stopping.", args.steps)

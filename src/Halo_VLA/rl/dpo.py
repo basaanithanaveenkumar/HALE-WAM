@@ -57,8 +57,8 @@ def compute_dpo_loss(
         (loss, metrics).
     """
     # Log-probs under the trainable policy (carry gradients).
-    logp_w = policy.log_prob(cond, chosen)            # [B]
-    logp_l = policy.log_prob(cond, rejected)          # [B]
+    logp_w = policy.log_prob(cond, chosen)  # [B]
+    logp_l = policy.log_prob(cond, rejected)  # [B]
 
     # Log-probs under the frozen reference (no gradients).
     with torch.no_grad():
@@ -66,11 +66,11 @@ def compute_dpo_loss(
         ref_logp_l = ref_policy.log_prob(cond, rejected)
 
     # Per-sample implicit-reward differences (log-ratios).
-    chosen_logratio = logp_w - ref_logp_w             # [B]
-    rejected_logratio = logp_l - ref_logp_l           # [B]
+    chosen_logratio = logp_w - ref_logp_w  # [B]
+    rejected_logratio = logp_l - ref_logp_l  # [B]
 
     # The DPO logit: how much more the winner is preferred over the loser.
-    logits = beta * (chosen_logratio - rejected_logratio)   # [B]
+    logits = beta * (chosen_logratio - rejected_logratio)  # [B]
 
     # −log σ(logits) == softplus(−logits): the binary-cross-entropy form.
     loss = F.softplus(-logits).mean()

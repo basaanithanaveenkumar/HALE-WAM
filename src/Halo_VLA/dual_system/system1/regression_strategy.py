@@ -16,12 +16,24 @@ class RegressionStrategy(ActionPolicyStrategy):
     needs_noise = False
     has_sampler_step = False
 
-    def loss(self, head: nn.Module, cond: torch.Tensor, cond_mask: torch.Tensor, actions: torch.Tensor,
-             weight: torch.Tensor) -> torch.Tensor:
+    def loss(
+        self,
+        head: nn.Module,
+        cond: torch.Tensor,
+        cond_mask: torch.Tensor,
+        actions: torch.Tensor,
+        weight: torch.Tensor,
+    ) -> torch.Tensor:
         """Masked mean L1 between the predicted and the target chunk."""
         return self.masked_mean((head(cond, cond_mask) - actions).abs(), weight)
 
-    def sample_from_noise(self, head: nn.Module, cond: torch.Tensor, cond_mask: torch.Tensor,
-                          noise: torch.Tensor | None, steps: int) -> torch.Tensor:
+    def sample_from_noise(
+        self,
+        head: nn.Module,
+        cond: torch.Tensor,
+        cond_mask: torch.Tensor,
+        noise: torch.Tensor | None,
+        steps: int,
+    ) -> torch.Tensor:
         """The head's prediction; ``noise`` and ``steps`` are unused."""
         return head(cond, cond_mask)

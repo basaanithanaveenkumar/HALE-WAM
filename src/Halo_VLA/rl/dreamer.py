@@ -28,8 +28,8 @@ import torch
 import torch.nn.functional as F
 from torch.distributions import kl_divergence
 
-from rl.rssm import RSSM, LatentState
 from rl.actor_critic import Actor, Critic, lambda_return
+from rl.rssm import RSSM, LatentState
 
 
 # ---------------------------------------------------------------------------
@@ -71,18 +71,18 @@ def world_model_loss(
         continues = torch.ones(B, T, device=obs_embeds.device)
 
     rollout = rssm.observe(obs_embeds, actions)
-    feats = rollout["features"]                          # [B, T, F]
+    feats = rollout["features"]  # [B, T, F]
 
     # Reconstruction: decode the observation embedding back from the feature.
     recon = rssm.decoder(feats)
     recon_loss = F.mse_loss(recon, obs_embeds)
 
     # Reward prediction.
-    reward_pred = rssm.reward_head(feats).squeeze(-1)    # [B, T]
+    reward_pred = rssm.reward_head(feats).squeeze(-1)  # [B, T]
     reward_loss = F.mse_loss(reward_pred, rewards)
 
     # Continue prediction (Bernoulli via BCE-with-logits).
-    cont_logit = rssm.continue_head(feats).squeeze(-1)   # [B, T]
+    cont_logit = rssm.continue_head(feats).squeeze(-1)  # [B, T]
     continue_loss = F.binary_cross_entropy_with_logits(cont_logit, continues)
 
     # KL between posterior and prior at every step, with KL balancing + free nats.
@@ -90,11 +90,11 @@ def world_model_loss(
     for prior, post in zip(rollout["priors"], rollout["posteriors"]):
         post_sg = _detach_dist(post)
         prior_sg = _detach_dist(prior)
-        kl_lhs = kl_divergence(post_sg, prior).mean()    # train prior -> posterior
-        kl_rhs = kl_divergence(post, prior_sg).mean()    # regularise posterior
+        kl_lhs = kl_divergence(post_sg, prior).mean()  # train prior -> posterior
+        kl_rhs = kl_divergence(post, prior_sg).mean()  # regularise posterior
         kl_values.append(kl_balance * kl_lhs + (1.0 - kl_balance) * kl_rhs)
     kl = torch.stack(kl_values).mean()
-    kl_clipped = torch.clamp(kl, min=free_nats)          # free-nats floor
+    kl_clipped = torch.clamp(kl, min=free_nats)  # free-nats floor
 
     loss = recon_loss + reward_loss + continue_loss + kl_scale * kl_clipped
 
@@ -113,6 +113,7 @@ def _detach_dist(dist):
     (stop-gradient), used for KL balancing."""
     base = dist.base_dist
     from torch.distributions import Independent, Normal
+
     return Independent(Normal(base.loc.detach(), base.scale.detach()), 1)
 
 
@@ -120,7 +121,9 @@ def _detach_dist(dist):
 # Phase 2 — imagination + actor-critic
 # ---------------------------------------------------------------------------
 @torch.no_grad()
-def imagine(rssm: RSSM, actor: Actor, init_state: LatentState, horizon: int) -> dict[str, torch.Tensor]:
+def imagine(
+    rssm: RSSM, actor: Actor, init_state: LatentState, horizon: int
+) -> dict[str, torch.Tensor]:
     """Roll the RSSM prior forward under the actor, purely in latent space.
 
     The dynamics rollout runs under ``no_grad`` — gradients for the actor are
@@ -150,10 +153,10 @@ def imagine(rssm: RSSM, actor: Actor, init_state: LatentState, horizon: int) -> 
         rews.append(rssm.reward_head(next_feat).squeeze(-1))
         conts.append(torch.sigmoid(rssm.continue_head(next_feat).squeeze(-1)))
     return {
-        "features": torch.stack(feats, dim=1),     # [M, H, F]
-        "actions": torch.stack(acts, dim=1),       # [M, H, A]
-        "rewards": torch.stack(rews, dim=1),       # [M, H]
-        "continues": torch.stack(conts, dim=1),    # [M, H]
+        "features": torch.stack(feats, dim=1),  # [M, H, F]
+        "actions": torch.stack(acts, dim=1),  # [M, H, A]
+        "rewards": torch.stack(rews, dim=1),  # [M, H]
+        "continues": torch.stack(conts, dim=1),  # [M, H]
     }
 
 
@@ -181,13 +184,13 @@ def actor_critic_loss(
         (actor_loss, critic_loss, metrics).
     """
     traj = imagine(rssm, actor, init_state, horizon)
-    feats = traj["features"]                       # [M, H, F] (detached: no_grad)
-    actions = traj["actions"]                      # [M, H, A]
-    rewards = traj["rewards"]                      # [M, H]
-    continues = traj["continues"]                  # [M, H]
+    feats = traj["features"]  # [M, H, F] (detached: no_grad)
+    actions = traj["actions"]  # [M, H, A]
+    rewards = traj["rewards"]  # [M, H]
+    continues = traj["continues"]  # [M, H]
 
     # Critic values of the imagined states (with grad for the critic loss).
-    values = critic(feats)                         # [M, H]
+    values = critic(feats)  # [M, H]
 
     # λ-return targets — computed from detached values, then detached entirely so
     # neither actor nor critic backprops through the target ("semi-gradient").
@@ -201,7 +204,7 @@ def actor_critic_loss(
     flat_feat = feats.reshape(M * H, F_dim)
     flat_act = actions.reshape(M * H, -1)
     log_prob = actor.log_prob(flat_feat, flat_act).reshape(M, H)
-    advantage = (returns - values.detach())
+    advantage = returns - values.detach()
     actor_loss = -(log_prob * advantage).mean() - entropy_coef * actor.entropy(flat_feat).mean()
 
     metrics = {

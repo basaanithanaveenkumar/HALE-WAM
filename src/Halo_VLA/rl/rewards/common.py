@@ -29,8 +29,8 @@ def negative_distance_reward(
         reward: [B].
     """
     if target.dim() == 1:
-        target = target.unsqueeze(0)            # [1, A] broadcasts over batch
-    diff = actions - target                     # [B, A]
-    dist_sq = diff.pow(2).sum(dim=-1)           # [B]
+        target = target.unsqueeze(0)  # [1, A] broadcasts over batch
+    diff = actions - target  # [B, A]
+    dist_sq = diff.pow(2).sum(dim=-1)  # [B]
     dist = dist_sq if squared else dist_sq.clamp_min(1e-12).sqrt()
     return offset - dist

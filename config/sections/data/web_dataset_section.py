@@ -8,9 +8,14 @@ from config.sections.base import VLASection
 class WebDatasetSection(VLASection):
     """Convert the dataset to WebDataset tar shards once, then stream them (docs/distributed.md)."""
 
-    ARGS = {"enabled": "webdataset", "root": "webdataset_root", "samples_per_shard": "webdataset_samples_per_shard",
-            "convert_workers": "webdataset_convert_workers", "shuffle_buffer": "webdataset_shuffle_buffer",
-            "overwrite": "webdataset_overwrite"}
+    ARGS = {
+        "enabled": "webdataset",
+        "root": "webdataset_root",
+        "samples_per_shard": "webdataset_samples_per_shard",
+        "convert_workers": "webdataset_convert_workers",
+        "shuffle_buffer": "webdataset_shuffle_buffer",
+        "overwrite": "webdataset_overwrite",
+    }
 
     enabled: bool = False
     root: str = "data/webdataset"

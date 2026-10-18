@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import List
-
 import torch
 
 from ..base import RoboticsMetricBase
@@ -32,7 +30,7 @@ class EpisodeLengthMetric(RoboticsMetricBase):
 
     def reset(self) -> None:
         """Forget the recorded episode lengths."""
-        self._steps: List[int] = []
+        self._steps: list[int] = []
 
     def update(self, episode_steps: int, max_steps: int | None = None) -> None:  # type: ignore[override]
         """
@@ -51,15 +49,15 @@ class EpisodeLengthMetric(RoboticsMetricBase):
         if not self._steps:
             return {
                 "mean_episode_steps": 0.0,
-                "efficiency":         0.0,
-                "timeout_rate":       0.0,
+                "efficiency": 0.0,
+                "timeout_rate": 0.0,
             }
         s = torch.tensor(self._steps, dtype=torch.float32)
         mean_steps = float(s.mean().item())
-        efficiency = 1.0 - mean_steps / self.max_steps        # 0 = used full budget; 1 = instant
+        efficiency = 1.0 - mean_steps / self.max_steps  # 0 = used full budget; 1 = instant
         timeout_rate = float((s >= self.max_steps).float().mean().item())
         return {
             "mean_episode_steps": mean_steps,
-            "efficiency":         max(efficiency, 0.0),        # clamp: >max_steps possible
-            "timeout_rate":       timeout_rate,
+            "efficiency": max(efficiency, 0.0),  # clamp: >max_steps possible
+            "timeout_rate": timeout_rate,
         }

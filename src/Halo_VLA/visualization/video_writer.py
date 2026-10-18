@@ -1,7 +1,5 @@
 """Render a dataset walk-through video with predictions, answers and action plots."""
 
-from typing import List, Optional, Tuple
-
 import numpy as np
 from loguru import logger
 
@@ -52,12 +50,12 @@ from visualization.text_generation import (  # noqa: F401 - moved; re-exported f
 # Main video writer
 # ---------------------------------------------------------------------------
 def create_video(
-    frames: List[np.ndarray],
+    frames: list[np.ndarray],
     question: str,
     gt_answer: str,
-    pred_answer: Optional[str],
-    gt_actions: Optional[np.ndarray],
-    pred_actions: Optional[np.ndarray],
+    pred_answer: str | None,
+    gt_actions: np.ndarray | None,
+    pred_actions: np.ndarray | None,
     output_path: str,
     fps: int = 12,
     frame_hold: float = 3.0,
@@ -108,11 +106,12 @@ def create_video(
     if pred_answer is not None:
         is_correct = simple_match(gt_answer, pred_answer)
 
-    composed_frames: List[np.ndarray] = []
-    frame_durations_ms: List[int] = []
+    composed_frames: list[np.ndarray] = []
+    frame_durations_ms: list[int] = []
 
-    def _stack(canvas: np.ndarray, reveal_up_to: Optional[int] = None,
-               phase_label: str = "Action Trajectory") -> np.ndarray:
+    def _stack(
+        canvas: np.ndarray, reveal_up_to: int | None = None, phase_label: str = "Action Trajectory"
+    ) -> np.ndarray:
         """Append the action chart underneath ``canvas`` if actions are present."""
         if chart_h <= 0:
             return canvas
@@ -120,8 +119,10 @@ def create_video(
             blank = np.zeros((chart_h, W, 3), dtype=np.uint8)
             return add_divider(canvas, blank, divider_h)
         chart = action_comparison_image(
-            pred_act_traj, gt_act_traj,
-            width=W, height=chart_h,
+            pred_act_traj,
+            gt_act_traj,
+            width=W,
+            height=chart_h,
             reveal_up_to=reveal_up_to,
             phase_label=phase_label,
         )
@@ -143,19 +144,21 @@ def create_video(
 
     for idx, raw_frame in enumerate(frames):
         sub = f"frame {idx + 1} / {n_frames}"
-        panel_lines: List[Tuple[str, Tuple[int, int, int], bool]] = []
+        panel_lines: list[tuple[str, tuple[int, int, int], bool]] = []
         panel_lines.append(("Question", (160, 200, 255), True))
         panel_lines.append((question, (245, 245, 250), False))
         panel_lines.append(("Ground Truth", (255, 210, 120), True))
         panel_lines.append((gt_answer, (250, 230, 180), False))
 
         canvas = compose_frame(
-            raw_frame, phase_label="CONTEXT", sub_label=sub,
-            panel_lines=panel_lines, accent=(96, 200, 255),
+            raw_frame,
+            phase_label="CONTEXT",
+            sub_label=sub,
+            panel_lines=panel_lines,
+            accent=(96, 200, 255),
             active_phase=_PHASE_LABEL_TO_PRAI["CONTEXT"],
         )
-        combined = _stack(canvas, reveal_up_to=0,
-                          phase_label="Action (GT preview)")
+        combined = _stack(canvas, reveal_up_to=0, phase_label="Action (GT preview)")
         _write(combined, copies=hold_copies, per_frame_ms=hold_ms)
 
     # ==================================================================
@@ -181,15 +184,16 @@ def create_video(
 
             sub = f"generating ({n_words}/{len(pred_words)})"
             canvas = compose_frame(
-                last_frame, phase_label="ANSWER", sub_label=sub,
-                panel_lines=panel_lines, is_correct=is_correct,
+                last_frame,
+                phase_label="ANSWER",
+                sub_label=sub,
+                panel_lines=panel_lines,
+                is_correct=is_correct,
                 accent=(150, 220, 255),
                 active_phase=_PHASE_LABEL_TO_PRAI["ANSWER"],
             )
-            combined = _stack(canvas, reveal_up_to=0,
-                              phase_label="Action (GT preview)")
-            _write(combined, copies=max(token_ms * fps // 1000, 1),
-                   per_frame_ms=token_ms)
+            combined = _stack(canvas, reveal_up_to=0, phase_label="Action (GT preview)")
+            _write(combined, copies=max(token_ms * fps // 1000, 1), per_frame_ms=token_ms)
 
         # Hold the completed prediction briefly so the reader can absorb it.
         _write(combined, copies=max(fps, 1), per_frame_ms=900)
@@ -214,9 +218,11 @@ def create_video(
         anim_ms = int(1000 / fps)
         for reveal in range(0, n_anim + 1):
             canvas = compose_frame(
-                last_frame, phase_label="ACTION",
+                last_frame,
+                phase_label="ACTION",
                 sub_label=f"step {reveal} / {n_anim}",
-                panel_lines=panel_lines, is_correct=is_correct,
+                panel_lines=panel_lines,
+                is_correct=is_correct,
                 accent=(255, 180, 110),
                 active_phase=_PHASE_LABEL_TO_PRAI["ACTION"],
             )
@@ -229,14 +235,15 @@ def create_video(
 
         # Hold the final chart.
         canvas = compose_frame(
-            last_frame, phase_label="ACTION",
+            last_frame,
+            phase_label="ACTION",
             sub_label=f"complete ({n_anim}/{n_anim})",
-            panel_lines=panel_lines, is_correct=is_correct,
+            panel_lines=panel_lines,
+            is_correct=is_correct,
             accent=(255, 180, 110),
             active_phase=_PHASE_LABEL_TO_PRAI["ACTION"],
         )
-        final_combined = _stack(canvas, reveal_up_to=n_anim,
-                                phase_label="Action Trajectory")
+        final_combined = _stack(canvas, reveal_up_to=n_anim, phase_label="Action Trajectory")
         _write(final_combined, copies=max(fps * 2, 1), per_frame_ms=1200)
 
     writer.release()

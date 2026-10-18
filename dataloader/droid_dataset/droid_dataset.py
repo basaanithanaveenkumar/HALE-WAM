@@ -3,18 +3,19 @@
 from __future__ import annotations
 
 import random
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any
 
 import numpy as np
 import torch
-from exceptions import DatasetNotFoundError
 from loguru import logger
 from torch.utils.data import Dataset
 
 from dataloader.droid_dataset.droid_episode_index import DroidEpisodeIndexMixin
 from dataloader.droid_dataset.droid_prompt import DroidPromptMixin
 from dataloader.eo_dataset import build_image_transform
+from exceptions import DatasetNotFoundError
 
 from .droid_config import DROIDConfig
 
@@ -34,7 +35,7 @@ class DROIDDataset(DroidPromptMixin, DroidEpisodeIndexMixin, Dataset):
 
     def __init__(
         self,
-        config: Optional[DROIDConfig] = None,
+        config: DROIDConfig | None = None,
         tokenizer: Any = None,
         split: str = "train",
         **kwargs: Any,
@@ -72,29 +73,19 @@ class DROIDDataset(DroidPromptMixin, DroidEpisodeIndexMixin, Dataset):
     # Metadata loading
     # ------------------------------------------------------------------
 
-
-
-
     # ------------------------------------------------------------------
     # Episode list construction
     # ------------------------------------------------------------------
-
-
-
-
 
     # ------------------------------------------------------------------
     # Tokenizer
     # ------------------------------------------------------------------
 
-
     # ------------------------------------------------------------------
     # Episode data loading
     # ------------------------------------------------------------------
 
-    def _load_episode_parquet(
-        self, data_path: Path
-    ) -> Tuple[np.ndarray, np.ndarray, int]:
+    def _load_episode_parquet(self, data_path: Path) -> tuple[np.ndarray, np.ndarray, int]:
         """
         Parse a per-episode parquet file.
 
@@ -153,8 +144,7 @@ class DROIDDataset(DroidPromptMixin, DroidEpisodeIndexMixin, Dataset):
 
         # ── States ───────────────────────────────────────────────────────────
         state_col = next(
-            (c for c in ("observation.state", "state", "observation.robot_state")
-             if c in names),
+            (c for c in ("observation.state", "state", "observation.robot_state") if c in names),
             None,
         )
         if state_col:
@@ -173,7 +163,7 @@ class DROIDDataset(DroidPromptMixin, DroidEpisodeIndexMixin, Dataset):
         return acts.astype(np.float32), sts.astype(np.float32), T
 
     @staticmethod
-    def _nested_to_array(rows: List[Any], T: int) -> np.ndarray:
+    def _nested_to_array(rows: list[Any], T: int) -> np.ndarray:
         """
         Convert a list of rows (each a float or list[float]) to float32 [T, D].
         Handles both scalar and vector action/state formats.
@@ -208,6 +198,7 @@ class DROIDDataset(DroidPromptMixin, DroidEpisodeIndexMixin, Dataset):
         """Return frame count without full decode."""
         try:
             import av
+
             container = av.open(str(video_path))
             stream = container.streams.video[0]
             if stream.frames and stream.frames > 0:
@@ -228,7 +219,7 @@ class DROIDDataset(DroidPromptMixin, DroidEpisodeIndexMixin, Dataset):
 
     def _read_frames_at_indices(
         self, video_path: Path, indices: Sequence[int]
-    ) -> List[torch.Tensor]:
+    ) -> list[torch.Tensor]:
         """Decode specific frame indices using PyAV with a sequential counter."""
         try:
             import av
@@ -249,7 +240,7 @@ class DROIDDataset(DroidPromptMixin, DroidEpisodeIndexMixin, Dataset):
 
         stream = container.streams.video[0]
         required = set(int(i) for i in indices)
-        frame_map: Dict[int, torch.Tensor] = {}
+        frame_map: dict[int, torch.Tensor] = {}
         counter = 0
 
         for packet in container.demux(stream):
@@ -275,16 +266,11 @@ class DROIDDataset(DroidPromptMixin, DroidEpisodeIndexMixin, Dataset):
     # Conversation / tokenisation
     # ------------------------------------------------------------------
 
-
-
-
     # ------------------------------------------------------------------
     # Window sampling helpers
     # ------------------------------------------------------------------
 
-    def _sample_window(
-        self, T: int, idx: int
-    ) -> Tuple[List[int], List[int]]:
+    def _sample_window(self, T: int, idx: int) -> tuple[list[int], list[int]]:
         """
         Sample ``num_sample_frames + num_predict_frames`` indices with ``frame_stride``.
 
@@ -321,7 +307,7 @@ class DROIDDataset(DroidPromptMixin, DroidEpisodeIndexMixin, Dataset):
     def __len__(self) -> int:
         return len(self.episodes)
 
-    def __getitem__(self, idx: int) -> Dict[str, Any]:
+    def __getitem__(self, idx: int) -> dict[str, Any]:
         ep = self.episodes[idx]
         task = ep["task"] or "robot manipulation"
         data_path = ep["data_path"]
@@ -334,6 +320,7 @@ class DROIDDataset(DroidPromptMixin, DroidEpisodeIndexMixin, Dataset):
             if data_path.is_file():
                 try:
                     import pyarrow.parquet as pq
+
                     T = pq.read_metadata(data_path).num_rows
                 except (ImportError, OSError, ValueError) as exc:
                     # pyarrow missing or unreadable parquet: fall back to the video length below
@@ -373,22 +360,22 @@ class DROIDDataset(DroidPromptMixin, DroidEpisodeIndexMixin, Dataset):
 
         # Pool states: one <state> token in the prompt → single vector [1, state_dim]
         if states.numel() > 0:
-            states_in = states.mean(dim=0, keepdim=True)     # [1, state_dim]
+            states_in = states.mean(dim=0, keepdim=True)  # [1, state_dim]
             state_mask_in = torch.ones(1, dtype=torch.long)
         else:
             states_in = torch.zeros(1, self.cfg.state_dim)
             state_mask_in = torch.zeros(1, dtype=torch.long)
 
         return {
-            "images": images,                      # [n, 3, H, W]
-            "future_frames": future_frames,        # [p, 3, H, W]
-            "input_ids": input_ids,                # [seq_len]
+            "images": images,  # [n, 3, H, W]
+            "future_frames": future_frames,  # [p, 3, H, W]
+            "input_ids": input_ids,  # [seq_len]
             "attention_mask": attention_mask_tok,  # [seq_len]
-            "labels": labels,                      # [seq_len]
-            "actions": actions,                    # [T, action_dim]
-            "action_mask": action_mask,            # [T]
-            "states": states_in,                   # [1, state_dim]
-            "state_mask": state_mask_in,           # [1]
+            "labels": labels,  # [seq_len]
+            "actions": actions,  # [T, action_dim]
+            "action_mask": action_mask,  # [T]
+            "states": states_in,  # [1, state_dim]
+            "state_mask": state_mask_in,  # [1]
             "num_images": images.size(0),
             "pad_token_id": self.pad_token_id,
         }
@@ -397,8 +384,8 @@ class DROIDDataset(DroidPromptMixin, DroidEpisodeIndexMixin, Dataset):
         self,
         acts: np.ndarray,
         sts: np.ndarray,
-        frame_indices: List[int],
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        frame_indices: list[int],
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Extract and truncate action + state rows aligned to ``frame_indices``.
 
@@ -421,8 +408,10 @@ class DROIDDataset(DroidPromptMixin, DroidEpisodeIndexMixin, Dataset):
         T = acts.shape[0]
         idx_clamped = [min(max(0, i), T - 1) for i in frame_indices]
 
-        sel_acts = acts[idx_clamped]   # [n, D_a]
-        sel_sts = sts[idx_clamped] if sts.shape[0] > 0 else np.zeros((len(idx_clamped), D_s), np.float32)
+        sel_acts = acts[idx_clamped]  # [n, D_a]
+        sel_sts = (
+            sts[idx_clamped] if sts.shape[0] > 0 else np.zeros((len(idx_clamped), D_s), np.float32)
+        )
 
         # Consecutive action differences give a delta-action representation.
         # When the parquet already stores delta actions (DROID default), the
@@ -430,9 +419,9 @@ class DROIDDataset(DroidPromptMixin, DroidEpisodeIndexMixin, Dataset):
         # acceptable for imitation learning.  Override this behaviour by
         # setting action_dim to the raw parquet width if you need absolute actions.
         if sel_acts.shape[0] > 1:
-            diff = np.diff(sel_acts, axis=0)   # [n-1, D_a]
+            diff = np.diff(sel_acts, axis=0)  # [n-1, D_a]
         else:
-            diff = sel_acts                    # [1, D_a] when single frame
+            diff = sel_acts  # [1, D_a] when single frame
 
         max_t = self.cfg.max_action_len
         diff = diff[:max_t]

@@ -22,9 +22,9 @@ if TYPE_CHECKING:
 class TrainingStage(StrEnum):
     """High-level training phase for Halo-VLA policies.
 
-      PRETRAIN   — web-scale video/image data + large open robot teleoperation
-      MID_TRAIN  — domain-specific robot manipulation (lab-collected corpora)
-      POST_TRAIN — task-specific fine-tuning on target robot and task
+    PRETRAIN   — web-scale video/image data + large open robot teleoperation
+    MID_TRAIN  — domain-specific robot manipulation (lab-collected corpora)
+    POST_TRAIN — task-specific fine-tuning on target robot and task
     """
 
     PRETRAIN = "pretrain"
@@ -42,7 +42,7 @@ def build_stage_dataloader(
     max_action_len: int = 64,
     action_dim: int = 32,
     **dataset_kwargs,
-) -> "DataLoader":
+) -> DataLoader:
     """Return a DataLoader for the given training stage.
 
     Args:
@@ -58,9 +58,9 @@ def build_stage_dataloader(
     Returns:
         A configured ``torch.utils.data.DataLoader``.
     """
-    from dataloader.stages.pretrain import PretrainDatasetRegistry
     from dataloader.stages.mid_train import MidTrainDatasetRegistry
     from dataloader.stages.post_train import PostTrainDatasetRegistry
+    from dataloader.stages.pretrain import PretrainDatasetRegistry
 
     _registries = {
         TrainingStage.PRETRAIN: PretrainDatasetRegistry,

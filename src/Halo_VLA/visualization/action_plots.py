@@ -1,7 +1,5 @@
 """Action trajectories and image tensors rendered for display."""
 
-from typing import Optional, Tuple
-
 import numpy as np
 import torch
 
@@ -32,12 +30,14 @@ from visualization.drawing import (  # noqa: F401 - moved; re-exported for calle
 # legend in two columns underneath the axes (so it never occludes data), a
 # vertical cursor at the latest revealed timestep, and a clear ASCII title.
 # ---------------------------------------------------------------------------
-def action_comparison_image(pred: Optional[np.ndarray],
-                            gt: np.ndarray,
-                            width: int = 640,
-                            height: int = 240,
-                            reveal_up_to: Optional[int] = None,
-                            phase_label: str = "Action Trajectory") -> np.ndarray:
+def action_comparison_image(
+    pred: np.ndarray | None,
+    gt: np.ndarray,
+    width: int = 640,
+    height: int = 240,
+    reveal_up_to: int | None = None,
+    phase_label: str = "Action Trajectory",
+) -> np.ndarray:
     """
     Render predicted vs GT action trajectories.
 
@@ -63,27 +63,34 @@ def action_comparison_image(pred: Optional[np.ndarray],
     gt_colours = [base(min((d * 2) % 20, 19)) for d in range(n_dims)]
     pred_colours = [base(min((d * 2 + 1) % 20, 19)) for d in range(n_dims)]
 
-    with plt.rc_context({
-        "figure.facecolor": "#0d1226",
-        "axes.facecolor": "#141a30",
-        "axes.edgecolor": "#3a4060",
-        "axes.labelcolor": "#dde2f0",
-        "xtick.color": "#a0a8c0",
-        "ytick.color": "#a0a8c0",
-        "text.color": "#e8ecf7",
-        "grid.color": "#242a45",
-        "grid.linestyle": "--",
-        "grid.alpha": 0.55,
-        "axes.titleweight": "bold",
-    }):
+    with plt.rc_context(
+        {
+            "figure.facecolor": "#0d1226",
+            "axes.facecolor": "#141a30",
+            "axes.edgecolor": "#3a4060",
+            "axes.labelcolor": "#dde2f0",
+            "xtick.color": "#a0a8c0",
+            "ytick.color": "#a0a8c0",
+            "text.color": "#e8ecf7",
+            "grid.color": "#242a45",
+            "grid.linestyle": "--",
+            "grid.alpha": 0.55,
+            "axes.titleweight": "bold",
+        }
+    ):
         fig, ax = plt.subplots(figsize=(width / 100, height / 100), dpi=100)
 
         # GT lines — solid, medium weight.
         for d in range(n_dims):
             colour = gt_colours[d]
-            ax.plot(gt_t, gt[:, d], color=colour, linewidth=1.6,
-                    alpha=0.95,
-                    label=f"GT d{d}" if d < 8 else "_nolegend_")
+            ax.plot(
+                gt_t,
+                gt[:, d],
+                color=colour,
+                linewidth=1.6,
+                alpha=0.95,
+                label=f"GT d{d}" if d < 8 else "_nolegend_",
+            )
 
         # Predicted lines — dashed, with a cursor marker at the latest
         # revealed step so the user can see the animation progressing.
@@ -98,37 +105,61 @@ def action_comparison_image(pred: Optional[np.ndarray],
 
                 for d in range(min(n_dims, pred_slice.shape[1])):
                     colour = pred_colours[d]
-                    ax.plot(pred_t_slice, pred_slice[:, d],
-                            color=colour, linewidth=1.7, alpha=0.95,
-                            linestyle=(0, (4, 2)),
-                            label=f"Pred d{d}" if d < 8 else "_nolegend_")
+                    ax.plot(
+                        pred_t_slice,
+                        pred_slice[:, d],
+                        color=colour,
+                        linewidth=1.7,
+                        alpha=0.95,
+                        linestyle=(0, (4, 2)),
+                        label=f"Pred d{d}" if d < 8 else "_nolegend_",
+                    )
 
                     if k < n_pred_steps:
-                        ax.plot(pred_t_slice[-1], pred_slice[-1, d], "o",
-                                color=colour, markersize=5, zorder=6,
-                                markeredgecolor="#ffffff", markeredgewidth=0.8)
+                        ax.plot(
+                            pred_t_slice[-1],
+                            pred_slice[-1, d],
+                            "o",
+                            color=colour,
+                            markersize=5,
+                            zorder=6,
+                            markeredgecolor="#ffffff",
+                            markeredgewidth=0.8,
+                        )
 
                 # Vertical cursor at the currently revealed timestep.
                 if k < n_pred_steps and k >= 1:
-                    ax.axvline(x=pred_t_slice[-1], color="#ffffff",
-                               linewidth=0.6, alpha=0.25, linestyle=":")
+                    ax.axvline(
+                        x=pred_t_slice[-1],
+                        color="#ffffff",
+                        linewidth=0.6,
+                        alpha=0.25,
+                        linestyle=":",
+                    )
 
         # Subtle horizontal zero line for reference.
-        ax.axhline(y=0, color="#5a6488", linewidth=0.6, alpha=0.5,
-                   linestyle="-")
+        ax.axhline(y=0, color="#5a6488", linewidth=0.6, alpha=0.5, linestyle="-")
 
         # Legend below the plot, two rows, so it never overlaps the data.
         ax.legend(
-            fontsize=7, loc="lower center", bbox_to_anchor=(0.5, -0.42),
-            facecolor="#0d1226", edgecolor="#3a4060",
-            labelcolor="#dde2f0", framealpha=0.95,
-            ncol=8, borderaxespad=0.2, handlelength=2.2, columnspacing=1.0,
+            fontsize=7,
+            loc="lower center",
+            bbox_to_anchor=(0.5, -0.42),
+            facecolor="#0d1226",
+            edgecolor="#3a4060",
+            labelcolor="#dde2f0",
+            framealpha=0.95,
+            ncol=8,
+            borderaxespad=0.2,
+            handlelength=2.2,
+            columnspacing=1.0,
         )
 
         ax.set_xlabel("Timestep", fontsize=8.5)
         ax.set_ylabel("Value", fontsize=8.5)
-        ax.set_title(f"{phase_label}   GT (solid)  /  Pred (dashed)",
-                     fontsize=9.5, color="#ffffff", pad=6)
+        ax.set_title(
+            f"{phase_label}   GT (solid)  /  Pred (dashed)", fontsize=9.5, color="#ffffff", pad=6
+        )
         ax.tick_params(labelsize=7.5, length=3, width=0.7)
         ax.grid(True, linewidth=0.5)
 
@@ -152,7 +183,7 @@ def action_comparison_image(pred: Optional[np.ndarray],
 # ---------------------------------------------------------------------------
 # Image normalisation helpers
 # ---------------------------------------------------------------------------
-def unnormalise_image(tensor: torch.Tensor, mean: Tuple, std: Tuple) -> np.ndarray:
+def unnormalise_image(tensor: torch.Tensor, mean: tuple, std: tuple) -> np.ndarray:
     """Convert a normalised [3, H, W] tensor to uint8 BGR for OpenCV."""
     cv2 = _import_cv2()
     img = tensor.clone().cpu().float()

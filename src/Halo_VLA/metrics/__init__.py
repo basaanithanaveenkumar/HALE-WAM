@@ -48,27 +48,24 @@ Example
     print(sr.compute())
 """
 
-from .base import RoboticsMetricBase
-
 from .action import (
+    ActionChunkAccuracyMetric,
     ActionL1Metric,
     ActionMSEMetric,
-    ActionChunkAccuracyMetric,
-    TrajectorySmoothnessMetric,
     ActionNormalisedError,
+    TrajectorySmoothnessMetric,
 )
-
+from .base import RoboticsMetricBase
 from .generation import (
+    FVDProxyMetric,
     PSNRMetric,
     SSIMMetric,
-    FVDProxyMetric,
 )
-
 from .policy import (
+    EpisodeLengthMetric,
+    GoalReachingMetric,
     SuccessRateMetric,
     TaskCompletionMetric,
-    GoalReachingMetric,
-    EpisodeLengthMetric,
 )
 
 __all__ = [

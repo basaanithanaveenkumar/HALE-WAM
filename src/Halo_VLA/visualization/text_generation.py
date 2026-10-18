@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Tuple
+from typing import Any
 
 import torch
 import torch.nn as nn
@@ -39,7 +39,7 @@ from visualization.drawing import (  # noqa: F401 - moved; re-exported for calle
 # ---------------------------------------------------------------------------
 # Checkpoint / model helpers (optional — used when --checkpoint is given)
 # ---------------------------------------------------------------------------
-def load_model(ckpt_path: str, device: torch.device) -> Tuple[nn.Module, HaloVLMConfig]:
+def load_model(ckpt_path: str, device: torch.device) -> tuple[nn.Module, HaloVLMConfig]:
     """Load a training checkpoint into a ``HaloVLM`` in eval mode.
 
     Args:
@@ -62,16 +62,21 @@ def load_model(ckpt_path: str, device: torch.device) -> Tuple[nn.Module, HaloVLM
             miss[:5],
         )
     model.eval()
-    logger.info(
-        "Loaded checkpoint {}  (epoch {})", ckpt_path, ckpt.get("epoch", -1)
-    )
+    logger.info("Loaded checkpoint {}  (epoch {})", ckpt_path, ckpt.get("epoch", -1))
     return model, config
 
 
 @torch.no_grad()
-def generate_text(model: nn.Module, tokenizer: Any, images: torch.Tensor, input_ids: torch.Tensor,
-                  attention_mask: torch.Tensor, states: torch.Tensor, max_new_tokens: int = 128,
-                  device: torch.device | str = "cpu") -> Tuple[str, torch.Tensor | None]:
+def generate_text(
+    model: nn.Module,
+    tokenizer: Any,
+    images: torch.Tensor,
+    input_ids: torch.Tensor,
+    attention_mask: torch.Tensor,
+    states: torch.Tensor,
+    max_new_tokens: int = 128,
+    device: torch.device | str = "cpu",
+) -> tuple[str, torch.Tensor | None]:
     """Greedy auto-regressive generation. Returns decoded string + action preds."""
     eos_id = tokenizer.eos_token_id
     action_preds = None
@@ -79,8 +84,10 @@ def generate_text(model: nn.Module, tokenizer: Any, images: torch.Tensor, input_
 
     for _ in range(max_new_tokens):
         logits, action_hiddens, _, _ = model(
-            images=images, input_ids=input_ids,
-            attention_mask=attention_mask, states=states,
+            images=images,
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            states=states,
         )
         next_token = logits[:, -1, :].argmax(dim=-1, keepdim=True)
         token_id = next_token.item()
@@ -106,7 +113,7 @@ def generate_text(model: nn.Module, tokenizer: Any, images: torch.Tensor, input_
 # ---------------------------------------------------------------------------
 # Text extraction helpers
 # ---------------------------------------------------------------------------
-def extract_question_answer(sample: Dict) -> Tuple[str, str]:
+def extract_question_answer(sample: dict) -> tuple[str, str]:
     """Pull the first user question and assistant answer from raw conversation."""
     conv = sample.get("conversation", [])
     question, answer = "", ""

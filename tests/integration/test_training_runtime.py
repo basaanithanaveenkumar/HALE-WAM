@@ -40,7 +40,11 @@ def test_single_process_trains_and_checkpoints(tmp_path: Path) -> None:
 def test_resume_continues_from_checkpoint(tmp_path: Path) -> None:
     module = load_train_script()
     module.train(tiny_args(module, tmp_path))
-    module.train(tiny_args(module, tmp_path, "--epochs", "3", "--resume", str(tmp_path / "halo_vla_epoch2.pt")))
+    module.train(
+        tiny_args(
+            module, tmp_path, "--epochs", "3", "--resume", str(tmp_path / "halo_vla_epoch2.pt")
+        )
+    )
     ckpt = torch.load(tmp_path / "halo_vla_epoch3.pt", weights_only=False)
     assert ckpt["epoch"] == 3 and ckpt["global_step"] == 24
 
@@ -49,8 +53,15 @@ def test_resume_continues_from_checkpoint(tmp_path: Path) -> None:
 def test_webdataset_flag_converts_once_and_streams(tmp_path: Path) -> None:
     module = load_train_script()
     shards = tmp_path / "shards"
-    args = tiny_args(module, tmp_path / "ckpt", "--webdataset", "--webdataset_root", str(shards),
-                     "--webdataset_samples_per_shard", "4")
+    args = tiny_args(
+        module,
+        tmp_path / "ckpt",
+        "--webdataset",
+        "--webdataset_root",
+        str(shards),
+        "--webdataset_samples_per_shard",
+        "4",
+    )
     module.train(args)
     (directory,) = [p for p in shards.iterdir() if p.is_dir()]
     tars = sorted(directory.glob("shard-*.tar"))
@@ -70,8 +81,13 @@ def _free_port() -> int:
 
 def _ddp_rank(rank: int, world: int, port: int, tmp: str) -> None:
     """One torchrun-style rank: env vars set, process group created by DDPSession."""
-    os.environ.update(MASTER_ADDR="127.0.0.1", MASTER_PORT=str(port), RANK=str(rank),
-                      LOCAL_RANK=str(rank), WORLD_SIZE=str(world))
+    os.environ.update(
+        MASTER_ADDR="127.0.0.1",
+        MASTER_PORT=str(port),
+        RANK=str(rank),
+        LOCAL_RANK=str(rank),
+        WORLD_SIZE=str(world),
+    )
     root = Path(__file__).resolve().parents[2]
     sys.path[:0] = [str(root), str(root / "src" / "Halo_VLA")]
     module = load_train_script()
@@ -100,8 +116,15 @@ def test_ddp_two_ranks_stay_in_sync(tmp_path: Path) -> None:
 @pytest.mark.skipif(not HAS_RAY, reason="needs hale-blocks[ray]")
 def test_ray_two_workers_report_checkpoint(tmp_path: Path) -> None:
     module = load_train_script()
-    args = tiny_args(module, tmp_path / "ckpt", "--ray", "--ray_num_workers", "2",
-                     "--ray_storage_path", str(tmp_path / "ray"))
+    args = tiny_args(
+        module,
+        tmp_path / "ckpt",
+        "--ray",
+        "--ray_num_workers",
+        "2",
+        "--ray_storage_path",
+        str(tmp_path / "ray"),
+    )
     # Workers import the entry by name (repo root is on their PYTHONPATH via RayCliOptions).
     result = module.launch_train_on_ray("tests.support.training_support:train_tiny", args)
     assert result.ok, result.error

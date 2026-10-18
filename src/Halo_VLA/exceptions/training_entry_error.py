@@ -6,5 +6,4 @@ from exceptions.halo_vla_error import HaloVLAError
 
 
 class TrainingEntryError(HaloVLAError, ImportError):
-    """The ``--entry`` given to the Ray launcher does not name an importable training function.
-    """
+    """The ``--entry`` given to the Ray launcher does not name an importable training function."""

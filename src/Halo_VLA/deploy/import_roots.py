@@ -26,7 +26,7 @@ class ImportRoots:
     def __init__(self, anchor: Path | None = None) -> None:
         here = (anchor or Path(__file__)).resolve()
         self.source_root = here.parents[1]  # .../src/Halo_VLA
-        self.repo_root = here.parents[3]    # .../HALE-WAM
+        self.repo_root = here.parents[3]  # .../HALE-WAM
 
     def ensure(self) -> list[str]:
         """Add the roots that are missing; returns the paths that were added."""

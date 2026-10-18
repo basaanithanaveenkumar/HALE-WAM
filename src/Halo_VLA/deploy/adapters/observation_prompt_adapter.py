@@ -20,8 +20,16 @@ class ObservationPromptAdapter(HaloAdapterBase):
         opt_seq / max_seq: prompt lengths for tracing / the largest accepted prompt.
     """
 
-    def __init__(self, num_images: int = 1, num_states: int = 1, num_action_tokens: int = 1,
-                 num_world_video_tokens: int = 0, opt_seq: int = 64, max_seq: int = 256, **base: Any) -> None:
+    def __init__(
+        self,
+        num_images: int = 1,
+        num_states: int = 1,
+        num_action_tokens: int = 1,
+        num_world_video_tokens: int = 0,
+        opt_seq: int = 64,
+        max_seq: int = 256,
+        **base: Any,
+    ) -> None:
         super().__init__(**base)
         self.num_images = int(num_images)
         self.num_states = int(num_states)
@@ -30,7 +38,9 @@ class ObservationPromptAdapter(HaloAdapterBase):
         self.opt_seq = int(opt_seq)
         self.max_seq = int(max_seq)
 
-    def observation_signature(self, outputs: list[str], extra_inputs: list[dict[str, Any]] | tuple[()] = ()) -> PromptIOSignature:
+    def observation_signature(
+        self, outputs: list[str], extra_inputs: list[dict[str, Any]] | tuple[()] = ()
+    ) -> PromptIOSignature:
         """Signature of an observation + prompt graph.
 
         Args:
@@ -42,21 +52,51 @@ class ObservationPromptAdapter(HaloAdapterBase):
         """
         cfg = self.model_config()
         head = (cfg.image_token_id,) * self.num_images + (cfg.state_token_id,) * self.num_states
-        tail = (cfg.world_video_token_id,) * self.num_world_video_tokens + (cfg.action_token_id,) * self.num_action_tokens
-        special = min(cfg.image_token_id, cfg.state_token_id, cfg.action_token_id, cfg.world_video_token_id)
+        tail = (cfg.world_video_token_id,) * self.num_world_video_tokens + (
+            cfg.action_token_id,
+        ) * self.num_action_tokens
+        special = min(
+            cfg.image_token_id, cfg.state_token_id, cfg.action_token_id, cfg.world_video_token_id
+        )
         min_seq = 2 + len(head) + len(tail)
-        base = self.build_signature({
-            "inputs": [
-                {"name": "images", "shape": ["batch", self.num_images, 3, cfg.img_size, cfg.img_size],
-                 "dtype": "float32", "value_range": [0.0, 1.0]},
-                {"name": "input_ids", "shape": ["batch", "seq"], "dtype": "int64", "value_range": [3, special]},
-                {"name": "attention_mask", "shape": ["batch", "seq"], "dtype": "int64", "value_range": [1, 2]},
-                {"name": "states", "shape": ["batch", self.num_states, cfg.state_dim], "dtype": "float32",
-                 "value_range": [-1.0, 1.0]},
-                *extra_inputs,
-            ],
-            "outputs": outputs,
-            "dims": {"batch": self.batch_dim(),
-                     "seq": [min_seq, max(min_seq, self.opt_seq), max(min_seq, self.opt_seq, self.max_seq)]},
-        })
+        base = self.build_signature(
+            {
+                "inputs": [
+                    {
+                        "name": "images",
+                        "shape": ["batch", self.num_images, 3, cfg.img_size, cfg.img_size],
+                        "dtype": "float32",
+                        "value_range": [0.0, 1.0],
+                    },
+                    {
+                        "name": "input_ids",
+                        "shape": ["batch", "seq"],
+                        "dtype": "int64",
+                        "value_range": [3, special],
+                    },
+                    {
+                        "name": "attention_mask",
+                        "shape": ["batch", "seq"],
+                        "dtype": "int64",
+                        "value_range": [1, 2],
+                    },
+                    {
+                        "name": "states",
+                        "shape": ["batch", self.num_states, cfg.state_dim],
+                        "dtype": "float32",
+                        "value_range": [-1.0, 1.0],
+                    },
+                    *extra_inputs,
+                ],
+                "outputs": outputs,
+                "dims": {
+                    "batch": self.batch_dim(),
+                    "seq": [
+                        min_seq,
+                        max(min_seq, self.opt_seq),
+                        max(min_seq, self.opt_seq, self.max_seq),
+                    ],
+                },
+            }
+        )
         return PromptIOSignature(base.inputs, base.outputs, base.dims, "input_ids", head, tail)

@@ -36,8 +36,9 @@ from collections.abc import Callable
 
 import torch
 import torch.nn as nn
-from exceptions import ModelInputError
 from torch.distributions import Independent, Normal
+
+from exceptions import ModelInputError
 
 #: ``actions [M, A] -> reward [M]``: the scalar signal the policy-gradient trainers maximise.
 RewardFn = Callable[[torch.Tensor], torch.Tensor]
@@ -97,9 +98,9 @@ class GaussianActionPolicy(nn.Module):
         Normal so that ``log_prob`` / ``entropy`` reduce over the action
         dimension and yield one scalar **per sample** (shape ``[B]``).
         """
-        mean = self.mean_net(cond)                                  # [B, A]
+        mean = self.mean_net(cond)  # [B, A]
         log_std = self.log_std.clamp(self.log_std_min, self.log_std_max)
-        std = log_std.exp().expand_as(mean)                         # [B, A]
+        std = log_std.exp().expand_as(mean)  # [B, A]
         # Independent(..., 1) treats the last dim as event dims, so log_prob
         # sums the per-coordinate log-densities → a single value per sample.
         return Independent(Normal(mean, std), 1)
@@ -149,8 +150,9 @@ class GaussianActionPolicy(nn.Module):
     # ------------------------------------------------------------------ #
     @staticmethod
     @torch.no_grad()
-    def conditioning_from_halo(model: nn.Module, batch: dict[str, torch.Tensor],
-                               device: torch.device | str | None = None) -> torch.Tensor:
+    def conditioning_from_halo(
+        model: nn.Module, batch: dict[str, torch.Tensor], device: torch.device | str | None = None
+    ) -> torch.Tensor:
         """Extract a conditioning vector from a real Halo-VLA forward pass.
 
         Runs ``HaloVLM.forward`` and mean-pools the transformer hidden states at
@@ -167,6 +169,7 @@ class GaussianActionPolicy(nn.Module):
         Returns:
             cond: [B, emb_dim].  Rows are zero where a sample had no action token.
         """
+
         def to(x: torch.Tensor | None) -> torch.Tensor | None:
             """Move ``x`` to ``device`` when one is given."""
             return x.to(device) if (device is not None and x is not None) else x

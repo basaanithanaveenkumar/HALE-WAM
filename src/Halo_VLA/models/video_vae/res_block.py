@@ -12,11 +12,11 @@ class ResBlock(nn.Module):
 
     def __init__(self, in_ch: int, out_ch: int) -> None:
         super().__init__()
-        self.norm1 = nn.GroupNorm(32, in_ch,  eps=1e-6, affine=True)
-        self.conv1 = nn.Conv2d(in_ch,  out_ch, 3, padding=1)
+        self.norm1 = nn.GroupNorm(32, in_ch, eps=1e-6, affine=True)
+        self.conv1 = nn.Conv2d(in_ch, out_ch, 3, padding=1)
         self.norm2 = nn.GroupNorm(32, out_ch, eps=1e-6, affine=True)
         self.conv2 = nn.Conv2d(out_ch, out_ch, 3, padding=1)
-        self.skip  = nn.Conv2d(in_ch,  out_ch, 1) if in_ch != out_ch else nn.Identity()
+        self.skip = nn.Conv2d(in_ch, out_ch, 1) if in_ch != out_ch else nn.Identity()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Residual forward: ``[B, in_ch, H, W] -> [B, out_ch, H, W]``."""

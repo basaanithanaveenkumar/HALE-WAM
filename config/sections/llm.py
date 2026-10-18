@@ -25,15 +25,22 @@ class LLMConfig(VLASection):
     ``use_lora`` (adapters) > ``freeze_llm`` (no LLM gradients) > full fine-tuning.
     """
 
-    ARGS = {"backbone": "llm_backbone", "model_id": "llm_model_id", "checkpoint": "llm_checkpoint",
-            "dtype": "llm_dtype", "lora_r": "llm_lora_r", "lora_alpha": "llm_lora_alpha",
-            "lora_dropout": "llm_lora_dropout", "gradient_checkpointing": "llm_gradient_checkpointing",
-            "attn_implementation": "llm_attn_implementation"}
+    ARGS = {
+        "backbone": "llm_backbone",
+        "model_id": "llm_model_id",
+        "checkpoint": "llm_checkpoint",
+        "dtype": "llm_dtype",
+        "lora_r": "llm_lora_r",
+        "lora_alpha": "llm_lora_alpha",
+        "lora_dropout": "llm_lora_dropout",
+        "gradient_checkpointing": "llm_gradient_checkpointing",
+        "attn_implementation": "llm_attn_implementation",
+    }
     OVERRIDES = {"lora_target_modules": "llm_lora_target_modules"}
 
     backbone: str | None = None
-    model_id: str | None = None            # another repo / local path of the same family
-    checkpoint: str | None = None          # HaloDiffusionLLM .pt for hale-* backbones
+    model_id: str | None = None  # another repo / local path of the same family
+    checkpoint: str | None = None  # HaloDiffusionLLM .pt for hale-* backbones
     dtype: str = "bfloat16"
     freeze_llm: bool = True
     use_lora: bool = True
@@ -41,9 +48,9 @@ class LLMConfig(VLASection):
     lora_alpha: int = 32
     lora_dropout: float = 0.05
     lora_target_modules: list[str] | None = None
-    lora_train_embeddings: bool = True     # the VLA's new special tokens must be learned
+    lora_train_embeddings: bool = True  # the VLA's new special tokens must be learned
     gradient_checkpointing: bool = False
-    attn_implementation: str | None = "sdpa"   # Gemma: eager
+    attn_implementation: str | None = "sdpa"  # Gemma: eager
 
     @field_validator("backbone")
     @classmethod
@@ -53,7 +60,9 @@ class LLMConfig(VLASection):
         from hale_core.nn.llm import is_registered, list_llm_backbones
 
         if not is_registered(name):
-            raise HaloVLAConfigError(f"unknown LLM backbone {name!r}; choose one of {list_llm_backbones()} or 'custom'")
+            raise HaloVLAConfigError(
+                f"unknown LLM backbone {name!r}; choose one of {list_llm_backbones()} or 'custom'"
+            )
         return name
 
     @field_validator("dtype")

@@ -21,15 +21,23 @@ class FlowPolicyGraph(nn.Module):
         num_steps: Euler steps (default: ``config.flow_num_ode_steps``).
     """
 
-    def __init__(self, vlm: nn.Module, num_action_tokens: int = 1, num_steps: int | None = None) -> None:
+    def __init__(
+        self, vlm: nn.Module, num_action_tokens: int = 1, num_steps: int | None = None
+    ) -> None:
         super().__init__()
         self.perception = PerceptionGraph(vlm, num_action_tokens)
         self.flow_decoder = vlm.flow_decoder
         self.chunk, self.action_dim = vlm.action_chunk_size, vlm.action_dim
         self.num_steps = int(num_steps or vlm.flow_num_ode_steps)
 
-    def forward(self, images: torch.Tensor, input_ids: torch.Tensor, attention_mask: torch.Tensor,
-                states: torch.Tensor, noise: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self,
+        images: torch.Tensor,
+        input_ids: torch.Tensor,
+        attention_mask: torch.Tensor,
+        states: torch.Tensor,
+        noise: torch.Tensor,
+    ) -> torch.Tensor:
         """Sample action chunks with the unrolled Euler integrator.
 
         Args:
@@ -42,7 +50,7 @@ class FlowPolicyGraph(nn.Module):
         Returns:
             ``[B, K, chunk, action_dim]``.
         """
-        cond = self.perception(images, input_ids, attention_mask, states)          # [B, K, D]
+        cond = self.perception(images, input_ids, attention_mask, states)  # [B, K, D]
         b, k, d = cond.shape
         cond = cond.reshape(b * k, d)
         x = noise.reshape(b * k, self.chunk * self.action_dim)

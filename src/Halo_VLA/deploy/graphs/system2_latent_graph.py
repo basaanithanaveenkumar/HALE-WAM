@@ -29,8 +29,13 @@ class System2LatentGraph(nn.Module):
         self.bridge = dual.bridge
         self.frame_delay = int(cfg.system2_frame_delay)
 
-    def forward(self, images: torch.Tensor, input_ids: torch.Tensor, attention_mask: torch.Tensor,
-                states: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self,
+        images: torch.Tensor,
+        input_ids: torch.Tensor,
+        attention_mask: torch.Tensor,
+        states: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """Encode the observation and instruction into System 1's latent.
 
         Args:
@@ -47,9 +52,19 @@ class System2LatentGraph(nn.Module):
             index = [max(i - self.frame_delay, 0) for i in range(n)]
             images = images[:, index]
         b = input_ids.shape[0]
-        extra = None if self.act_queries is None else self.act_queries.unsqueeze(0).expand(b, -1, -1)
-        hidden, mask, num_prefix, layer_hidden = self.encoder(images, input_ids, attention_mask, states, extra)
-        enc = {"hidden": hidden, "mask": mask, "num_prefix": num_prefix, "text_len": input_ids.shape[1],
-               "num_extra": 0 if extra is None else extra.shape[1], "layer_hidden": layer_hidden}
+        extra = (
+            None if self.act_queries is None else self.act_queries.unsqueeze(0).expand(b, -1, -1)
+        )
+        hidden, mask, num_prefix, layer_hidden = self.encoder(
+            images, input_ids, attention_mask, states, extra
+        )
+        enc = {
+            "hidden": hidden,
+            "mask": mask,
+            "num_prefix": num_prefix,
+            "text_len": input_ids.shape[1],
+            "num_extra": 0 if extra is None else extra.shape[1],
+            "layer_hidden": layer_hidden,
+        }
         tokens, latent_mask = self.latent(enc)
         return self.bridge(tokens.float()), latent_mask

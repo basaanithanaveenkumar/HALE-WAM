@@ -55,8 +55,14 @@ class DiffusionStrategy(ActionPolicyStrategy):
         """Resolve the noise levels eagerly so tracing sees Python constants."""
         self.levels(steps)
 
-    def loss(self, head: nn.Module, cond: torch.Tensor, cond_mask: torch.Tensor, actions: torch.Tensor,
-             weight: torch.Tensor) -> torch.Tensor:
+    def loss(
+        self,
+        head: nn.Module,
+        cond: torch.Tensor,
+        cond_mask: torch.Tensor,
+        actions: torch.Tensor,
+        weight: torch.Tensor,
+    ) -> torch.Tensor:
         """Mean squared error of the predicted velocity at a random noise level."""
         b = actions.size(0)
         noise = torch.randn_like(actions)
@@ -66,8 +72,14 @@ class DiffusionStrategy(ActionPolicyStrategy):
         target = ab.sqrt() * noise - (1 - ab).sqrt() * actions  # v-prediction
         return self.masked_mean((head(cond, cond_mask, noisy, k) - target) ** 2, weight)
 
-    def sample_from_noise(self, head: nn.Module, cond: torch.Tensor, cond_mask: torch.Tensor,
-                          noise: torch.Tensor | None, steps: int) -> torch.Tensor:
+    def sample_from_noise(
+        self,
+        head: nn.Module,
+        cond: torch.Tensor,
+        cond_mask: torch.Tensor,
+        noise: torch.Tensor | None,
+        steps: int,
+    ) -> torch.Tensor:
         """DDIM over an evenly spaced subset of the training noise levels."""
         x = noise
         levels = self.levels(steps)
@@ -76,6 +88,10 @@ class DiffusionStrategy(ActionPolicyStrategy):
             v = head(cond, cond_mask, x, torch.full_like(x[:, 0, 0], float(k)))
             x0 = ab.sqrt() * x - (1 - ab).sqrt() * v
             eps = (1 - ab).sqrt() * x + ab.sqrt() * v
-            ab_prev = self.alpha_bar[levels[i + 1]] if i + 1 < len(levels) else torch.ones((), device=x.device)
+            ab_prev = (
+                self.alpha_bar[levels[i + 1]]
+                if i + 1 < len(levels)
+                else torch.ones((), device=x.device)
+            )
             x = ab_prev.sqrt() * x0 + (1 - ab_prev).sqrt() * eps
         return x

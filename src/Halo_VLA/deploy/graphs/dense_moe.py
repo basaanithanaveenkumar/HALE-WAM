@@ -45,8 +45,11 @@ class DenseMoE(nn.Module):
         logits = self.router_logits(x)
         remaining = logits
         for _ in range(self.top_k - 1):
-            remaining = torch.where(remaining >= remaining.amax(-1, keepdim=True),
-                                    torch.full_like(remaining, float("-inf")), remaining)
+            remaining = torch.where(
+                remaining >= remaining.amax(-1, keepdim=True),
+                torch.full_like(remaining, float("-inf")),
+                remaining,
+            )
         selected = logits >= remaining.amax(-1, keepdim=True)  # the top-k logits
         sparse = torch.where(selected, logits, torch.full_like(logits, float("-inf")))
         return torch.softmax(sparse, dim=-1)
@@ -67,5 +70,5 @@ class DenseMoE(nn.Module):
         for expert in self.shared_experts:
             out = out + expert(flat)
         for i, expert in enumerate(self.routed_experts):
-            out = out + expert(flat) * gates[:, i:i + 1]
+            out = out + expert(flat) * gates[:, i : i + 1]
         return out.reshape(b, s, d)

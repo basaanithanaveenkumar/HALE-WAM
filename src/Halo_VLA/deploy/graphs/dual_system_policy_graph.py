@@ -26,8 +26,14 @@ class DualSystemPolicyGraph(nn.Module):
         self.system2 = System2LatentGraph(dual)
         self.system1 = System1PolicyGraph(dual, steps)
 
-    def forward(self, images: torch.Tensor, input_ids: torch.Tensor, attention_mask: torch.Tensor,
-                states: torch.Tensor, noise: torch.Tensor | None = None) -> torch.Tensor:
+    def forward(
+        self,
+        images: torch.Tensor,
+        input_ids: torch.Tensor,
+        attention_mask: torch.Tensor,
+        states: torch.Tensor,
+        noise: torch.Tensor | None = None,
+    ) -> torch.Tensor:
         """Predict an action chunk from an observation and prompt.
 
         Args:
@@ -41,6 +47,10 @@ class DualSystemPolicyGraph(nn.Module):
             ``[B, chunk, action_dim]``.
         """
         latent, latent_mask = self.system2(images, input_ids, attention_mask, states)
-        image = images[:, -1]                     # newest frame (latest_frame without an image mask)
-        state = states[:, -1] if states.shape[1] > 0 else states.new_zeros(states.shape[0], states.shape[2])
+        image = images[:, -1]  # newest frame (latest_frame without an image mask)
+        state = (
+            states[:, -1]
+            if states.shape[1] > 0
+            else states.new_zeros(states.shape[0], states.shape[2])
+        )
         return self.system1(latent, latent_mask, image, state, noise)

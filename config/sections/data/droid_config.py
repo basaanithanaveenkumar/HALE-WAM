@@ -13,5 +13,8 @@ class DroidConfig(VLASection):
     ARGS = {"data_root": "droid_data_root", "camera": "droid_camera"}
 
     data_root: str | None = None
-    camera: Literal["observation.images.exterior_image_1_left", "observation.images.exterior_image_2_left",
-                    "observation.images.wrist_image_left"] = "observation.images.exterior_image_1_left"
+    camera: Literal[
+        "observation.images.exterior_image_1_left",
+        "observation.images.exterior_image_2_left",
+        "observation.images.wrist_image_left",
+    ] = "observation.images.exterior_image_1_left"

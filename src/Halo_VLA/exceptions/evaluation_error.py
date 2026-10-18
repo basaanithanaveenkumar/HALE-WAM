@@ -6,5 +6,4 @@ from exceptions.halo_vla_error import HaloVLAError
 
 
 class EvaluationError(HaloVLAError, ValueError):
-    """The validation data is empty or incompatible with the evaluator (e.g. action width mismatch).
-    """
+    """The validation data is empty or incompatible with the evaluator (e.g. action width mismatch)."""

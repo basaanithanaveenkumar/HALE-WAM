@@ -25,14 +25,16 @@ class VAEEncoder(nn.Module):
 
         self.conv_in = nn.Conv2d(in_ch, ch[0], 3, padding=1)
 
-        self.blocks = nn.ModuleList([
-            EncoderBlock(ch[0], ch[0], num_res=2, downsample=True),   # H   → H/2
-            EncoderBlock(ch[0], ch[1], num_res=2, downsample=True),   # H/2 → H/4
-            EncoderBlock(ch[1], ch[2], num_res=2, downsample=True),   # H/4 → H/8
-            EncoderBlock(ch[2], ch[3], num_res=2, downsample=False),  # H/8 (bottleneck)
-        ])
+        self.blocks = nn.ModuleList(
+            [
+                EncoderBlock(ch[0], ch[0], num_res=2, downsample=True),  # H   → H/2
+                EncoderBlock(ch[0], ch[1], num_res=2, downsample=True),  # H/2 → H/4
+                EncoderBlock(ch[1], ch[2], num_res=2, downsample=True),  # H/4 → H/8
+                EncoderBlock(ch[2], ch[3], num_res=2, downsample=False),  # H/8 (bottleneck)
+            ]
+        )
 
-        self.mid      = MidBlock(ch[-1])
+        self.mid = MidBlock(ch[-1])
         self.norm_out = nn.GroupNorm(32, ch[-1], eps=1e-6, affine=True)
         self.conv_out = nn.Conv2d(ch[-1], latent_ch * 2, 3, padding=1)
 

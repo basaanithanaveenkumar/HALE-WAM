@@ -16,15 +16,29 @@ for _path in (ROOT, ROOT / "src" / "Halo_VLA"):
 
 from config import HaloVLMConfig  # noqa: E402
 from models.halo_vla import HaloVLM  # noqa: E402
-from training import HaloVLATrainingStep, VLAEvaluator, split_validation  # noqa: E402
-
 from tests.support.llm_support import batch_for  # noqa: E402
+from training import HaloVLATrainingStep, VLAEvaluator, split_validation  # noqa: E402
 
 
 def small(**kw) -> HaloVLMConfig:
-    base = dict(img_size=32, patch_size=16, emb_dim=64, vit_num_layers=1, vit_num_heads=4, vit_mlp_dim=64,
-                dec_num_layers=1, dec_num_heads=4, dec_mlp_dim=64, use_moe=False, action_dim=4, state_dim=3,
-                action_chunk_size=2, enable_visual_dit=False, flow_hidden_dim=32, flow_num_ode_steps=2)
+    base = dict(
+        img_size=32,
+        patch_size=16,
+        emb_dim=64,
+        vit_num_layers=1,
+        vit_num_heads=4,
+        vit_mlp_dim=64,
+        dec_num_layers=1,
+        dec_num_heads=4,
+        dec_mlp_dim=64,
+        use_moe=False,
+        action_dim=4,
+        state_dim=3,
+        action_chunk_size=2,
+        enable_visual_dit=False,
+        flow_hidden_dim=32,
+        flow_num_ode_steps=2,
+    )
     base.update(kw)
     return HaloVLMConfig(**base)
 
@@ -43,7 +57,9 @@ def test_local_hale_backbone_sets_width_tokens_and_stays_frozen() -> None:
     model = HaloVLM(cfg)
     width = model.vis_enc.output_dim
     assert cfg.proj_vision_dim == width and cfg.vision_num_tokens == 4
-    assert not any(p.requires_grad for p in model.vis_enc.backbone.parameters())  # frozen by default
+    assert not any(
+        p.requires_grad for p in model.vis_enc.backbone.parameters()
+    )  # frozen by default
     model.train()
     assert not model.vis_enc.backbone.training  # frozen backbone stays in eval mode
     out = HaloVLATrainingStep(model)(batch_for(cfg))  # language loss uses the measured token count
@@ -62,11 +78,22 @@ def test_siglip_encoder_renormalises_and_checks_resolution() -> None:
     # AutoImageProcessor is a Pillow-backed dummy without Pillow (a declared dependency): skip
     # rather than report a missing optional library as a model bug.
     pytest.importorskip("PIL", reason="transformers.AutoImageProcessor needs Pillow")
-    tiny = transformers.SiglipVisionConfig(image_size=32, patch_size=16, hidden_size=32, intermediate_size=64,
-                                           num_hidden_layers=1, num_attention_heads=4)
-    with patch.object(transformers.SiglipVisionModel, "from_pretrained",
-                      side_effect=lambda *a, **k: transformers.SiglipVisionModel(tiny)), \
-         patch.object(transformers.AutoImageProcessor, "from_pretrained", side_effect=OSError):
+    tiny = transformers.SiglipVisionConfig(
+        image_size=32,
+        patch_size=16,
+        hidden_size=32,
+        intermediate_size=64,
+        num_hidden_layers=1,
+        num_attention_heads=4,
+    )
+    with (
+        patch.object(
+            transformers.SiglipVisionModel,
+            "from_pretrained",
+            side_effect=lambda *a, **k: transformers.SiglipVisionModel(tiny),
+        ),
+        patch.object(transformers.AutoImageProcessor, "from_pretrained", side_effect=OSError),
+    ):
         cfg = small(vision_encoder="siglip")
         model = HaloVLM(cfg)
         enc = model.vis_enc
@@ -85,10 +112,17 @@ def test_evaluator_reports_losses_and_action_metrics() -> None:
     torch.manual_seed(0)
     cfg = small()
     model = HaloVLM(cfg).train()
-    result = VLAEvaluator(cfg.action_dim).run(HaloVLATrainingStep(model), [batch_for(cfg), batch_for(cfg)],
-                                              torch.device("cpu"))
-    for key in ("val/loss_total", "val/loss_act", "val/action_l1", "val/action_mse", "val/chunk_acc_0.10",
-                "val/pred_smoothness"):
+    result = VLAEvaluator(cfg.action_dim).run(
+        HaloVLATrainingStep(model), [batch_for(cfg), batch_for(cfg)], torch.device("cpu")
+    )
+    for key in (
+        "val/loss_total",
+        "val/loss_act",
+        "val/action_l1",
+        "val/action_mse",
+        "val/chunk_acc_0.10",
+        "val/pred_smoothness",
+    ):
         assert key in result and torch.isfinite(torch.tensor(result[key])), key
     assert not any("_dim_" in k for k in result) and model.training  # train mode restored
 
@@ -114,4 +148,6 @@ def test_trajectory_smoothness_uses_true_second_differences() -> None:
     metric = TrajectorySmoothnessMetric()
     metric.update(pred=traj, target=traj)
     out = metric.compute()
-    assert out["pred_smoothness"] == pytest.approx(4.0) and out["target_smoothness"] == pytest.approx(4.0)
+    assert out["pred_smoothness"] == pytest.approx(4.0) and out[
+        "target_smoothness"
+    ] == pytest.approx(4.0)

@@ -28,7 +28,9 @@ def latest_state(states: torch.Tensor, state_dim: int) -> torch.Tensor:
     return states[:, -1]
 
 
-def action_targets(actions: torch.Tensor, mask: torch.Tensor, chunk: int) -> tuple[torch.Tensor, torch.Tensor]:
+def action_targets(
+    actions: torch.Tensor, mask: torch.Tensor, chunk: int
+) -> tuple[torch.Tensor, torch.Tensor]:
     """The first ``chunk`` actions and their validity mask, zero-padded to ``chunk`` steps."""
     b, t, d = actions.shape
     if t < chunk:
@@ -61,8 +63,12 @@ class DualSystemVLA(nn.Module):
         self.chunk, self.action_dim = vcfg.action_chunk_size, vcfg.action_dim
         self.system2 = System2(system2_model, config)
         self.latent = build_latent_extractor(config, vcfg.emb_dim, system2_model.layer_width)
-        self.bridge = LatentBridge(self.latent.width, config.system1_dim, config, self.chunk * self.action_dim)
-        self.system1 = System1Policy(config, vcfg.img_size, vcfg.state_dim, self.chunk, vcfg.action_dim)
+        self.bridge = LatentBridge(
+            self.latent.width, config.system1_dim, config, self.chunk * self.action_dim
+        )
+        self.system1 = System1Policy(
+            config, vcfg.img_size, vcfg.state_dim, self.chunk, vcfg.action_dim
+        )
         if config.system1_checkpoint:
             state = torch.load(config.system1_checkpoint, map_location="cpu", weights_only=True)
             self.system1.load_state_dict(state.get("system1", state))
@@ -102,8 +108,9 @@ class DualSystemVLA(nn.Module):
         enc["latent_tokens"], enc["latent_mask"] = tokens, mask
         return self.bridge(tokens.float()), mask, enc
 
-    def system1_condition(self, latent: torch.Tensor, latent_mask: torch.Tensor,
-                          batch: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
+    def system1_condition(
+        self, latent: torch.Tensor, latent_mask: torch.Tensor, batch: dict[str, torch.Tensor]
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """Condition System 1 on a latent and the batch's newest frame and state.
 
         Args:
@@ -124,17 +131,25 @@ class DualSystemVLA(nn.Module):
         actions, action_mask`` and optional ``image_mask``)."""
         latent, latent_mask, enc = self.encode_latent(batch)
         cond, cond_mask = self.system1_condition(latent, latent_mask, batch)
-        actions, mask = action_targets(batch["actions"].float(), batch["action_mask"].float(), self.chunk)
+        actions, mask = action_targets(
+            batch["actions"].float(), batch["action_mask"].float(), self.chunk
+        )
         policy = self.system1.loss(cond, cond_mask, actions, mask)
         zero = policy.new_zeros(())
         aux = align = lm = zero
         cfg = self.config
         if cfg.aux_weight > 0:
             flat_mask = mask.unsqueeze(-1).expand_as(actions).reshape(actions.size(0), -1)
-            aux = self.bridge.auxiliary_loss(enc["latent_tokens"].float(), enc["latent_mask"],
-                                             actions.reshape(actions.size(0), -1), flat_mask)
+            aux = self.bridge.auxiliary_loss(
+                enc["latent_tokens"].float(),
+                enc["latent_mask"],
+                actions.reshape(actions.size(0), -1),
+                flat_mask,
+            )
         if cfg.align_weight > 0:
-            align = self.bridge.alignment_loss(enc["latent_tokens"].float(), enc["latent_mask"], enc)
+            align = self.bridge.alignment_loss(
+                enc["latent_tokens"].float(), enc["latent_mask"], enc
+            )
         if cfg.lm_weight > 0:
             lm = self._language_loss(enc, batch["labels"])
         total = policy + cfg.aux_weight * aux + cfg.align_weight * align + cfg.lm_weight * lm
@@ -144,13 +159,18 @@ class DualSystemVLA(nn.Module):
     def _language_loss(enc: dict, labels: torch.Tensor) -> torch.Tensor:
         """Next-token loss of System 2 on the text (image prefix and <ACT> queries excluded)."""
         start = enc["num_prefix"]
-        logits = enc["logits"][:, start: start + enc["text_len"]]
+        logits = enc["logits"][:, start : start + enc["text_len"]]
         return nn.functional.cross_entropy(
-            logits[:, :-1].reshape(-1, logits.size(-1)).float(), labels[:, 1:].reshape(-1), ignore_index=-100)
+            logits[:, :-1].reshape(-1, logits.size(-1)).float(),
+            labels[:, 1:].reshape(-1),
+            ignore_index=-100,
+        )
 
     # ------------------------------------------------------------------ inference
     @torch.no_grad()
-    def predict_actions(self, batch: dict, latent: tuple[torch.Tensor, torch.Tensor] | None = None) -> torch.Tensor:
+    def predict_actions(
+        self, batch: dict, latent: tuple[torch.Tensor, torch.Tensor] | None = None
+    ) -> torch.Tensor:
         """Action chunk ``(B, chunk, action_dim)``; pass a cached ``(latent, mask)`` to skip System 2."""
         if latent is None:
             latent_tokens, latent_mask, _ = self.encode_latent(batch)

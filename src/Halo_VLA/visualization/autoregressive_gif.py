@@ -1,6 +1,6 @@
 """Autoregressive multi-frame DiT rollout rendered as an annotated GIF with a filmstrip."""
 
-from typing import Any, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 import torch
@@ -100,8 +100,8 @@ def _heun_with_snapshots(
 
 
 def _filmstrip_bar(
-    frames_bgr: List[np.ndarray],
-    gt_frames_bgr: List[Optional[np.ndarray]],
+    frames_bgr: list[np.ndarray],
+    gt_frames_bgr: list[np.ndarray | None],
     strip_h: int,
     total_w: int,
     active_idx: int,
@@ -128,9 +128,8 @@ def _filmstrip_bar(
         if x0 + thumb_w - 2 > total_w:
             break
 
-        thumb = cv2.resize(frame, (thumb_w - 4, thumb_h - 4),
-                           interpolation=cv2.INTER_AREA)
-        bar[2:2 + thumb_h - 4, x0 + 2:x0 + thumb_w - 2] = thumb
+        thumb = cv2.resize(frame, (thumb_w - 4, thumb_h - 4), interpolation=cv2.INTER_AREA)
+        bar[2 : 2 + thumb_h - 4, x0 + 2 : x0 + thumb_w - 2] = thumb
 
         # Border colour: cyan for predicted (active or past), white for others
         if i == active_idx:
@@ -140,8 +139,7 @@ def _filmstrip_bar(
         else:
             border_col = (96, 200, 255)  # cyan — context / observed
 
-        cv2.rectangle(bar, (x0, 2), (x0 + thumb_w - 2, strip_h - 2),
-                      border_col, 1)
+        cv2.rectangle(bar, (x0, 2), (x0 + thumb_w - 2, strip_h - 2), border_col, 1)
 
         # Place a small GT thumbnail in the bottom-right corner of each
         # predicted slot so the comparison is always visible.
@@ -151,10 +149,8 @@ def _filmstrip_bar(
             gt_thumb = cv2.resize(gt, (gt_w, gt_h), interpolation=cv2.INTER_AREA)
             gy = 2 + (thumb_h - 4) - gt_h
             gx = x0 + 2 + (thumb_w - 4) - gt_w
-            bar[gy:gy + gt_h, gx:gx + gt_w] = gt_thumb
-            cv2.rectangle(bar, (gx - 1, gy - 1),
-                          (gx + gt_w, gy + gt_h),
-                          (255, 210, 100), 1)
+            bar[gy : gy + gt_h, gx : gx + gt_w] = gt_thumb
+            cv2.rectangle(bar, (gx - 1, gy - 1), (gx + gt_w, gy + gt_h), (255, 210, 100), 1)
 
     return bar
 
@@ -164,9 +160,9 @@ def generate_autoregressive_gif(
     model: Any,
     predictor: Any,
     visual_context_emb: torch.Tensor,
-    world_video_query_hiddens: Optional[torch.Tensor],
-    context_frames_bgr: List[np.ndarray],
-    future_frames_bgr: List[np.ndarray],
+    world_video_query_hiddens: torch.Tensor | None,
+    context_frames_bgr: list[np.ndarray],
+    future_frames_bgr: list[np.ndarray],
     context_frames_tensor: torch.Tensor,
     output_path: str,
     canvas_w: int = 728,
@@ -174,8 +170,8 @@ def generate_autoregressive_gif(
     num_predict: int = 4,
     num_steps: int = 30,
     num_denoise_snapshots: int = _AR_DENOISE_SNAPSHOTS,
-    img_mean: Tuple = (0.485, 0.456, 0.406),
-    img_std: Tuple = (0.229, 0.224, 0.225),
+    img_mean: tuple = (0.485, 0.456, 0.406),
+    img_std: tuple = (0.229, 0.224, 0.225),
     fps: int = 12,
 ) -> None:
     """
@@ -217,19 +213,19 @@ def generate_autoregressive_gif(
 
     # ── State that evolves autoregressively ─────────────────────────────────
     # current_past mirrors halo_vla.predict_visual_future exactly
-    current_past_tensor = context_frames_tensor.unsqueeze(0)   # [1, T, 3, H, W]
-    filmstrip_bgr: List[np.ndarray] = list(context_frames_bgr)
-    filmstrip_gt: List[Optional[np.ndarray]] = [None] * len(context_frames_bgr)
-    predicted_bgr: List[np.ndarray] = []
+    current_past_tensor = context_frames_tensor.unsqueeze(0)  # [1, T, 3, H, W]
+    filmstrip_bgr: list[np.ndarray] = list(context_frames_bgr)
+    filmstrip_gt: list[np.ndarray | None] = [None] * len(context_frames_bgr)
+    predicted_bgr: list[np.ndarray] = []
     n_ctx = len(context_frames_bgr)
     n_total_slots = n_ctx + num_predict
 
     strip_h = max(canvas_h // 5, 60)
-    main_h = canvas_h - strip_h - 6    # 6 px divider
+    main_h = canvas_h - strip_h - 6  # 6 px divider
     base_dur = int(1000 / fps)
 
-    pil_frames: List = []
-    durations: List[int] = []
+    pil_frames: list = []
+    durations: list[int] = []
 
     def _push(bgr: np.ndarray, dur_ms: int):
         rgb = bgr[:, :, ::-1].copy()
@@ -240,13 +236,12 @@ def generate_autoregressive_gif(
         main_bgr: np.ndarray,
         phase: str,
         sub: str,
-        panel_lines: List[Tuple[str, Tuple[int, int, int], bool]],
-        accent: Tuple[int, int, int],
+        panel_lines: list[tuple[str, tuple[int, int, int], bool]],
+        accent: tuple[int, int, int],
         active_slot: int,
     ) -> np.ndarray:
         """Compose header + main image + filmstrip bar into one canvas."""
-        main_resized = cv2.resize(main_bgr, (canvas_w, main_h),
-                                  interpolation=cv2.INTER_CUBIC)
+        main_resized = cv2.resize(main_bgr, (canvas_w, main_h), interpolation=cv2.INTER_CUBIC)
         composed = compose_frame(
             main_resized,
             phase_label=phase,
@@ -256,7 +251,8 @@ def generate_autoregressive_gif(
             active_phase=3,  # IMAGINE
         )
         strip = _filmstrip_bar(
-            filmstrip_bgr, filmstrip_gt,
+            filmstrip_bgr,
+            filmstrip_gt,
             strip_h=strip_h,
             total_w=canvas_w,
             active_idx=active_slot,
@@ -273,8 +269,7 @@ def generate_autoregressive_gif(
             (f"Context frame {ci + 1}/{n_ctx}", (245, 245, 250), False),
             ("Model input — no prediction yet", (150, 170, 210), False),
         ]
-        f = _build_frame(ctx_bgr, "CONTEXT", f"frame {ci+1}/{n_ctx}",
-                         panel, (96, 200, 255), ci)
+        f = _build_frame(ctx_bgr, "CONTEXT", f"frame {ci + 1}/{n_ctx}", panel, (96, 200, 255), ci)
         _push(f, 600)
 
     # ── 2. Predict frames one at a time ─────────────────────────────────────
@@ -289,17 +284,13 @@ def generate_autoregressive_gif(
 
         # --- Per-frame WV query token ----------------------------------------
         wv_step = None
-        if (world_video_query_hiddens is not None
-                and step < world_video_query_hiddens.size(1)):
-            wv_step = world_video_query_hiddens[:, step:step + 1, :]  # [1,1,D]
+        if world_video_query_hiddens is not None and step < world_video_query_hiddens.size(1):
+            wv_step = world_video_query_hiddens[:, step : step + 1, :]  # [1,1,D]
 
         # --- Pixel anchor: last frame in current_past -----------------------
         context_frame = current_past_tensor[:, -1]  # [1, 3, H, W]
-        anchor_bgr = unnormalise_image(
-            context_frame[0], img_mean, img_std
-        )
-        anchor_display = cv2.resize(anchor_bgr, (canvas_w, main_h),
-                                    interpolation=cv2.INTER_CUBIC)
+        anchor_bgr = unnormalise_image(context_frame[0], img_mean, img_std)
+        anchor_display = cv2.resize(anchor_bgr, (canvas_w, main_h), interpolation=cv2.INTER_CUBIC)
 
         # Highlight the anchor: draw a glowing green border
         border_t = 8
@@ -317,8 +308,12 @@ def generate_autoregressive_gif(
                 ("This is the model's last seen/predicted frame", (150, 180, 150), False),
             ]
             f = _build_frame(
-                anchor_hl, "IMAGINE", f"frame {step+1}/{num_predict} · ANCHOR",
-                panel, (80, 240, 160), slot_idx,
+                anchor_hl,
+                "IMAGINE",
+                f"frame {step + 1}/{num_predict} · ANCHOR",
+                panel,
+                (80, 240, 160),
+                slot_idx,
             )
             _push(f, _AR_ANCHOR_MS)
 
@@ -328,13 +323,17 @@ def generate_autoregressive_gif(
             num_frames=1,
             world_video_query_hiddens=wv_step,
             frame_offset=step,
-            context_frames=context_frame,   # [1, 3, H, W]
+            context_frames=context_frame,  # [1, 3, H, W]
             cfg_drop_mask=None,
         )  # [1, D]  (BF = 1*1)
 
         # Phase B: DENOISE — Heun integration with snapshots
         pred_tensor, snapshots, snap_times = _heun_with_snapshots(
-            predictor.dit_rgb, cond, H_in, W_in, rgb_ch,
+            predictor.dit_rgb,
+            cond,
+            H_in,
+            W_in,
+            rgb_ch,
             num_steps=num_steps,
             num_snapshots=num_denoise_snapshots,
             device=device,
@@ -350,8 +349,7 @@ def generate_autoregressive_gif(
                 snap_bgr = unnormalise_image(snap, img_mean, img_std)
             else:
                 snap_bgr = tensor_to_display_image(snap)
-            snap_bgr = cv2.resize(snap_bgr, (canvas_w, main_h),
-                                  interpolation=cv2.INTER_CUBIC)
+            snap_bgr = cv2.resize(snap_bgr, (canvas_w, main_h), interpolation=cv2.INTER_CUBIC)
 
             noise_col = (
                 int(96 + (130 - 96) * progress),
@@ -361,13 +359,16 @@ def generate_autoregressive_gif(
             panel = [
                 (f"Predicting frame {step + 1}/{num_predict}", noise_col, True),
                 (f"Heun ODE  t = {t_val:.3f}  →  1.000", (220, 220, 255), False),
-                (f"Step {si+1}/{n_snaps}  ·  {int(progress*100)}% denoised",
-                 (180, 200, 240), False),
+                (
+                    f"Step {si + 1}/{n_snaps}  ·  {int(progress * 100)}% denoised",
+                    (180, 200, 240),
+                    False,
+                ),
             ]
             f = _build_frame(
                 snap_bgr,
                 "NOISE → FRAME",
-                f"frame {step+1}/{num_predict} · t={t_val:.2f}",
+                f"frame {step + 1}/{num_predict} · t={t_val:.2f}",
                 panel,
                 noise_col,
                 slot_idx,
@@ -377,8 +378,7 @@ def generate_autoregressive_gif(
 
         # Phase C: REVEAL — add prediction to filmstrip, show GT side-by-side
         pred_bgr = unnormalise_image(pred_tensor[0], img_mean, img_std)
-        pred_bgr_full = cv2.resize(pred_bgr, (canvas_w, main_h),
-                                   interpolation=cv2.INTER_CUBIC)
+        pred_bgr_full = cv2.resize(pred_bgr, (canvas_w, main_h), interpolation=cv2.INTER_CUBIC)
         filmstrip_bgr.append(cv2.resize(pred_bgr, (strip_h, strip_h)))
 
         gt_bgr = None
@@ -393,12 +393,28 @@ def generate_autoregressive_gif(
             gt_full = cv2.resize(future_frames_bgr[step], (half_w, main_h))
             split[:, half_w:] = gt_full
             # Draw a thin divider between the two halves
-            split[:, half_w - 1:half_w + 1] = (255, 255, 255)
+            split[:, half_w - 1 : half_w + 1] = (255, 255, 255)
             # Label: PRED on left, GT on right
-            cv2.putText(split, "PRED", (10, 30), cv2.FONT_HERSHEY_DUPLEX,
-                        0.8, (130, 235, 170), 2, cv2.LINE_AA)
-            cv2.putText(split, "GT", (half_w + 10, 30), cv2.FONT_HERSHEY_DUPLEX,
-                        0.8, (255, 210, 100), 2, cv2.LINE_AA)
+            cv2.putText(
+                split,
+                "PRED",
+                (10, 30),
+                cv2.FONT_HERSHEY_DUPLEX,
+                0.8,
+                (130, 235, 170),
+                2,
+                cv2.LINE_AA,
+            )
+            cv2.putText(
+                split,
+                "GT",
+                (half_w + 10, 30),
+                cv2.FONT_HERSHEY_DUPLEX,
+                0.8,
+                (255, 210, 100),
+                2,
+                cv2.LINE_AA,
+            )
 
         for _ in range(3):
             panel = [
@@ -407,9 +423,12 @@ def generate_autoregressive_gif(
                 ("Pixel anchor = model's own prior frame (no GT leakage)", (150, 200, 160), False),
             ]
             f = _build_frame(
-                split, "REVEAL",
-                f"frame {step+1}/{num_predict} · REVEAL",
-                panel, (130, 235, 170), slot_idx,
+                split,
+                "REVEAL",
+                f"frame {step + 1}/{num_predict} · REVEAL",
+                panel,
+                (130, 235, 170),
+                slot_idx,
             )
             _push(f, 700)
 
@@ -435,15 +454,20 @@ def generate_autoregressive_gif(
 
     panel = [
         (f"Generated {num_predict} future frames", (130, 235, 170), True),
-        ("Fully autoregressive — each frame conditions on the previous prediction",
-         (200, 230, 200), False),
-        ("Green border = predicted   Inset = GT   Cyan = context input",
-         (160, 200, 180), False),
+        (
+            "Fully autoregressive — each frame conditions on the previous prediction",
+            (200, 230, 200),
+            False,
+        ),
+        ("Green border = predicted   Inset = GT   Cyan = context input", (160, 200, 180), False),
     ]
     f = _build_frame(
-        last_frame, "IMAGINE",
+        last_frame,
+        "IMAGINE",
         f"complete — {num_predict} frames",
-        panel, (130, 235, 170), n_total_slots - 1,
+        panel,
+        (130, 235, 170),
+        n_total_slots - 1,
     )
     _push(f, 2500)
 

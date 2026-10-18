@@ -37,7 +37,9 @@ class ActTokenLatent(LatentExtractor):
         return config.latent == "multi_act" and config.multi_act_with_language
 
     @classmethod
-    def from_config(cls, config: DualSystemConfig, emb_dim: int, layer_width: int) -> ActTokenLatent:
+    def from_config(
+        cls, config: DualSystemConfig, emb_dim: int, layer_width: int
+    ) -> ActTokenLatent:
         """``multi_act`` with ``multi_act_with_language`` also passes the instruction states."""
         return cls(emb_dim, with_language=cls._with_language(config))
 

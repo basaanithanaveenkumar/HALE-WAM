@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
 
 # DROID action space: 7-DoF delta end-effector control + gripper
 DROID_ACTION_DIM = 7
@@ -24,8 +23,8 @@ class DROIDConfig:
 
     tokenizer_name: str = "HuggingFaceTB/cosmo2-tokenizer"
     img_size: int = 224
-    img_mean: Tuple[float, ...] = (0.485, 0.456, 0.406)
-    img_std: Tuple[float, ...] = (0.229, 0.224, 0.225)
+    img_mean: tuple[float, ...] = (0.485, 0.456, 0.406)
+    img_std: tuple[float, ...] = (0.229, 0.224, 0.225)
 
     max_seq_len: int = 512
     max_action_len: int = 256
@@ -37,9 +36,9 @@ class DROIDConfig:
     camera: str = "observation.images.exterior_image_1_left"
 
     # Window sampling
-    num_sample_frames: int = 5    # context frames fed as model input
-    num_predict_frames: int = 5   # future frames returned as DiT targets
-    frame_stride: int = 6         # temporal stride between sampled frames
+    num_sample_frames: int = 5  # context frames fed as model input
+    num_predict_frames: int = 5  # future frames returned as DiT targets
+    frame_stride: int = 6  # temporal stride between sampled frames
     min_episode_length: int = 12  # skip very short episodes
 
     # Episodes per chunk directory (default matches lerobot droid_100)
@@ -51,7 +50,7 @@ class DROIDConfig:
     assistant_prefix: str = "<|im_start|>assistant\n"
     turn_end: str = "<|im_end|>\n"
 
-    max_samples: Optional[int] = None
+    max_samples: int | None = None
     seed: int = 42
 
     # Internal — populated from meta/info.json

@@ -79,10 +79,8 @@ world_action_tokens[frame_offset + i]       ← learnable, one per global frame 
 ### World Action Tokens
 
 ```python
-self.world_action_tokens = nn.Parameter(
-    torch.empty(num_predict_frames, context_dim)
-)
-nn.init.normal_(self.world_action_tokens, std=0.02 * (num_predict_frames ** 0.5))
+self.world_action_tokens = nn.Parameter(torch.empty(num_predict_frames, context_dim))
+nn.init.normal_(self.world_action_tokens, std=0.02 * (num_predict_frames**0.5))
 ```
 
 One learnable token per predicted frame. The higher init std (`0.02 * sqrt(F)`) ensures tokens
@@ -93,7 +91,7 @@ At training and inference, `frame_offset` selects the correct token range:
 
 ```python
 token_start = frame_offset
-token_end   = min(frame_offset + num_frames, self.num_predict_frames)
+token_end = min(frame_offset + num_frames, self.num_predict_frames)
 action_query = self.world_action_tokens[token_start:token_end]
 ```
 
@@ -111,7 +109,7 @@ def _frame_pos_embedding(frame_indices: torch.Tensor, dim: int) -> torch.Tensor:
     half = dim // 2
     freqs = torch.exp(
         -torch.arange(half, dtype=torch.float32, device=frame_indices.device)
-        * (math.log(10000.0) / max(half - 1, 1))          # ← math.log, not torch
+        * (math.log(10000.0) / max(half - 1, 1))  # ← math.log, not torch
     )
     args = frame_indices.float().unsqueeze(1) * freqs.unsqueeze(0)
     return torch.cat([torch.sin(args), torch.cos(args)], dim=-1)
@@ -131,7 +129,7 @@ the current state entirely from a pooled transformer embedding, which is a much 
 
 ```python
 self.context_frame_enc = nn.Sequential(
-    nn.Conv2d(rgb_ch, context_dim // 4, kernel_size=8, stride=8),   # 224 → 28
+    nn.Conv2d(rgb_ch, context_dim // 4, kernel_size=8, stride=8),  # 224 → 28
     nn.GELU(),
     nn.Conv2d(context_dim // 4, context_dim // 2, kernel_size=4, stride=4),  # 28 → 7
     nn.GELU(),
@@ -165,9 +163,9 @@ signal, and then adds the context directly:
 
 ```python
 # In DiT.forward:
-gate = torch.sigmoid(self.context_gate(context))   # [B, D] ∈ (0, 1)
-ctx  = self.context_embed(context)                 # [B, D]
-c    = gate * t_emb + ctx
+gate = torch.sigmoid(self.context_gate(context))  # [B, D] ∈ (0, 1)
+ctx = self.context_embed(context)  # [B, D]
+c = gate * t_emb + ctx
 ```
 
 `context_gate.bias` is initialised to zero so `sigmoid(0) = 0.5` at the start —
@@ -185,7 +183,7 @@ v_cfg = v_null + guidance_scale * (v_cond - v_null)
 
 **Training:**
 ```python
-cfg_drop = torch.rand(B, device=device) < cfg_dropout_prob   # [B] bool
+cfg_drop = torch.rand(B, device=device) < cfg_dropout_prob  # [B] bool
 # Inside _create_all_frame_contexts:
 drop_flat = cfg_drop.unsqueeze(1).expand(-1, num_frames).reshape(BF)
 null = self.cfg_null_context.unsqueeze(0).expand(BF, -1)
@@ -221,7 +219,7 @@ x_next  = x  + (v(x, t) + v2) / 2 · dt   # trapezoidal average
 ```python
 for i in range(num_steps):
     t_val = i * dt
-    t     = torch.full((BF,), t_val, device=x.device)
+    t = torch.full((BF,), t_val, device=x.device)
 
     v1 = self.dit_rgb(x, t, cond)
     if use_cfg:
@@ -319,9 +317,9 @@ def F_func_temporal(v_frames: torch.Tensor) -> torch.Tensor:
 ```python
 total = (
     cfm_loss
-    + perceptual_weight * perc_loss   # default 0.1
-    + ssim_weight       * ssim_loss   # default 0.4
-    + temporal_weight   * temp_loss   # default 0.2
+    + perceptual_weight * perc_loss  # default 0.1
+    + ssim_weight * ssim_loss  # default 0.4
+    + temporal_weight * temp_loss  # default 0.2
 )
 ```
 
@@ -343,7 +341,7 @@ effective_batch = batch_size × grad_accum_steps
 **How it works in the training loop:**
 
 ```python
-optimizer.zero_grad()   # reset once before the accumulation window
+optimizer.zero_grad()  # reset once before the accumulation window
 
 for step, batch in enumerate(train_loader, 1):
     with autocast("cuda"):
@@ -353,7 +351,7 @@ for step, batch in enumerate(train_loader, 1):
     # over the effective batch, not the sum.
     scaler.scale(total_loss / accum_steps).backward()
 
-    is_last_batch = (step == len(train_loader))
+    is_last_batch = step == len(train_loader)
     if step % accum_steps == 0 or is_last_batch:
         scaler.unscale_(optimizer)
         clip_grad_norm_(model.parameters(), grad_clip)
@@ -384,10 +382,10 @@ If you change `accum_steps` significantly, adjust `T_max`:
 
 ```python
 # Current (train.py)
-T_max = epochs * len(train_loader)   # in micro-steps
+T_max = epochs * len(train_loader)  # in micro-steps
 
 # Correct for accumulation
-T_max = epochs * len(train_loader) // accum_steps   # in optimizer steps
+T_max = epochs * len(train_loader) // accum_steps  # in optimizer steps
 ```
 
 ---
@@ -428,10 +426,10 @@ with `frame_indices` on GPU, PyTorch raises a device mismatch error.
 
 ```python
 # Before (broken on GPU)
-* (torch.log(torch.tensor(10000.0)) / max(half - 1, 1))
+*(torch.log(torch.tensor(10000.0)) / max(half - 1, 1))
 
 # After
-* (math.log(10000.0) / max(half - 1, 1))
+*(math.log(10000.0) / max(half - 1, 1))
 ```
 
 `math.log` returns a Python float and participates in the tensor computation without

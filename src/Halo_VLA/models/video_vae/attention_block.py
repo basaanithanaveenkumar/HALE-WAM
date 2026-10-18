@@ -11,12 +11,12 @@ class AttentionBlock(nn.Module):
 
     def __init__(self, ch: int) -> None:
         super().__init__()
-        self.norm  = nn.GroupNorm(32, ch, eps=1e-6, affine=True)
-        self.q     = nn.Conv2d(ch, ch, 1)
-        self.k     = nn.Conv2d(ch, ch, 1)
-        self.v     = nn.Conv2d(ch, ch, 1)
-        self.proj  = nn.Conv2d(ch, ch, 1)
-        self.scale = ch ** -0.5
+        self.norm = nn.GroupNorm(32, ch, eps=1e-6, affine=True)
+        self.q = nn.Conv2d(ch, ch, 1)
+        self.k = nn.Conv2d(ch, ch, 1)
+        self.v = nn.Conv2d(ch, ch, 1)
+        self.proj = nn.Conv2d(ch, ch, 1)
+        self.scale = ch**-0.5
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Residual spatial self-attention.
@@ -28,10 +28,10 @@ class AttentionBlock(nn.Module):
             ``[B, C, H, W]``; attention is over the ``H * W`` positions (O((HW)^2) memory).
         """
         B, C, H, W = x.shape
-        h   = self.norm(x)
-        q   = self.q(h).view(B, C, H * W).permute(0, 2, 1)   # [B, HW, C]
-        k   = self.k(h).view(B, C, H * W)                     # [B, C,  HW]
-        v   = self.v(h).view(B, C, H * W).permute(0, 2, 1)   # [B, HW, C]
+        h = self.norm(x)
+        q = self.q(h).view(B, C, H * W).permute(0, 2, 1)  # [B, HW, C]
+        k = self.k(h).view(B, C, H * W)  # [B, C,  HW]
+        v = self.v(h).view(B, C, H * W).permute(0, 2, 1)  # [B, HW, C]
         att = torch.softmax(torch.bmm(q, k) * self.scale, dim=-1)
         out = torch.bmm(att, v).permute(0, 2, 1).view(B, C, H, W)
         return x + self.proj(out)

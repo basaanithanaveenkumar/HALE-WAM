@@ -11,13 +11,28 @@ from torch.utils.data import DataLoader
 
 #: CLI arguments that change the samples a dataset produces (they form the shard fingerprint).
 DATA_ARGUMENTS = (
-    "dataset", "subset", "moma_data_root", "droid_data_root", "moma_camera", "droid_camera",
-    "moma_num_frames", "moma_frame_stride", "moma_max_action_len", "max_seq_len", "action_dim",
-    "state_dim", "action_chunk_size", "num_predict_frames", "max_samples",
+    "dataset",
+    "subset",
+    "moma_data_root",
+    "droid_data_root",
+    "moma_camera",
+    "droid_camera",
+    "moma_num_frames",
+    "moma_frame_stride",
+    "moma_max_action_len",
+    "max_seq_len",
+    "action_dim",
+    "state_dim",
+    "action_chunk_size",
+    "num_predict_frames",
+    "max_samples",
     # the LLM backbone's tokenizer defines the token ids stored in the shards
-    "llm_backbone", "llm_model_id", "llm_checkpoint",
+    "llm_backbone",
+    "llm_model_id",
+    "llm_checkpoint",
     # the validation split removes samples from the training shards
-    "val_fraction", "val_seed",
+    "val_fraction",
+    "val_seed",
 )
 
 
@@ -33,16 +48,35 @@ class WebDatasetCliOptions:
     def add_arguments(parser: argparse.ArgumentParser) -> None:
         """Add the ``--webdataset*`` flags to ``parser``."""
         group = parser.add_argument_group("WebDataset (optional, needs hale-blocks[webdataset])")
-        group.add_argument("--webdataset", action="store_true",
-                           help="Convert the training dataset to WebDataset shards and stream them")
-        group.add_argument("--webdataset_root", default="data/webdataset", help="Shard root directory")
-        group.add_argument("--webdataset_samples_per_shard", type=int, default=256,
-                           help="Samples per tar shard (keep >= ranks x DataLoader workers shards)")
-        group.add_argument("--webdataset_convert_workers", type=int, default=0,
-                           help="DataLoader workers reading the source dataset while converting")
-        group.add_argument("--webdataset_shuffle_buffer", type=int, default=1000,
-                           help="In-memory sample shuffle buffer while training")
-        group.add_argument("--webdataset_overwrite", action="store_true", help="Re-convert existing shards")
+        group.add_argument(
+            "--webdataset",
+            action="store_true",
+            help="Convert the training dataset to WebDataset shards and stream them",
+        )
+        group.add_argument(
+            "--webdataset_root", default="data/webdataset", help="Shard root directory"
+        )
+        group.add_argument(
+            "--webdataset_samples_per_shard",
+            type=int,
+            default=256,
+            help="Samples per tar shard (keep >= ranks x DataLoader workers shards)",
+        )
+        group.add_argument(
+            "--webdataset_convert_workers",
+            type=int,
+            default=0,
+            help="DataLoader workers reading the source dataset while converting",
+        )
+        group.add_argument(
+            "--webdataset_shuffle_buffer",
+            type=int,
+            default=1000,
+            help="In-memory sample shuffle buffer while training",
+        )
+        group.add_argument(
+            "--webdataset_overwrite", action="store_true", help="Re-convert existing shards"
+        )
 
     @staticmethod
     def build_config(args: argparse.Namespace) -> Any:
@@ -73,8 +107,10 @@ class WebDatasetCliOptions:
         # set, so shards written before these options existed keep their fingerprint).
         from config.overrides import parse_model_options
 
-        overrides = {**(getattr(args, "model_overrides", None) or {}),
-                     **parse_model_options(getattr(args, "model_option", None))}
+        overrides = {
+            **(getattr(args, "model_overrides", None) or {}),
+            **parse_model_options(getattr(args, "model_option", None)),
+        }
         if overrides.get("img_size") is not None:
             spec["img_size"] = overrides["img_size"]
         return hashlib.sha256(json.dumps(spec, sort_keys=True, default=str).encode()).hexdigest()

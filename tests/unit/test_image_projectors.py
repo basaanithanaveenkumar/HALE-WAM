@@ -1,4 +1,5 @@
 """Q-Former / gated cross-attention image projectors for HaloVLM."""
+
 import sys
 from pathlib import Path
 
@@ -36,7 +37,12 @@ def _small_config(**overrides) -> HaloVLMConfig:
 
 def test_qformer_shapes_and_cross_attention_frequency():
     model = QFormer(
-        VISION_DIM, LLM_DIM, num_queries=8, hidden_dim=16, num_layers=4, num_heads=4,
+        VISION_DIM,
+        LLM_DIM,
+        num_queries=8,
+        hidden_dim=16,
+        num_layers=4,
+        num_heads=4,
         cross_attention_freq=2,
     )
     assert [layer.has_cross_attention for layer in model.layers] == [True, False, True, False]
@@ -77,7 +83,9 @@ def test_heads_must_divide_hidden_dim(cls):
 def test_config_validates_and_counts_image_tokens():
     assert HaloVLMConfig().proj_type == "mlp"
     assert HaloVLMConfig().num_image_tokens_per_image == (224 // 16) ** 2
-    assert HaloVLMConfig(proj_type="qformer", qformer_num_queries=12).num_image_tokens_per_image == 12
+    assert (
+        HaloVLMConfig(proj_type="qformer", qformer_num_queries=12).num_image_tokens_per_image == 12
+    )
     gated = HaloVLMConfig(proj_type="gated_cross_attention", gated_xattn_num_latents=7)
     assert gated.num_image_tokens_per_image == 7
     with pytest.raises(ValueError, match="proj_type"):

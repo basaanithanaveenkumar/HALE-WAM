@@ -15,10 +15,14 @@ class VLALoggingConfig(VLASection):
         tb_image_every: steps between input-frame images (0 disables).
     """
 
-    ARGS = {"log_every": "log_every", "tensorboard_dir": "tensorboard_dir", "tb_run_name": "tb_run_name",
-            "tb_image_every": "tb_image_every"}
+    ARGS = {
+        "log_every": "log_every",
+        "tensorboard_dir": "tensorboard_dir",
+        "tb_run_name": "tb_run_name",
+        "tb_image_every": "tb_image_every",
+    }
 
     log_every: int = 10
-    tensorboard_dir: str = "runs"          # "" disables TensorBoard
-    tb_run_name: str = ""                  # default: timestamp
+    tensorboard_dir: str = "runs"  # "" disables TensorBoard
+    tb_run_name: str = ""  # default: timestamp
     tb_image_every: int = 0

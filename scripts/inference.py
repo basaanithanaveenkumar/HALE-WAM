@@ -36,11 +36,11 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src" / "Halo_VLA"))
 
-from config import HaloVLMConfig
-from models.halo_vla import HaloVLM
-from dataloader.eo_dataset import build_eo_dataloader
-
 from loguru import logger
+
+from config import HaloVLMConfig
+from dataloader.eo_dataset import build_eo_dataloader
+from models.halo_vla import HaloVLM
 
 
 # ---------------------------------------------------------------------------
@@ -78,11 +78,10 @@ def load_checkpoint(ckpt_path: str, device: torch.device) -> tuple[HaloVLM, Halo
 def get_tokenizer(max_seq_len: int = 512) -> Any:
     """Return the same tokenizer used during training."""
     from transformers import AutoTokenizer
+
     from config.tokens import get_all_custom_tokens
 
-    tok = AutoTokenizer.from_pretrained(
-        "HuggingFaceTB/cosmo2-tokenizer", trust_remote_code=True
-    )
+    tok = AutoTokenizer.from_pretrained("HuggingFaceTB/cosmo2-tokenizer", trust_remote_code=True)
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
 
@@ -100,11 +99,13 @@ def get_tokenizer(max_seq_len: int = 512) -> Any:
 def preprocess_image(img_path: str, img_size: int = 224) -> torch.Tensor:
     """Load and transform a single image → [1, 3, H, W]."""
     img = Image.open(img_path).convert("RGB")
-    transform = T.Compose([
-        T.Resize((img_size, img_size)),
-        T.ToTensor(),
-        T.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
-    ])
+    transform = T.Compose(
+        [
+            T.Resize((img_size, img_size)),
+            T.ToTensor(),
+            T.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+        ]
+    )
     return transform(img).unsqueeze(0)  # [1, 3, H, W]
 
 
@@ -115,10 +116,10 @@ def preprocess_image(img_path: str, img_size: int = 224) -> torch.Tensor:
 def generate(
     model: HaloVLM,
     tokenizer: Any,
-    images: torch.Tensor,       # [1, N_img, 3, H, W]
-    input_ids: torch.Tensor,    # [1, seq_len]
+    images: torch.Tensor,  # [1, N_img, 3, H, W]
+    input_ids: torch.Tensor,  # [1, seq_len]
     attention_mask: torch.Tensor,
-    states: torch.Tensor,       # [1, N_state, state_dim]
+    states: torch.Tensor,  # [1, N_state, state_dim]
     max_new_tokens: int = 128,
     temperature: float = 1.0,
     top_k: int = 0,
@@ -179,7 +180,7 @@ def generate(
             next_token = next_logits.argmax(dim=-1, keepdim=True)  # [1, 1]
         else:
             probs = F.softmax(next_logits, dim=-1)
-            next_token = torch.multinomial(probs, num_samples=1)   # [1, 1]
+            next_token = torch.multinomial(probs, num_samples=1)  # [1, 1]
 
         token_id = next_token.item()
         generated_ids.append(token_id)
@@ -226,9 +227,7 @@ def interactive(args: argparse.Namespace) -> None:
     states = torch.zeros(1, 1, config.state_dim, device=device)
 
     # Build system prompt
-    sys_text = (
-        f"<|im_start|>system\n{config.system_prompt}<|im_end|>\n"
-    )
+    sys_text = f"<|im_start|>system\n{config.system_prompt}<|im_end|>\n"
 
     # Interactive REPL: the banner and the replies are the command's output, so they go to stdout.
     print("\n=== Halo-VLA Interactive Inference ===")
@@ -304,7 +303,7 @@ def evaluate_dataset(args: argparse.Namespace) -> None:
 
     loader = build_eo_dataloader(
         subset=args.subset,
-        split="train",       # use "train" if no val split is available
+        split="train",  # use "train" if no val split is available
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         img_size=config.img_size,
@@ -374,7 +373,10 @@ def evaluate_dataset(args: argparse.Namespace) -> None:
         if step % args.log_every == 0:
             logger.info(
                 "Step {}/{} | lang={:.4f}  act={:.4f}",
-                step, len(loader), lang_loss.item(), act_loss.item(),
+                step,
+                len(loader),
+                lang_loss.item(),
+                act_loss.item(),
             )
 
     elapsed = time.time() - t0

@@ -19,7 +19,7 @@ EncoderBuild = tuple[nn.Module, VisionEncoderInfo | None]
 #: Default Hub repos for the pretrained encoders (both checked on the Hub).
 DEFAULT_HF_ENCODERS = {
     "siglip": "google/siglip-base-patch16-224",  # Zhai et al., 2023, arXiv:2303.15343
-    "clip": "openai/clip-vit-base-patch16",      # Radford et al., 2021, arXiv:2103.00020
+    "clip": "openai/clip-vit-base-patch16",  # Radford et al., 2021, arXiv:2103.00020
 }
 
 
@@ -29,9 +29,14 @@ def build_vit_encoder(config: HaloVLMConfig) -> EncoderBuild:
     from models.vit import VisTransformer  # lazy: keeps the registry importable on its own
 
     encoder = VisTransformer(
-        img_size=config.img_size, p_size=config.patch_size, in_chans=config.in_chans,
-        emb_dim=config.emb_dim, num_layers=config.vit_num_layers, num_heads=config.vit_num_heads,
-        mlp_dim=config.vit_mlp_dim, drop_fact=config.vit_drop,
+        img_size=config.img_size,
+        p_size=config.patch_size,
+        in_chans=config.in_chans,
+        emb_dim=config.emb_dim,
+        num_layers=config.vit_num_layers,
+        num_heads=config.vit_num_heads,
+        mlp_dim=config.vit_mlp_dim,
+        drop_fact=config.vit_drop,
     )
     if config.resolved_vision_freeze:
         encoder.requires_grad_(False)
@@ -62,7 +67,8 @@ def build_local_encoder(config: HaloVLMConfig) -> EncoderBuild:
     from models.vision_backbone import HaloVisionBackbone  # lazy: pulls in the HaleBlocks backbones
 
     encoder = HaloVisionBackbone(
-        backbone_name=config.vision_backbone, img_size=config.img_size,
+        backbone_name=config.vision_backbone,
+        img_size=config.img_size,
         freeze_encoder=config.resolved_vision_freeze,
         freeze_up_to_stage=config.vision_freeze_up_to_stage,
         pretrained_path=config.vision_pretrained_path,

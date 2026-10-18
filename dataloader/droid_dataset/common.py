@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from torch.utils.data import DataLoader
 
@@ -37,7 +37,7 @@ def build_droid_dataloader(
     frame_stride: int = 6,
     split: str = "train",
     shuffle: bool = True,
-    max_samples: Optional[int] = None,
+    max_samples: int | None = None,
     pin_memory: bool = True,
     **kwargs: Any,
 ) -> DataLoader:
@@ -70,8 +70,7 @@ def build_droid_dataloader(
         num_predict_frames=num_predict_frames,
         frame_stride=frame_stride,
         max_samples=max_samples,
-        **{k: v for k, v in kwargs.items()
-           if k in DROIDConfig.__dataclass_fields__},
+        **{k: v for k, v in kwargs.items() if k in DROIDConfig.__dataclass_fields__},
     )
     ds = DROIDDataset(config=cfg, tokenizer=tokenizer, split=split)
     return DataLoader(

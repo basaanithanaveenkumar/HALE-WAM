@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from torch import Tensor
 
 
-def _apply_mask(t: Tensor, mask: Optional[Tensor]) -> Tensor:
+def _apply_mask(t: Tensor, mask: Tensor | None) -> Tensor:
     """Flatten a [B, T, D] tensor, applying a [B, T] boolean mask if given."""
     if mask is None:
         return t.reshape(-1, t.shape[-1])

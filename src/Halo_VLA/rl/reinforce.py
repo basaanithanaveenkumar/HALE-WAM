@@ -60,22 +60,22 @@ def compute_reinforce_loss(
     # 1. Sample an action and its (differentiable) log-probability.
     #    ``sample`` returns a detached action so log_prob's gradient is the pure
     #    score function ∇θ log π(a|s).
-    action, log_prob = policy.sample(cond)           # [B, A], [B]
+    action, log_prob = policy.sample(cond)  # [B, A], [B]
 
     # 2. Reward is an external signal — no gradient flows through it.
     with torch.no_grad():
-        reward = reward_fn(action)                   # [B]
+        reward = reward_fn(action)  # [B]
 
     # 3. Critic prediction of the return for this state.
-    value_pred = value(cond)                         # [B]
+    value_pred = value(cond)  # [B]
 
     # 4. Advantage.  Detached: the actor update treats (R − V) as a constant
     #    weight on ∇θ log π; we do not want gradients flowing into V through the
     #    actor term (V is trained by its own regression loss below).
     if use_baseline:
-        advantage = (reward - value_pred).detach()   # [B]
+        advantage = (reward - value_pred).detach()  # [B]
     else:
-        advantage = reward.detach()                  # [B]
+        advantage = reward.detach()  # [B]
 
     # 5. Actor loss: maximise A·logπ  ==  minimise −A·logπ.
     policy_loss = -(advantage * log_prob).mean()

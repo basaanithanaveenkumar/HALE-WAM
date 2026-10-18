@@ -27,8 +27,14 @@ class System1PolicyGraph(nn.Module):
         self.steps = int(steps or dual.config.sample_steps)
         self.system1.strategy.prepare(self.steps)  # concrete noise levels before tracing
 
-    def forward(self, latent: torch.Tensor, latent_mask: torch.Tensor, image: torch.Tensor, state: torch.Tensor,
-                noise: torch.Tensor | None = None) -> torch.Tensor:
+    def forward(
+        self,
+        latent: torch.Tensor,
+        latent_mask: torch.Tensor,
+        image: torch.Tensor,
+        state: torch.Tensor,
+        noise: torch.Tensor | None = None,
+    ) -> torch.Tensor:
         """Condition on the latent and run the policy's sampler from ``noise``.
 
         Args:
@@ -42,4 +48,6 @@ class System1PolicyGraph(nn.Module):
             The action chunk ``(B, chunk, action_dim)``.
         """
         cond, cond_mask = self.system1.condition(latent, latent_mask, image, state)
-        return self.system1.strategy.sample_from_noise(self.system1.head, cond, cond_mask, noise, self.steps)
+        return self.system1.strategy.sample_from_noise(
+            self.system1.head, cond, cond_mask, noise, self.steps
+        )

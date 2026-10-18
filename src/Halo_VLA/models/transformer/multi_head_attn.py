@@ -5,6 +5,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 from exceptions import HaloVLAConfigError
 
 from .head_attn import HeadAttn
@@ -27,21 +28,36 @@ class MultiHeadAttn(nn.Module):
         HaloVLAConfigError: if ``emb_dim`` is not divisible by ``num_heads``.
     """
 
-    def __init__(self, emb_dim: int = 256, num_heads: int = 8, drop_fact: float = 0.0, causal_mask: bool = False,
-                 return_attn_weights: bool = False) -> None:
+    def __init__(
+        self,
+        emb_dim: int = 256,
+        num_heads: int = 8,
+        drop_fact: float = 0.0,
+        causal_mask: bool = False,
+        return_attn_weights: bool = False,
+    ) -> None:
         super().__init__()
         self.em_dim = emb_dim
         self.num_heads = num_heads
         if emb_dim % num_heads != 0:
-            raise HaloVLAConfigError(f"emb_dim {emb_dim} must be divisible by num_heads {num_heads}")
+            raise HaloVLAConfigError(
+                f"emb_dim {emb_dim} must be divisible by num_heads {num_heads}"
+            )
 
         self.head_size = emb_dim // num_heads
         self.causal_mask = causal_mask
-        self.heads = nn.ModuleList([
-            HeadAttn(emb_dim, head_size=self.head_size, drop_fact=drop_fact,
-                     causal_mask=causal_mask, return_attn_weights=return_attn_weights)
-            for _ in range(num_heads)
-        ])
+        self.heads = nn.ModuleList(
+            [
+                HeadAttn(
+                    emb_dim,
+                    head_size=self.head_size,
+                    drop_fact=drop_fact,
+                    causal_mask=causal_mask,
+                    return_attn_weights=return_attn_weights,
+                )
+                for _ in range(num_heads)
+            ]
+        )
         self.proj = nn.Linear(emb_dim, emb_dim)
         self.dropout = nn.Dropout(drop_fact)
 
@@ -59,8 +75,8 @@ class MultiHeadAttn(nn.Module):
         # Project all heads at once → [B, H, L, head_size].
         # Weights come from the existing per-head Linear layers (checkpoint-compatible).
         Q = torch.stack([h.query_proj(inputs) for h in self.heads], dim=1)
-        K = torch.stack([h.key_proj(inputs)   for h in self.heads], dim=1)
-        V = torch.stack([h.val_proj(inputs)   for h in self.heads], dim=1)
+        K = torch.stack([h.key_proj(inputs) for h in self.heads], dim=1)
+        V = torch.stack([h.val_proj(inputs) for h in self.heads], dim=1)
 
         # Boolean attend-mask (True = this position is allowed to be attended to).
         attn_mask = None
@@ -77,7 +93,9 @@ class MultiHeadAttn(nn.Module):
         # F.scaled_dot_product_attention uses Flash Attention when available,
         # avoiding the explicit [B, H, L, L] attention matrix entirely.
         out = F.scaled_dot_product_attention(
-            Q, K, V,
+            Q,
+            K,
+            V,
             attn_mask=attn_mask,
             dropout_p=self.dropout.p if self.training else 0.0,
         )  # [B, H, L, head_size]

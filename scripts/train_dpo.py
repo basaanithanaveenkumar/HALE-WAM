@@ -38,9 +38,9 @@ from loguru import logger
 
 from config import HaloVLMConfig
 from models.halo_vla import HaloVLM
+from rl.dpo import compute_dpo_loss
 from rl.policy import GaussianActionPolicy
 from rl.preference import sample_preference_pairs
-from rl.dpo import compute_dpo_loss
 from rl.rewards import negative_distance_reward
 
 
@@ -78,7 +78,8 @@ def main() -> None:
     logger.info("Device: {}", device)
 
     config = HaloVLMConfig(
-        action_dim=args.action_dim, state_dim=args.state_dim,
+        action_dim=args.action_dim,
+        state_dim=args.state_dim,
         action_chunk_size=args.action_chunk_size,
     )
 
@@ -103,13 +104,15 @@ def main() -> None:
             cond = GaussianActionPolicy.conditioning_from_halo(model, batch, device=device)
 
             actions = batch["actions"].to(device)
-            target = actions[:, :config.action_chunk_size].reshape(actions.size(0), -1)
+            target = actions[:, : config.action_chunk_size].reshape(actions.size(0), -1)
             if target.size(1) < flat_dim:
                 pad = torch.zeros(target.size(0), flat_dim - target.size(1), device=device)
                 target = torch.cat([target, pad], dim=1)
             target = target[:, :flat_dim]
 
-            def reward_fn(a: torch.Tensor, _t: torch.Tensor = target, _k: int = args.num_candidates) -> torch.Tensor:
+            def reward_fn(
+                a: torch.Tensor, _t: torch.Tensor = target, _k: int = args.num_candidates
+            ) -> torch.Tensor:
                 """Negative distance of each candidate to its state's target (``_k`` candidates per state)."""
                 tgt = _t.repeat_interleave(_k, dim=0)
                 return negative_distance_reward(a, tgt)
@@ -133,8 +136,12 @@ def main() -> None:
                 logger.info(
                     "step {} | loss {:.4f} | acc {:.3f} | margin {:.4f} | "
                     "r_chosen {:.4f} | r_rejected {:.4f}",
-                    step, metrics["loss"], metrics["accuracy"], metrics["margin"],
-                    metrics["chosen_reward"], metrics["rejected_reward"],
+                    step,
+                    metrics["loss"],
+                    metrics["accuracy"],
+                    metrics["margin"],
+                    metrics["chosen_reward"],
+                    metrics["rejected_reward"],
                 )
             if step >= args.steps:
                 logger.info("Reached --steps={}; stopping.", args.steps)
@@ -163,8 +170,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--lr", type=float, default=3e-4)
     p.add_argument("--grad_clip", type=float, default=1.0)
     p.add_argument("--beta", type=float, default=0.1, help="DPO temperature β")
-    p.add_argument("--num_candidates", type=int, default=8,
-                   help="Candidate actions sampled per state to form a pair")
+    p.add_argument(
+        "--num_candidates",
+        type=int,
+        default=8,
+        help="Candidate actions sampled per state to form a pair",
+    )
     p.add_argument("--log_every", type=int, default=5)
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     return p.parse_args()

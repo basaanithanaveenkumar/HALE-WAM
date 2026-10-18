@@ -43,7 +43,7 @@ class PSNRMetric(RoboticsMetricBase):
 
     def update(
         self,
-        pred: Tensor,    # [B, C, H, W] float32, same range as max_val
+        pred: Tensor,  # [B, C, H, W] float32, same range as max_val
         target: Tensor,  # [B, C, H, W]
     ) -> None:
         """Accumulate one batch.
@@ -67,5 +67,5 @@ class PSNRMetric(RoboticsMetricBase):
         if mean_mse < 1e-10:
             psnr = 100.0  # effectively infinite (perfect reconstruction)
         else:
-            psnr = 10.0 * math.log10((self.max_val ** 2) / mean_mse)
+            psnr = 10.0 * math.log10((self.max_val**2) / mean_mse)
         return {"psnr_mean": psnr}

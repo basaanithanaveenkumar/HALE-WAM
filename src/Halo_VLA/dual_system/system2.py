@@ -93,12 +93,20 @@ class System2(nn.Module):
             ``reference_embeds`` used by the alignment loss.
         """
         b = batch["input_ids"].size(0)
-        extra = None if self.act_queries is None else self.act_queries.unsqueeze(0).expand(b, -1, -1)
+        extra = (
+            None if self.act_queries is None else self.act_queries.unsqueeze(0).expand(b, -1, -1)
+        )
         layer = self.capture_layer()
-        with torch.set_grad_enabled(torch.is_grad_enabled() and not (self.frozen and extra is None)):
+        with torch.set_grad_enabled(
+            torch.is_grad_enabled() and not (self.frozen and extra is None)
+        ):
             out = self.model.encode_sequence(
-                self.view_images(batch["images"]), batch["input_ids"], batch["attention_mask"],
-                batch["states"], extra_embeds=extra, capture_layer=layer,
+                self.view_images(batch["images"]),
+                batch["input_ids"],
+                batch["attention_mask"],
+                batch["states"],
+                extra_embeds=extra,
+                capture_layer=layer,
             )
         out["input_ids"] = batch["input_ids"]
         # Instruction reference for the alignment loss, in the latent's space (emb_dim): the

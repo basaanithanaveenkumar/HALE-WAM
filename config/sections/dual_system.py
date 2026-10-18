@@ -8,7 +8,17 @@ from pydantic import model_validator
 
 from config.sections.base import VLASection
 
-PRESET_NAMES = ("none", "custom", "basic", "lcb", "dp_vla", "hirt", "robodual", "dexvla", "openhelix")
+PRESET_NAMES = (
+    "none",
+    "custom",
+    "basic",
+    "lcb",
+    "dp_vla",
+    "hirt",
+    "robodual",
+    "dexvla",
+    "openhelix",
+)
 
 
 class DualSystemSection(VLASection):
@@ -26,7 +36,10 @@ class DualSystemSection(VLASection):
     """
 
     preset: Literal[PRESET_NAMES] = "none"
-    latent: Literal["act_token", "multi_act", "last_hidden", "pooled", "language", "middle_layer"] | None = None
+    latent: (
+        Literal["act_token", "multi_act", "last_hidden", "pooled", "language", "middle_layer"]
+        | None
+    ) = None
     num_act_tokens: int | None = None
     multi_act_with_language: bool | None = None
     middle_layer: int | None = None
@@ -55,7 +68,9 @@ class DualSystemSection(VLASection):
     def _resolves(self) -> DualSystemSection:
         from dual_system.resolution import resolve_dual_system_config
 
-        resolve_dual_system_config(self.preset, self.options() or None)  # raises on bad combinations
+        resolve_dual_system_config(
+            self.preset, self.options() or None
+        )  # raises on bad combinations
         return self
 
     def train_arguments(self) -> dict[str, Any]:
@@ -65,5 +80,7 @@ class DualSystemSection(VLASection):
             out["dual_system"] = self.preset
         options = self.options()
         if options:
-            out["dual_system_option"] = [f"{k}={'none' if v is None else v}" for k, v in options.items()]
+            out["dual_system_option"] = [
+                f"{k}={'none' if v is None else v}" for k, v in options.items()
+            ]
         return out

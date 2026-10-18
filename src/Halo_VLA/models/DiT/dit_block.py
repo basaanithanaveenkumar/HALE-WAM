@@ -28,8 +28,7 @@ class DiTBlock(nn.Module):
         )
         # Adaptive LN parameters: scale and shift for both norms, plus residual scales
         self.adaLN_modulation = nn.Sequential(
-            nn.SiLU(),
-            nn.Linear(hidden_size, 6 * hidden_size, bias=True)
+            nn.SiLU(), nn.Linear(hidden_size, 6 * hidden_size, bias=True)
         )
 
     def forward(self, x: torch.Tensor, c: torch.Tensor) -> torch.Tensor:
@@ -43,8 +42,9 @@ class DiTBlock(nn.Module):
             ``[B, N, D]``.
         """
         # c is the adaLN conditioning vector (e.g., time embedding + context)
-        shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = \
-            self.adaLN_modulation(c).chunk(6, dim=1)
+        shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaLN_modulation(
+            c
+        ).chunk(6, dim=1)
         # Modulate layer norm 1
         x_norm = self.norm1(x)
         x_mod = x_norm * (1 + scale_msa.unsqueeze(1)) + shift_msa.unsqueeze(1)

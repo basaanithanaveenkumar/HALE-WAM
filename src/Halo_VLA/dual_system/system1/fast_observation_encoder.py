@@ -16,8 +16,10 @@ class FastObservationEncoder(nn.Module):
     def __init__(self, dim: int, img_size: int) -> None:
         super().__init__()
         self.stem = nn.Sequential(
-            nn.Conv2d(3, 32, 4, stride=4), nn.GELU(),
-            nn.Conv2d(32, 64, 2, stride=2), nn.GELU(),
+            nn.Conv2d(3, 32, 4, stride=4),
+            nn.GELU(),
+            nn.Conv2d(32, 64, 2, stride=2),
+            nn.GELU(),
             nn.Conv2d(64, dim, 2, stride=2),
         )
         grid = max(1, img_size // 16)

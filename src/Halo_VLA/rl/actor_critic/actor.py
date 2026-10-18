@@ -30,8 +30,10 @@ class Actor(nn.Module):
         self.log_std_min = log_std_min
         self.log_std_max = log_std_max
         self.net = nn.Sequential(
-            nn.Linear(feature_dim, hidden_dim), nn.ELU(),
-            nn.Linear(hidden_dim, hidden_dim), nn.ELU(),
+            nn.Linear(feature_dim, hidden_dim),
+            nn.ELU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ELU(),
         )
         self.mean = nn.Linear(hidden_dim, action_dim)
         self.log_std = nn.Linear(hidden_dim, action_dim)

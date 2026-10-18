@@ -30,10 +30,12 @@ class StubHaloVLA(nn.Module):
         mlp_dim: int = 512,
     ) -> None:
         super().__init__()
-        self.vit     = StubViT(emb_dim=emb_dim, n_layers=n_vit_layers, n_heads=n_heads, mlp_dim=mlp_dim)
-        self.proj    = nn.Linear(emb_dim, emb_dim)
-        self.decoder = StubDecoderTransformer(emb_dim=emb_dim, n_layers=n_dec_layers, n_heads=n_heads, mlp_dim=mlp_dim)
-        self.action  = StubActionDecoder(emb_dim=emb_dim)
+        self.vit = StubViT(emb_dim=emb_dim, n_layers=n_vit_layers, n_heads=n_heads, mlp_dim=mlp_dim)
+        self.proj = nn.Linear(emb_dim, emb_dim)
+        self.decoder = StubDecoderTransformer(
+            emb_dim=emb_dim, n_layers=n_dec_layers, n_heads=n_heads, mlp_dim=mlp_dim
+        )
+        self.action = StubActionDecoder(emb_dim=emb_dim)
 
     def forward(self, images: torch.Tensor, state: torch.Tensor) -> torch.Tensor:
         """Run the stub pipeline.
@@ -45,8 +47,8 @@ class StubHaloVLA(nn.Module):
         Returns:
             An action chunk ``[B, chunk_size, action_dim]``.
         """
-        vis  = self.vit(images)          # (B, patches, emb)
-        vis  = self.proj(vis)
-        ctx  = torch.cat([vis, state.unsqueeze(1)], dim=1)
-        h    = self.decoder(ctx)
+        vis = self.vit(images)  # (B, patches, emb)
+        vis = self.proj(vis)
+        ctx = torch.cat([vis, state.unsqueeze(1)], dim=1)
+        h = self.decoder(ctx)
         return self.action(h)

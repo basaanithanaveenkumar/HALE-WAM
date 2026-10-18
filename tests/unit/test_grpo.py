@@ -17,8 +17,8 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src" / "Halo_VLA"))
 
-from rl.policy import GaussianActionPolicy
 from rl.grpo import compute_grpo_loss, group_relative_advantage
+from rl.policy import GaussianActionPolicy
 from rl.rewards import negative_distance_reward
 
 
@@ -33,7 +33,7 @@ def _fresh_ref(policy):
 def test_group_relative_advantage_is_standardised():
     """Each group's advantages are zero-mean and (for G>1) unit-std."""
     torch.manual_seed(0)
-    rewards = torch.randn(5, 8) * 3 + 7   # arbitrary mean/scale per group
+    rewards = torch.randn(5, 8) * 3 + 7  # arbitrary mean/scale per group
     adv = group_relative_advantage(rewards)
     assert torch.allclose(adv.mean(dim=1), torch.zeros(5), atol=1e-5)
     assert torch.allclose(adv.std(dim=1, unbiased=False), torch.ones(5), atol=1e-3)
@@ -51,9 +51,7 @@ def test_grpo_loss_scalar_and_backprops():
     def reward_fn(a, g=8):
         return negative_distance_reward(a, target)
 
-    loss, metrics = compute_grpo_loss(
-        policy, ref, cond, reward_fn, group_size=8, kl_beta=0.04
-    )
+    loss, metrics = compute_grpo_loss(policy, ref, cond, reward_fn, group_size=8, kl_beta=0.04)
     assert loss.dim() == 0
     loss.backward()
     assert any(p.grad is not None and p.grad.abs().sum() > 0 for p in policy.parameters())
@@ -70,8 +68,12 @@ def test_grpo_at_init_kl_zero_and_loss_near_zero():
     target = torch.randn(A)
 
     loss, metrics = compute_grpo_loss(
-        policy, ref, cond, lambda a: negative_distance_reward(a, target),
-        group_size=16, kl_beta=0.04,
+        policy,
+        ref,
+        cond,
+        lambda a: negative_distance_reward(a, target),
+        group_size=16,
+        kl_beta=0.04,
     )
     assert abs(metrics["kl"]) < 1e-5, metrics["kl"]
     assert abs(metrics["ratio_mean"] - 1.0) < 1e-5, metrics["ratio_mean"]
@@ -102,8 +104,8 @@ def test_grpo_increases_preference_margin():
     # Freeze a group of actions so we compare like-for-like across updates.
     cond_rep = cond.repeat_interleave(G, dim=0)
     with torch.no_grad():
-        actions = ref.distribution(cond_rep).sample()           # [N*G, A]
-        rewards = negative_distance_reward(actions, target)     # [N*G]
+        actions = ref.distribution(cond_rep).sample()  # [N*G, A]
+        rewards = negative_distance_reward(actions, target)  # [N*G]
     rg = rewards.view(N, G)
     best_idx = rg.argmax(dim=1) + torch.arange(N) * G
     worst_idx = rg.argmin(dim=1) + torch.arange(N) * G
@@ -128,11 +130,11 @@ def test_grpo_increases_preference_margin():
 
     margin_after = margin()
     assert margin_after > margin_before, (
-        f"preference margin should grow: before={margin_before:.3f} "
-        f"after={margin_after:.3f}"
+        f"preference margin should grow: before={margin_before:.3f} after={margin_after:.3f}"
     )
-    print(f"test_grpo_increases_preference_margin passed "
-          f"({margin_before:.3f} -> {margin_after:.3f}).")
+    print(
+        f"test_grpo_increases_preference_margin passed ({margin_before:.3f} -> {margin_after:.3f})."
+    )
 
 
 if __name__ == "__main__":

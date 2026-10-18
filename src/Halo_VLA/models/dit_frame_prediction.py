@@ -20,7 +20,7 @@ Training objective (same OT path as conditional flow matching)::
     x_0 ~ N(0, I),  t ~ U(0, 1),  x_1 = target RGB frame
     x_t = (1 - t) x_0 + t * x_1
     v*  = x_1 - x_0
-    
+
     c_action[i] = CrossAttn(world_action_tokens[i] → text_embeddings)
     L_cfm = || v_θ(x_t, t, c_action[i]) - v* ||²
 
@@ -38,21 +38,18 @@ Key features:
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-from typing import Any, Dict, Optional, Tuple
-
 import math
+from typing import Any
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from models.DiT import DiT
 from models.dit_frame_prediction_losses import (  # noqa: F401 - re-exported
     F_func_temporal,
-    _VGGPerceptualLoss,
     _get_vgg_loss,
     _ssim_loss,
+    _VGGPerceptualLoss,
     flow_matching_velocity_loss,
     make_dit_config,
     sample_di_t_euler,
@@ -75,49 +72,35 @@ def _frame_pos_embedding(frame_indices: torch.Tensor, dim: int) -> torch.Tensor:
         * (math.log(10000.0) / max(half - 1, 1))
     )
     args = frame_indices.float().unsqueeze(1) * freqs.unsqueeze(0)  # [N, half]
-    return torch.cat([torch.sin(args), torch.cos(args)], dim=-1)    # [N, dim]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    return torch.cat([torch.sin(args), torch.cos(args)], dim=-1)  # [N, dim]
 
 
 class RGBFramePredictor(nn.Module):
     """
     Multi-frame RGB predictor using DiT with conditional flow matching.
-    
+
     This module predicts a sequence of future RGB frames using a single DiT conditioned on:
       1. World action query tokens (learnable, one per frame)
       2. Text embeddings (from frozen encoder, interacted via cross-attention)
       3. Diffusion time t ∈ [0, 1]
-    
+
     The key innovation is that world action tokens **interact with text embeddings** through
     cross-attention to generate frame-specific conditional embeddings. This allows the text
     to guide the action tokens, creating rich spatiotemporal dynamics for each predicted frame.
-    
+
     Key design choices:
       - Single DiT head for RGB (simplified from three heads for RGB/depth/flow).
       - World action tokens: learnable [num_frames, context_dim] embeddings that attend
         to text embeddings via cross-attention (not simple concatenation).
       - Configurable number of frames to predict (via num_predict_frames parameter).
       - Uses flow matching (OT path) loss during training.
-    
+
     Architecture flow:
       world_action_tokens[i] --[cross-attention]--> text_embeddings --> conditional_emb[i]
                                                                                 |
                                                                                 v
                                                                           DiT(x_t, t, cond_emb[i])
-    
+
     Usage:
         During training: call compute_loss(future_rgb, text_emb, num_frames=4)
         During inference: call predict_future_frames(height, width, text_emb, num_frames=4)
@@ -126,7 +109,7 @@ class RGBFramePredictor(nn.Module):
     def __init__(self, config: Any, num_predict_frames: int = 4):
         """
         Initialize the RGB frame predictor with world action query tokens.
-        
+
         Args:
             config: Configuration object with DiT hyperparameters
                    (dit_hidden_size, dit_depth, dit_num_heads, dit_patch_size, emb_dim, etc.).
@@ -137,24 +120,22 @@ class RGBFramePredictor(nn.Module):
         super().__init__()
         self.config = config
         self.num_predict_frames = num_predict_frames
-        
+
         # RGB channels (typically 3 for RGB)
         rgb_ch = getattr(config, "rgb_channels", getattr(config, "dit_rgb_in_channels", 3))
         context_dim = config.emb_dim
-        
+
         # Create the single DiT for RGB prediction
         self.dit_rgb = DiT(make_dit_config(config, rgb_ch, rgb_ch))
-        
+
         # ==================== World Action Tokens ====================
         # Learnable query tokens: one per predicted frame
         # These tokens will attend to text embeddings to create frame-specific conditioning
         # Shape: [num_predict_frames, context_dim]
-        self.world_action_tokens = nn.Parameter(
-            torch.empty(num_predict_frames, context_dim)
-        )
+        self.world_action_tokens = nn.Parameter(torch.empty(num_predict_frames, context_dim))
         # Higher std so tokens start distinguishable — critical for per-frame diversity.
-        nn.init.normal_(self.world_action_tokens, std=0.02 * (num_predict_frames ** 0.5))
-        
+        nn.init.normal_(self.world_action_tokens, std=0.02 * (num_predict_frames**0.5))
+
         # ==================== Text-Action Cross-Attention ====================
         # Cross-attention: world_action_tokens (queries) attend to text_embeddings (keys/values)
         # This produces frame-specific conditional embeddings that combine text and action info
@@ -217,36 +198,36 @@ class RGBFramePredictor(nn.Module):
         # doesn't over-rely on perfect GT prev-frames (teacher forcing gap).
         ctx_drop = getattr(config, "context_frame_dropout", 0.2)
         self.context_frame_dropout = nn.Dropout(p=ctx_drop)
-    
+
     def _create_augmented_context(
         self,
         text_emb: torch.Tensor,
         num_frames: int,
-        frame_idx: Optional[int] = None,
-        world_video_query: Optional[torch.Tensor] = None,
+        frame_idx: int | None = None,
+        world_video_query: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """
         Create frame-specific conditional embeddings via world action token-text interaction.
-        
+
         This method uses cross-attention to fuse world action query tokens with text embeddings.
         Each frame's action token attends to the full text sequence, creating a rich conditional
         embedding that combines temporal action information with semantic text guidance.
-        
+
         Architecture:
           - Queries (Q): world_action_tokens[frame_idx] for the specific frame
           - Keys (K), Values (V): text_embeddings (frozen encoder output)
           - Output: conditional embedding [B, 1, emb_dim] refined via feed-forward
-        
+
         Args:
             text_emb: [B, seq_len, emb_dim] or [B, emb_dim] text embeddings from frozen encoder.
                      If 2D, will be expanded to [B, 1, emb_dim] as a single summary token.
             num_frames: Total number of frames being predicted.
             frame_idx: Optional frame index (0 to num_frames-1). If None, uses average
                       of all action tokens for this batch of frames.
-        
+
         Returns:
             conditional_emb: [B, emb_dim] conditional embedding for DiT from text-action interaction.
-        
+
         Process:
           1. Get frame-specific action token(s)
           2. Expand to batch: [1, emb_dim] → [B, 1, emb_dim]
@@ -263,7 +244,7 @@ class RGBFramePredictor(nn.Module):
         else:
             # Already [B, seq_len, emb_dim]
             text_emb_seq = text_emb
-        
+
         if world_video_query is not None:
             # world_video_query: [B, emb_dim] — contextualized hidden state from HaloVLM.
             # Project to context_dim (no-op when dims match) and use as cross-attn query.
@@ -277,7 +258,7 @@ class RGBFramePredictor(nn.Module):
                 action_token = action_tokens.mean(dim=0)  # [emb_dim]
             action_query = action_token.unsqueeze(0).unsqueeze(0).expand(batch_size, -1, -1)
             # [B, 1, context_dim]
-        
+
         # ==================== Cross-Attention: Action Token → Text ====================
         # Q: action_query [B, 1, emb_dim] — what to predict
         # K, V: text_emb_seq [B, seq_len, emb_dim] — text guidance
@@ -289,13 +270,17 @@ class RGBFramePredictor(nn.Module):
             need_weights=False,
         )
         # attn_output: [B, 1, emb_dim]
-        
+
         # Residual + norm after cross-attention (pre-FFN norm)
-        action_query_refined = self.cross_attn_norm(attn_output.squeeze(1) + action_query.squeeze(1))
+        action_query_refined = self.cross_attn_norm(
+            attn_output.squeeze(1) + action_query.squeeze(1)
+        )
         # [B, emb_dim]
 
         # FFN with residual + post-FFN norm (standard transformer block structure)
-        conditional_emb = self.proj_norm(action_query_refined + self.cross_attn_proj(action_query_refined))
+        conditional_emb = self.proj_norm(
+            action_query_refined + self.cross_attn_proj(action_query_refined)
+        )
         # [B, emb_dim]
 
         return conditional_emb
@@ -304,10 +289,10 @@ class RGBFramePredictor(nn.Module):
         self,
         text_emb: torch.Tensor,
         num_frames: int,
-        world_video_query_hiddens: Optional[torch.Tensor] = None,
+        world_video_query_hiddens: torch.Tensor | None = None,
         frame_offset: int = 0,
-        context_frames: Optional[torch.Tensor] = None,
-        cfg_drop_mask: Optional[torch.Tensor] = None,
+        context_frames: torch.Tensor | None = None,
+        cfg_drop_mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """
         Batched version of _create_augmented_context: processes all frames in one
@@ -345,7 +330,9 @@ class RGBFramePredictor(nn.Module):
             # Use the world_action_tokens for the correct frame range
             token_start = frame_offset
             token_end = min(frame_offset + num_frames, self.num_predict_frames)
-            action_query = self.world_action_tokens[token_start:token_end].unsqueeze(0).expand(B, -1, -1)
+            action_query = (
+                self.world_action_tokens[token_start:token_end].unsqueeze(0).expand(B, -1, -1)
+            )
         # [B, num_frames, emb_dim]
 
         # Flatten to [B*F, 1, D] and [B*F, S, D] for a single batched cross-attn call
@@ -354,19 +341,22 @@ class RGBFramePredictor(nn.Module):
         text_flat = text_seq.unsqueeze(1).expand(-1, num_frames, -1, -1).reshape(BF, S, -1)
 
         attn_out, _ = self.text_action_cross_attn(
-            aq_flat, text_flat, text_flat, need_weights=False,
+            aq_flat,
+            text_flat,
+            text_flat,
+            need_weights=False,
         )  # [BF, 1, D]
 
         refined = self.cross_attn_norm(attn_out.squeeze(1) + aq_flat.squeeze(1))  # [BF, D]
-        cond = self.proj_norm(refined + self.cross_attn_proj(refined))             # [BF, D]
+        cond = self.proj_norm(refined + self.cross_attn_proj(refined))  # [BF, D]
 
         # Add a sinusoidal frame-index embedding so the DiT always gets an explicit
         # "which frame am I predicting" signal, even when world_action_tokens are
         # still similar early in training.
-        frame_ids = torch.arange(num_frames, device=cond.device)                  # [F]
-        frame_ids = (frame_ids + frame_offset)                                     # global idx
-        pos_emb = _frame_pos_embedding(frame_ids, cond.size(-1))                  # [F, D]
-        pos_emb = pos_emb.unsqueeze(0).expand(B, -1, -1).reshape(BF, -1)         # [BF, D]
+        frame_ids = torch.arange(num_frames, device=cond.device)  # [F]
+        frame_ids = frame_ids + frame_offset  # global idx
+        pos_emb = _frame_pos_embedding(frame_ids, cond.size(-1))  # [F, D]
+        pos_emb = pos_emb.unsqueeze(0).expand(B, -1, -1).reshape(BF, -1)  # [BF, D]
         cond = cond + self.frame_pos_proj(pos_emb)
 
         # ── Context frame pixel encoding ────────────────────────────────────
@@ -380,7 +370,7 @@ class RGBFramePredictor(nn.Module):
             else:
                 # [B, F, 3, H, W] — per-frame context (autoregressive)
                 cf_flat = context_frames[:, :num_frames].reshape(BF, *context_frames.shape[2:])
-            ctx_feat = self.context_frame_enc(cf_flat)    # [BF, D]
+            ctx_feat = self.context_frame_enc(cf_flat)  # [BF, D]
             cond = cond + self.context_frame_dropout(ctx_feat)
 
         # ── Classifier-Free Guidance dropout ────────────────────────────────
@@ -399,13 +389,13 @@ class RGBFramePredictor(nn.Module):
         future_rgb: torch.Tensor,
         text_emb: torch.Tensor,
         num_frames: int = 4,
-        world_video_query_hiddens: Optional[torch.Tensor] = None,
+        world_video_query_hiddens: torch.Tensor | None = None,
         perceptual_weight: float = 0.1,
         ssim_weight: float = 0.1,
         temporal_weight: float = 0.05,
-        last_context_frame: Optional[torch.Tensor] = None,
+        last_context_frame: torch.Tensor | None = None,
         cfg_dropout_prob: float = 0.1,
-    ) -> Dict[str, torch.Tensor]:
+    ) -> dict[str, torch.Tensor]:
         """
         Compute training losses for multi-frame RGB prediction.
 
@@ -433,7 +423,7 @@ class RGBFramePredictor(nn.Module):
               loss_rgb_temporal  — temporal smoothness loss (0 if F < 2 or disabled)
               loss_rgb_total     — weighted sum of all active losses
         """
-        out: Dict[str, torch.Tensor] = {}
+        out: dict[str, torch.Tensor] = {}
 
         if future_rgb.dim() == 4:
             future_rgb = future_rgb.unsqueeze(1)
@@ -461,7 +451,9 @@ class RGBFramePredictor(nn.Module):
         )
 
         cond_all = self._create_all_frame_contexts(
-            text_emb, nF, world_video_query_hiddens,
+            text_emb,
+            nF,
+            world_video_query_hiddens,
             context_frames=prev_frames,
             cfg_drop_mask=cfg_drop,
         )
@@ -469,7 +461,9 @@ class RGBFramePredictor(nn.Module):
 
         # ── Flow matching ────────────────────────────────────────────────────
         cfm_loss, x_t, t, v_pred = flow_matching_velocity_loss(
-            self.dit_rgb, targets_flat, cond_all,
+            self.dit_rgb,
+            targets_flat,
+            cond_all,
         )
         out["loss_rgb_cfm"] = cfm_loss
 
@@ -499,19 +493,19 @@ class RGBFramePredictor(nn.Module):
         # so the model learns smooth, consistent motion rather than per-frame jumps.
         temp_loss = torch.tensor(0.0, device=device)
         if temporal_weight > 0 and nF >= 2:
-            v_frames = v_pred.view(B, nF, C, H, W)          # [B, nF, C, H, W]
+            v_frames = v_pred.view(B, nF, C, H, W)  # [B, nF, C, H, W]
             temp_loss = F_func_temporal(v_frames)
         out["loss_rgb_temporal"] = temp_loss
 
         total = (
             cfm_loss
             + perceptual_weight * perc_loss
-            + ssim_weight       * ssim_loss
-            + temporal_weight   * temp_loss
+            + ssim_weight * ssim_loss
+            + temporal_weight * temp_loss
         )
         out["loss_rgb_total"] = total
         return out
-    
+
     @torch.no_grad()
     def predict_future_frames(
         self,
@@ -520,9 +514,9 @@ class RGBFramePredictor(nn.Module):
         text_emb: torch.Tensor,
         num_frames: int = 4,
         num_steps: int = 20,
-        world_video_query_hiddens: Optional[torch.Tensor] = None,
+        world_video_query_hiddens: torch.Tensor | None = None,
         frame_offset: int = 0,
-        context_frame: Optional[torch.Tensor] = None,
+        context_frame: torch.Tensor | None = None,
         guidance_scale: float = 1.0,
     ) -> torch.Tensor:
         """
@@ -548,7 +542,9 @@ class RGBFramePredictor(nn.Module):
 
         # Conditioned vectors [B*F, D]
         cond = self._create_all_frame_contexts(
-            text_emb, num_frames, world_video_query_hiddens,
+            text_emb,
+            num_frames,
+            world_video_query_hiddens,
             frame_offset=frame_offset,
             context_frames=context_frame,
         )
@@ -558,7 +554,9 @@ class RGBFramePredictor(nn.Module):
         if use_cfg:
             null_mask = torch.ones(B, dtype=torch.bool, device=text_emb.device)
             cond_null = self._create_all_frame_contexts(
-                text_emb, num_frames, world_video_query_hiddens,
+                text_emb,
+                num_frames,
+                world_video_query_hiddens,
                 frame_offset=frame_offset,
                 cfg_drop_mask=null_mask,
             )

@@ -22,7 +22,6 @@ import argparse
 import sys
 from dataclasses import fields
 from pathlib import Path
-from typing import List, Tuple
 
 import numpy as np
 import torch
@@ -31,16 +30,17 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src" / "Halo_VLA"))
 
+from loguru import logger
+
 from config import HaloVLMConfig
 from dataloader.eo_dataset import EODatasetConfig, build_eo_dataloader
 from models.dit_frame_prediction import backward_warp
 from models.halo_vla import HaloVLM
 
-from loguru import logger
-
 
 def _import_cv2():
     import cv2
+
     return cv2
 
 
@@ -69,9 +69,7 @@ def load_model(
                     setattr(config, f.name, getattr(raw_cfg, f.name))
         config.enable_visual_dit = enable_visual_dit
         model = HaloVLM(config=config).to(device)
-        missing, unexpected = model.load_state_dict(
-            ckpt["model_state_dict"], strict=False
-        )
+        missing, unexpected = model.load_state_dict(ckpt["model_state_dict"], strict=False)
         if missing:
             logger.warning(
                 "Checkpoint missing {} keys (inits random): e.g. {}",
@@ -91,7 +89,7 @@ def load_model(
     return model, config
 
 
-def unnormalise_image(tensor: torch.Tensor, mean: Tuple, std: Tuple) -> np.ndarray:
+def unnormalise_image(tensor: torch.Tensor, mean: tuple, std: tuple) -> np.ndarray:
     """[3,H,W] normalised tensor → uint8 BGR."""
     cv2 = _import_cv2()
     img = tensor.clone().cpu().float()
@@ -188,14 +186,14 @@ def resize_h(img: np.ndarray, height: int) -> np.ndarray:
     return cv2.resize(img, (w, height), interpolation=cv2.INTER_AREA)
 
 
-def hstack_images(imgs: List[np.ndarray], height: int) -> np.ndarray:
+def hstack_images(imgs: list[np.ndarray], height: int) -> np.ndarray:
     """Resize every image to ``height`` and place them side by side."""
     resized = [resize_h(im, height) for im in imgs]
     return np.hstack(resized)
 
 
 def build_panel(
-    past_bgr: List[np.ndarray],
+    past_bgr: list[np.ndarray],
     gt_future_bgr: np.ndarray,
     pred_rgb_bgr: np.ndarray,
     depth_bgr: np.ndarray,
@@ -307,9 +305,7 @@ def main() -> None:
             if not preds:
                 continue
 
-            past_bgr = [
-                unnormalise_image(past[0, i].cpu(), ds_mean, ds_std) for i in range(n_past)
-            ]
+            past_bgr = [unnormalise_image(past[0, i].cpu(), ds_mean, ds_std) for i in range(n_past)]
             gt_bgr = unnormalise_image(fut.cpu(), ds_mean, ds_std)
 
             pr_rgb = pred_rgb_to_bgr(preds["rgb"])

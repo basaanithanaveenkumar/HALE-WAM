@@ -23,6 +23,7 @@ import json
 import re
 import sys
 from pathlib import Path
+
 from loguru import logger
 
 
@@ -92,6 +93,7 @@ def load_parquet_episodes(data_root: Path) -> list[dict]:
         return []
 
     import pandas as pd
+
     combined = pd.concat(frames, ignore_index=True)
 
     # Normalise column names to snake_case
@@ -120,9 +122,7 @@ def build_jsonl(
     parquet_by_idx: dict[int, dict] = {}
     for row in parquet_rows:
         # Common column names in HF lerobot datasets
-        idx = int(
-            row.get("episode_index", row.get("episode_id", row.get("index", -1)))
-        )
+        idx = int(row.get("episode_index", row.get("episode_id", row.get("index", -1))))
         if idx >= 0:
             parquet_by_idx[idx] = row
 
@@ -159,9 +159,9 @@ def build_jsonl(
         # Serialise — convert any non-JSON-native types
         clean: dict = {}
         for k, v in meta.items():
-            if hasattr(v, "item"):           # numpy scalar
+            if hasattr(v, "item"):  # numpy scalar
                 v = v.item()
-            elif hasattr(v, "tolist"):       # numpy array
+            elif hasattr(v, "tolist"):  # numpy array
                 v = v.tolist()
             elif isinstance(v, float) and (v != v):  # NaN
                 v = None
@@ -186,14 +186,25 @@ def build_jsonl(
 def main() -> None:
     """Generate ``episodes.jsonl`` for the MoMa dataset from the command line."""
     ap = argparse.ArgumentParser(description="Generate episodes.jsonl for AiroaMomaDataset")
-    ap.add_argument("--data_root", default="/home/ha/datasets/airoa-moma",
-                    help="Path to the local airoa-moma clone")
-    ap.add_argument("--camera", default="head", choices=["head", "hand"],
-                    help="Camera to use for video path generation")
-    ap.add_argument("--out_path", default=None,
-                    help="Output path for episodes.jsonl (default: <data_root>/episodes.jsonl)")
-    ap.add_argument("--overwrite", action="store_true", default=True,
-                    help="Overwrite existing episodes.jsonl")
+    ap.add_argument(
+        "--data_root",
+        default="/home/ha/datasets/airoa-moma",
+        help="Path to the local airoa-moma clone",
+    )
+    ap.add_argument(
+        "--camera",
+        default="head",
+        choices=["head", "hand"],
+        help="Camera to use for video path generation",
+    )
+    ap.add_argument(
+        "--out_path",
+        default=None,
+        help="Output path for episodes.jsonl (default: <data_root>/episodes.jsonl)",
+    )
+    ap.add_argument(
+        "--overwrite", action="store_true", default=True, help="Overwrite existing episodes.jsonl"
+    )
     args = ap.parse_args()
 
     data_root = Path(args.data_root).expanduser().resolve()

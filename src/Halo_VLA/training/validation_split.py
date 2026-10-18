@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import torch
 from torch.utils.data import DataLoader, IterableDataset, Subset
+
 from exceptions import HaloVLAConfigError
 
 
-def split_validation(loader: DataLoader, fraction: float, seed: int = 0) -> tuple[DataLoader, DataLoader]:
+def split_validation(
+    loader: DataLoader, fraction: float, seed: int = 0
+) -> tuple[DataLoader, DataLoader]:
     """Split ``loader``'s map-style dataset into train / validation loaders.
 
     The split is a fixed random permutation (``seed``), so every rank and every resumed run
@@ -30,7 +33,13 @@ def split_validation(loader: DataLoader, fraction: float, seed: int = 0) -> tupl
         raise HaloVLAConfigError(f"val_fraction={fraction} leaves no training samples out of {n}")
     order = torch.randperm(n, generator=torch.Generator().manual_seed(seed)).tolist()
     train_set, val_set = Subset(dataset, order[n_val:]), Subset(dataset, order[:n_val])
-    common = dict(batch_size=loader.batch_size, num_workers=loader.num_workers, collate_fn=loader.collate_fn,
-                  pin_memory=loader.pin_memory)
-    return (DataLoader(train_set, shuffle=True, drop_last=loader.drop_last, **common),
-            DataLoader(val_set, shuffle=False, **common))
+    common = dict(
+        batch_size=loader.batch_size,
+        num_workers=loader.num_workers,
+        collate_fn=loader.collate_fn,
+        pin_memory=loader.pin_memory,
+    )
+    return (
+        DataLoader(train_set, shuffle=True, drop_last=loader.drop_last, **common),
+        DataLoader(val_set, shuffle=False, **common),
+    )

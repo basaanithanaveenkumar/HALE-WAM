@@ -8,9 +8,14 @@ from collections.abc import Iterable
 import torch
 from torch.amp import autocast
 
-from metrics import ActionChunkAccuracyMetric, ActionL1Metric, ActionMSEMetric, TrajectorySmoothnessMetric
-from training.training_step import HaloVLATrainingStep
 from exceptions import EvaluationError
+from metrics import (
+    ActionChunkAccuracyMetric,
+    ActionL1Metric,
+    ActionMSEMetric,
+    TrajectorySmoothnessMetric,
+)
+from training.training_step import HaloVLATrainingStep
 
 
 class VLAEvaluator:
@@ -34,7 +39,12 @@ class VLAEvaluator:
         flow_steps: Euler steps for action sampling (``None`` = the model's default).
     """
 
-    def __init__(self, action_dim: int | None = None, max_batches: int | None = None, flow_steps: int | None = None) -> None:
+    def __init__(
+        self,
+        action_dim: int | None = None,
+        max_batches: int | None = None,
+        flow_steps: int | None = None,
+    ) -> None:
         self.action_dim = action_dim
         self.max_batches = max_batches
         self.flow_steps = flow_steps
@@ -83,8 +93,15 @@ class VLAEvaluator:
     def _make_metrics(self, data_dim: int) -> list:
         dim = self.action_dim or data_dim
         if dim != data_dim:
-            raise EvaluationError(f"evaluator action_dim={dim} but the data has {data_dim}-dim actions")
-        return [ActionL1Metric(dim), ActionMSEMetric(dim), ActionChunkAccuracyMetric(), TrajectorySmoothnessMetric()]
+            raise EvaluationError(
+                f"evaluator action_dim={dim} but the data has {data_dim}-dim actions"
+            )
+        return [
+            ActionL1Metric(dim),
+            ActionMSEMetric(dim),
+            ActionChunkAccuracyMetric(),
+            TrajectorySmoothnessMetric(),
+        ]
 
     def _score_actions(self, model, action_hiddens, batch: dict, metrics: list) -> None:
         """Sample action chunks and update the metrics on the valid (unpadded) timesteps."""
@@ -93,7 +110,9 @@ class VLAEvaluator:
         elif action_hiddens is None:
             return
         else:
-            preds = model.sample_actions(action_hiddens.float(), num_steps=self.flow_steps)  # [B, n, chunk, D]
+            preds = model.sample_actions(
+                action_hiddens.float(), num_steps=self.flow_steps
+            )  # [B, n, chunk, D]
         b = preds.shape[0]
         preds = preds.reshape(b, -1, preds.shape[-1])  # [B, n * chunk, D]
         target = batch["actions"].float()

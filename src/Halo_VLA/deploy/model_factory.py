@@ -6,11 +6,11 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 import torch
+from hale_core.deploy.exceptions import ConfigError
 from loguru import logger
 from torch import nn
 
 from exceptions import HaloVLAConfigError
-from hale_core.deploy.exceptions import ConfigError
 
 if TYPE_CHECKING:
     from config.model_config import HaloVLMConfig
@@ -30,8 +30,13 @@ class HaloModelFactory:
         seed: initialisation seed (matters only without a checkpoint).
     """
 
-    def __init__(self, model: Mapping[str, Any] | None = None, dual_system: str | None = "none",
-                 dual_system_options: Mapping[str, Any] | None = None, seed: int = 0) -> None:
+    def __init__(
+        self,
+        model: Mapping[str, Any] | None = None,
+        dual_system: str | None = "none",
+        dual_system_options: Mapping[str, Any] | None = None,
+        seed: int = 0,
+    ) -> None:
         self.model_kwargs = dict(model or {})
         self.dual_system = dual_system or "none"
         self.dual_system_options = dict(dual_system_options or {})
@@ -71,5 +76,10 @@ class HaloModelFactory:
             dual_cfg = resolve_dual_system_config(self.dual_system, self.dual_system_options)
         except HaloVLAConfigError as exc:
             raise ConfigError(f"invalid dual-system settings: {exc}") from exc
-        logger.info("dual-system VLA preset={} policy={} latent={}", dual_cfg.name, dual_cfg.policy, dual_cfg.latent)
+        logger.info(
+            "dual-system VLA preset={} policy={} latent={}",
+            dual_cfg.name,
+            dual_cfg.policy,
+            dual_cfg.latent,
+        )
         return DualSystemVLA(vlm, dual_cfg)

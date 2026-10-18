@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from torch.utils.data import DataLoader
 
@@ -15,11 +15,14 @@ from .airoa_moma_dataset import AiroaMomaDataset
 def _import_cv2():
     try:
         import cv2
+
         return cv2
     except ImportError as e:
         from hale_core.exceptions import MissingDependencyError
 
-        raise MissingDependencyError("cv2", "OpenCV decodes MoMa video: pip install opencv-python") from e
+        raise MissingDependencyError(
+            "cv2", "OpenCV decodes MoMa video: pip install opencv-python"
+        ) from e
 
 
 def build_airoa_moma_dataloader(
@@ -38,7 +41,7 @@ def build_airoa_moma_dataloader(
     camera: str = "head",
     split: str = "train",
     shuffle: bool = True,
-    max_samples: Optional[int] = None,
+    max_samples: int | None = None,
     pin_memory: bool = True,
     **kwargs: Any,
 ) -> DataLoader:
@@ -72,5 +75,5 @@ def build_airoa_moma_dataloader(
         num_workers=num_workers,
         collate_fn=eo_collate_fn,
         pin_memory=pin_memory,
-        drop_last=len(ds) > batch_size,   # never drop if there is only 1 batch
+        drop_last=len(ds) > batch_size,  # never drop if there is only 1 batch
     )

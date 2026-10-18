@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
 
 
 # ---------------------------------------------------------------------------
@@ -19,16 +18,16 @@ class EODatasetConfig:
     img_size: int = 224
     max_seq_len: int = 77
     max_action_len: int = 64
-    action_dim: int = 32   # EO-Data uses 32-dim actions (varies by embodiment)
+    action_dim: int = 32  # EO-Data uses 32-dim actions (varies by embodiment)
     state_dim: int = 32
     max_images: int = 8  # max images per sample for interleaved data
     tokenizer_name: str = "HuggingFaceTB/cosmo2-tokenizer"
-    max_samples: Optional[int] = None   # limit dataset size (None = all)
+    max_samples: int | None = None  # limit dataset size (None = all)
     streaming: bool = False
-    cache_dir: Optional[str] = None
+    cache_dir: str | None = None
     # Image normalisation (ImageNet defaults)
-    img_mean: Tuple[float, ...] = (0.485, 0.456, 0.406)
-    img_std: Tuple[float, ...] = (0.229, 0.224, 0.225)
+    img_mean: tuple[float, ...] = (0.485, 0.456, 0.406)
+    img_std: tuple[float, ...] = (0.229, 0.224, 0.225)
     # Conversation formatting
     system_prefix: str = "<|im_start|>system\n"
     human_prefix: str = "<|im_start|>user\n"

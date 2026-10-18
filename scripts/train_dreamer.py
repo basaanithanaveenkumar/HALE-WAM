@@ -41,9 +41,9 @@ from loguru import logger
 
 from config import HaloVLMConfig
 from models.halo_vla import HaloVLM
-from rl.rssm import RSSM
 from rl.actor_critic import Actor, Critic
-from rl.dreamer import world_model_loss, actor_critic_loss
+from rl.dreamer import actor_critic_loss, world_model_loss
+from rl.rssm import RSSM
 
 
 @torch.no_grad()
@@ -58,10 +58,10 @@ def encode_frames(model: HaloVLM, images: torch.Tensor) -> torch.Tensor:
     B, T = images.shape[:2]
     embs = []
     for t in range(T):
-        feat = model.vis_enc(images[:, t])          # [B, P, emb_dim]
-        proj = model.image_projector(feat)          # [B, P, emb_dim]
-        embs.append(proj.mean(dim=1))               # [B, emb_dim]
-    return torch.stack(embs, dim=1)                  # [B, T, emb_dim]
+        feat = model.vis_enc(images[:, t])  # [B, P, emb_dim]
+        proj = model.image_projector(feat)  # [B, P, emb_dim]
+        embs.append(proj.mean(dim=1))  # [B, emb_dim]
+    return torch.stack(embs, dim=1)  # [B, T, emb_dim]
 
 
 def main() -> None:
@@ -76,9 +76,13 @@ def main() -> None:
         p.requires_grad_(False)
 
     obs_dim = config.emb_dim
-    rssm = RSSM(action_dim=config.action_dim, obs_embed_dim=obs_dim,
-                deter_dim=args.deter_dim, stoch_dim=args.stoch_dim,
-                hidden_dim=args.hidden_dim).to(device)
+    rssm = RSSM(
+        action_dim=config.action_dim,
+        obs_embed_dim=obs_dim,
+        deter_dim=args.deter_dim,
+        stoch_dim=args.stoch_dim,
+        hidden_dim=args.hidden_dim,
+    ).to(device)
     actor = Actor(rssm.feature_dim, config.action_dim, hidden_dim=args.hidden_dim).to(device)
     critic = Critic(rssm.feature_dim, hidden_dim=args.hidden_dim).to(device)
 
@@ -86,37 +90,48 @@ def main() -> None:
     ac_opt = Adam(list(actor.parameters()) + list(critic.parameters()), lr=args.ac_lr)
 
     from dataloader.eo_dataset import build_eo_dataloader
+
     loader = build_eo_dataloader(
-        subset=args.subset, split="train", batch_size=args.batch_size,
-        num_workers=args.num_workers, img_size=config.img_size,
-        max_seq_len=args.max_seq_len, action_dim=config.action_dim,
-        state_dim=config.state_dim, num_predict_frames=config.num_visual_predict_frames,
-        shuffle=True, max_samples=args.max_samples,
+        subset=args.subset,
+        split="train",
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        img_size=config.img_size,
+        max_seq_len=args.max_seq_len,
+        action_dim=config.action_dim,
+        state_dim=config.state_dim,
+        num_predict_frames=config.num_visual_predict_frames,
+        shuffle=True,
+        max_samples=args.max_samples,
     )
     logger.info("Dataset size: {} | batches: {}", len(loader.dataset), len(loader))
 
     step = 0
     for epoch in range(1, args.epochs + 1):
         for batch in loader:
-            images = batch["images"].to(device)             # [B, T, 3, H, W]
+            images = batch["images"].to(device)  # [B, T, 3, H, W]
             T = images.size(1)
-            obs_embeds = encode_frames(model, images)       # [B, T, emb_dim]
+            obs_embeds = encode_frames(model, images)  # [B, T, emb_dim]
 
             # Align actions to the T context frames (subsample / pad the demo).
-            actions = batch["actions"].to(device)           # [B, T_act, act_dim]
+            actions = batch["actions"].to(device)  # [B, T_act, act_dim]
             actions = actions[:, :T]
             if actions.size(1) < T:
                 pad = actions[:, -1:].repeat(1, T - actions.size(1), 1)
                 actions = torch.cat([actions, pad], dim=1)
 
             # Reward: closeness of each frame embedding to the final/goal frame.
-            goal = obs_embeds[:, -1:].detach()              # [B, 1, emb_dim]
+            goal = obs_embeds[:, -1:].detach()  # [B, 1, emb_dim]
             rewards = -((obs_embeds - goal) ** 2).mean(dim=-1)  # [B, T]
 
             # --- Phase 1: world model ---
             wm_loss, wm_metrics, rollout = world_model_loss(
-                rssm, obs_embeds, actions, rewards,
-                free_nats=args.free_nats, kl_scale=args.kl_scale,
+                rssm,
+                obs_embeds,
+                actions,
+                rewards,
+                free_nats=args.free_nats,
+                kl_scale=args.kl_scale,
             )
             wm_opt.zero_grad()
             wm_loss.backward()
@@ -128,8 +143,13 @@ def main() -> None:
             with torch.no_grad():
                 seed_state = rssm.observe(obs_embeds, actions)["state"]
             a_loss, c_loss, ac_metrics = actor_critic_loss(
-                rssm, actor, critic, seed_state,
-                horizon=args.horizon, gamma=args.gamma, lam=args.lam,
+                rssm,
+                actor,
+                critic,
+                seed_state,
+                horizon=args.horizon,
+                gamma=args.gamma,
+                lam=args.lam,
                 entropy_coef=args.entropy_coef,
             )
             ac_opt.zero_grad()
@@ -144,9 +164,13 @@ def main() -> None:
                 logger.info(
                     "step {} | wm {:.4f} (recon {:.4f} rew {:.4f} kl {:.4f}) | "
                     "actor {:.4f} critic {:.4f} | imag_return {:.4f}",
-                    step, wm_metrics["wm_loss"], wm_metrics["recon_loss"],
-                    wm_metrics["reward_loss"], wm_metrics["kl"],
-                    ac_metrics["actor_loss"], ac_metrics["critic_loss"],
+                    step,
+                    wm_metrics["wm_loss"],
+                    wm_metrics["recon_loss"],
+                    wm_metrics["reward_loss"],
+                    wm_metrics["kl"],
+                    ac_metrics["actor_loss"],
+                    ac_metrics["critic_loss"],
                     ac_metrics["imagined_return"],
                 )
             if step >= args.steps:

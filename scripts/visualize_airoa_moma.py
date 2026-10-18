@@ -24,7 +24,6 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from typing import List, Tuple
 
 import numpy as np
 import torch
@@ -33,22 +32,23 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src" / "Halo_VLA"))
 
+from loguru import logger
+
 from config import HaloVLMConfig
 from dataloader.airoa_moma_dataset import AiroaMomaConfig, AiroaMomaDataset
 from models.halo_vla import HaloVLM
 
-from loguru import logger
-
 
 def _import_cv2():
     import cv2
+
     return cv2
 
 
 def tensor_to_bgr(
     tensor: torch.Tensor,
-    mean: Tuple[float, float, float],
-    std: Tuple[float, float, float],
+    mean: tuple[float, float, float],
+    std: tuple[float, float, float],
 ) -> np.ndarray:
     """Denormalise ImageNet [3,H,W] → uint8 BGR."""
     cv2 = _import_cv2()
@@ -98,17 +98,21 @@ def hstack_three(inp: np.ndarray, gt: np.ndarray, pr: np.ndarray, height: int) -
     b = label_bar(resize_h(gt, height), "ground truth")
     c = label_bar(resize_h(pr, height), "predicted")
     w_max = max(a.shape[1], b.shape[1], c.shape[1])
+
     def pad(x: np.ndarray) -> np.ndarray:
         """Right-pad ``x`` with grey to the common width."""
         if x.shape[1] < w_max:
             padw = w_max - x.shape[1]
             return np.pad(x, ((0, 0), (0, padw), (0, 0)), constant_values=40)
         return x
+
     a, b, c = pad(a), pad(b), pad(c)
     return np.hstack([a, b, c])
 
 
-def load_model_ckpt(path: str | None, device: torch.device) -> tuple[HaloVLM | None, HaloVLMConfig | None]:
+def load_model_ckpt(
+    path: str | None, device: torch.device
+) -> tuple[HaloVLM | None, HaloVLMConfig | None]:
     """Load a checkpoint's weights into a ``HaloVLM``.
 
     Args:
@@ -190,9 +194,7 @@ def main() -> None:
                 if preds.get("rgb") is not None:
                     pred_bgr = pred_rgb_to_bgr(preds["rgb"])
 
-        blank_pred = np.full(
-            (args.row_height + 32, args.row_height + 32, 3), 40, dtype=np.uint8
-        )
+        blank_pred = np.full((args.row_height + 32, args.row_height + 32, 3), 40, dtype=np.uint8)
         cv2.putText(
             blank_pred,
             "no pred",
@@ -204,7 +206,7 @@ def main() -> None:
             cv2.LINE_AA,
         )
 
-        frames_out: List[np.ndarray] = []
+        frames_out: list[np.ndarray] = []
         for t in range(T):
             inp_bgr = tensor_to_bgr(images[t], mean, std)
             gt_bgr = inp_bgr.copy()

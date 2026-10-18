@@ -13,9 +13,13 @@ class ActionConfig(VLASection):
     """Action / proprioception spaces and their encoders."""
 
     ARGS = {"action_dim": "action_dim", "state_dim": "state_dim", "chunk_size": "action_chunk_size"}
-    OVERRIDES = {"hidden_dims": "action_hidden_dims", "dropout": "action_dropout",
-                 "use_layernorm": "action_use_layernorm", "state_hidden_dims": "state_hidden_dims",
-                 "state_dropout": "state_dropout"}
+    OVERRIDES = {
+        "hidden_dims": "action_hidden_dims",
+        "dropout": "action_dropout",
+        "use_layernorm": "action_use_layernorm",
+        "state_hidden_dims": "state_hidden_dims",
+        "state_dropout": "state_dropout",
+    }
 
     action_dim: int = 32
     state_dim: int = 32

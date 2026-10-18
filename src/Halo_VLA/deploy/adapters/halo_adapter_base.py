@@ -7,12 +7,12 @@ from collections.abc import Iterator, Mapping
 from typing import TYPE_CHECKING, Any
 
 import torch
-from torch import nn
-
 from hale_core.deploy.adapters.export_module import ExportModule
 from hale_core.deploy.adapters.model_adapter import ModelAdapter
 from hale_core.deploy.core.io_signature import IOSignature
 from hale_core.deploy.exceptions import ConfigError
+from torch import nn
+
 from Halo_VLA.deploy.graphs.moe_densifier import MoEDensifier
 from Halo_VLA.deploy.model_factory import HaloModelFactory
 
@@ -42,17 +42,27 @@ class HaloAdapterBase(ModelAdapter):
 
     requires_dual: bool | None = None  # True: dual-system only, False: single-system only
 
-    def __init__(self, model: Mapping[str, Any] | None = None, dual_system: str = "none",
-                 dual_system_options: Mapping[str, Any] | None = None, max_batch: int = 4, seed: int = 0,
-                 **base: Any) -> None:
+    def __init__(
+        self,
+        model: Mapping[str, Any] | None = None,
+        dual_system: str = "none",
+        dual_system_options: Mapping[str, Any] | None = None,
+        max_batch: int = 4,
+        seed: int = 0,
+        **base: Any,
+    ) -> None:
         super().__init__(**base)
         self.factory = HaloModelFactory(model, dual_system, dual_system_options, seed)
         self.max_batch = int(max_batch)
         if self.requires_dual is True and not self.factory.is_dual:
-            raise ConfigError(f"{type(self).__name__} exports a dual-system part: set adapter.dual_system")
+            raise ConfigError(
+                f"{type(self).__name__} exports a dual-system part: set adapter.dual_system"
+            )
         if self.requires_dual is False and self.factory.is_dual:
-            raise ConfigError(f"{type(self).__name__} exports the single-system model: use the DualSystem* "
-                              f"adapters for dual_system={self.factory.dual_system!r}")
+            raise ConfigError(
+                f"{type(self).__name__} exports the single-system model: use the DualSystem* "
+                f"adapters for dual_system={self.factory.dual_system!r}"
+            )
         self._built: nn.Module | None = None
 
     # ------------------------------------------------------------------ model
@@ -74,9 +84,13 @@ class HaloAdapterBase(ModelAdapter):
 
     def dual_config(self) -> DualSystemConfig:
         """The resolved dual-system settings (``requires_dual`` adapters only)."""
-        from dual_system import resolve_dual_system_config  # lazy: import roots are set up by Halo_VLA.deploy
+        from dual_system import (
+            resolve_dual_system_config,  # lazy: import roots are set up by Halo_VLA.deploy
+        )
 
-        return resolve_dual_system_config(self.factory.dual_system, self.factory.dual_system_options)
+        return resolve_dual_system_config(
+            self.factory.dual_system, self.factory.dual_system_options
+        )
 
     # ------------------------------------------------------------------ export
     @abstractmethod
@@ -87,7 +101,9 @@ class HaloAdapterBase(ModelAdapter):
         """Densify MoE layers (static shapes), then wrap :meth:`graph` for the exporters."""
         MoEDensifier().apply(model)
         sig = self.signature()
-        return ExportModule(self.graph(model).eval(), self.forward_for_export, sig.input_names, sig.outputs).eval()
+        return ExportModule(
+            self.graph(model).eval(), self.forward_for_export, sig.input_names, sig.outputs
+        ).eval()
 
     def forward_for_export(self, graph: nn.Module, inputs: dict[str, torch.Tensor]) -> Any:
         """Call ``graph`` with the named inputs (default: keyword arguments)."""

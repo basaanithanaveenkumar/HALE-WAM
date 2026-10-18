@@ -30,7 +30,9 @@ class DualSystem1AdapterBase(HaloAdapterBase):
         """
         if self._latent_tokens is not None:
             return self._latent_tokens
-        from dual_system.latent.latent_registry import LATENT_EXTRACTORS  # lazy: import roots are set up by Halo_VLA.deploy
+        from dual_system.latent.latent_registry import (
+            LATENT_EXTRACTORS,  # lazy: import roots are set up by Halo_VLA.deploy
+        )
 
         static = LATENT_EXTRACTORS.get(self.dual_config().latent).static_length(self.dual_config())
         return static if static is not None else [1, 16, 512]
@@ -47,10 +49,28 @@ class DualSystem1AdapterBase(HaloAdapterBase):
         """Input specs shared by the System 1 graphs: latent, latent mask, current image, state."""
         cfg, dual = self.model_config(), self.dual_config()
         return [
-            {"name": "latent", "shape": ["batch", "latent_len", dual.system1_dim], "dtype": "float32",
-             "value_range": [-1.0, 1.0]},
-            {"name": "latent_mask", "shape": ["batch", "latent_len"], "dtype": "int64", "value_range": [1, 2]},
-            {"name": "image", "shape": ["batch", 3, cfg.img_size, cfg.img_size], "dtype": "float32",
-             "value_range": [0.0, 1.0]},
-            {"name": "state", "shape": ["batch", cfg.state_dim], "dtype": "float32", "value_range": [-1.0, 1.0]},
+            {
+                "name": "latent",
+                "shape": ["batch", "latent_len", dual.system1_dim],
+                "dtype": "float32",
+                "value_range": [-1.0, 1.0],
+            },
+            {
+                "name": "latent_mask",
+                "shape": ["batch", "latent_len"],
+                "dtype": "int64",
+                "value_range": [1, 2],
+            },
+            {
+                "name": "image",
+                "shape": ["batch", 3, cfg.img_size, cfg.img_size],
+                "dtype": "float32",
+                "value_range": [0.0, 1.0],
+            },
+            {
+                "name": "state",
+                "shape": ["batch", cfg.state_dim],
+                "dtype": "float32",
+                "value_range": [-1.0, 1.0],
+            },
         ]

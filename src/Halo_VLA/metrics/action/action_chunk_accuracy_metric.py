@@ -38,7 +38,7 @@ class ActionChunkAccuracyMetric(RoboticsMetricBase):
 
     def update(
         self,
-        pred: Tensor,    # [B, T, action_dim]
+        pred: Tensor,  # [B, T, action_dim]
         target: Tensor,  # [B, T, action_dim]
     ) -> None:
         """Accumulate one batch.

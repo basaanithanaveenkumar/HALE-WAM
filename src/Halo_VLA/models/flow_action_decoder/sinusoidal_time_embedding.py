@@ -8,6 +8,7 @@ import torch.nn as nn
 
 class SinusoidalTimeEmbedding(nn.Module):
     """Sinusoidal positional-style embedding for a continuous scalar t ∈ [0, 1]."""
+
     def __init__(self, embed_dim: int):
         super().__init__()
         self.embed_dim = embed_dim

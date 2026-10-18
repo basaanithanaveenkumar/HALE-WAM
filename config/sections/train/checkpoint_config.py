@@ -18,4 +18,4 @@ class CheckpointConfig(VLASection):
 
     dir: str = "checkpoints"
     every_n_steps: int = 100
-    keep_last: int = 3                     # 0 = keep all
+    keep_last: int = 3  # 0 = keep all

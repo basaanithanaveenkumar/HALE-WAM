@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import List, Tuple
-
 import torch
 
 from config.tokens import get_all_custom_tokens, get_token
@@ -20,16 +18,15 @@ class DroidPromptMixin:
             self.tokenizer = tokenizer
         else:
             from transformers import AutoTokenizer
+
             self.tokenizer = AutoTokenizer.from_pretrained(
-                self.cfg.tokenizer_name, trust_remote_code=True,
+                self.cfg.tokenizer_name,
+                trust_remote_code=True,
             )
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        extra = [
-            tok for tok in get_all_custom_tokens()
-            if tok not in self.tokenizer.get_vocab()
-        ]
+        extra = [tok for tok in get_all_custom_tokens() if tok not in self.tokenizer.get_vocab()]
         if extra:
             self.tokenizer.add_special_tokens({"additional_special_tokens": extra})
 
@@ -39,7 +36,7 @@ class DroidPromptMixin:
         self._world_video_tok = get_token("world_video_token")
         self.pad_token_id = self.tokenizer.pad_token_id
 
-    def _build_text(self, task: str, num_images: int) -> Tuple[str, str]:
+    def _build_text(self, task: str, num_images: int) -> tuple[str, str]:
         """
         Build the (user, assistant) string pair for one sample.
 
@@ -52,16 +49,14 @@ class DroidPromptMixin:
             "Predict the robot motion and describe the next action."
         )
         wv_tokens = self._world_video_tok * self.cfg.num_predict_frames
-        assistant_body = (
-            f"Executing: {task}\n"
-            f"{wv_tokens}{self._action_tok}"
-        )
+        assistant_body = f"Executing: {task}\n{wv_tokens}{self._action_tok}"
         return user_body, assistant_body
 
     def _tokenise(
         self, user_body: str, assistant_body: str
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         from config import HaloVLMConfig
+
         model_cfg = HaloVLMConfig()
         system_msg = f"{self.cfg.system_prefix}{model_cfg.system_prompt}{self.cfg.turn_end}"
         human_msg = f"{self.cfg.human_prefix}{user_body}{self.cfg.turn_end}"
@@ -90,8 +85,8 @@ class DroidPromptMixin:
     def _mask_non_assistant(
         self,
         full_text: str,
-        parts: List[str],
-        is_asst: List[bool],
+        parts: list[str],
+        is_asst: list[bool],
         labels: torch.Tensor,
     ) -> torch.Tensor:
         cursor = 0

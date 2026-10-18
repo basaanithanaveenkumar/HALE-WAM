@@ -5,8 +5,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import torch.nn as nn
-from exceptions import HaloVLAConfigError
 from hale_core.exceptions import RegistryError
+
+from exceptions import HaloVLAConfigError
 
 from . import projector_builders  # noqa: F401 - registers the built-in projectors
 from .projector_registry import IMAGE_PROJECTORS
@@ -15,7 +16,7 @@ if TYPE_CHECKING:
     from config.model_config import HaloVLMConfig
 
 
-def build_image_projector(config: "HaloVLMConfig") -> nn.Module:
+def build_image_projector(config: HaloVLMConfig) -> nn.Module:
     """Build the vision -> decoder projector selected by ``config.proj_type``.
 
     * ``"mlp"``: :class:`ImageProjector`, one token per ViT patch.

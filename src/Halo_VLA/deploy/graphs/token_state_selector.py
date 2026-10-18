@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import torch
-from exceptions import HaloVLAConfigError
 from torch import nn
+
+from exceptions import HaloVLAConfigError
 
 
 class TokenStateSelector(nn.Module):
@@ -36,8 +37,10 @@ class TokenStateSelector(nn.Module):
         Returns:
             ``[B, count, D]``; rows without a matching placeholder are zero.
         """
-        hit = input_ids == self.token_id                                   # [B, L]
-        rank = torch.cumsum(hit.to(torch.int64), dim=1)                    # k-th hit has rank k
+        hit = input_ids == self.token_id  # [B, L]
+        rank = torch.cumsum(hit.to(torch.int64), dim=1)  # k-th hit has rank k
         slots = torch.arange(1, self.count + 1, device=input_ids.device).view(1, self.count, 1)
-        one_hot = ((rank.unsqueeze(1) == slots) & hit.unsqueeze(1)).to(text_hidden.dtype)  # [B, K, L]
+        one_hot = ((rank.unsqueeze(1) == slots) & hit.unsqueeze(1)).to(
+            text_hidden.dtype
+        )  # [B, K, L]
         return torch.matmul(one_hot, text_hidden)

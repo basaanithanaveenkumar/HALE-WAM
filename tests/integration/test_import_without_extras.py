@@ -14,9 +14,27 @@ ROOT = Path(__file__).resolve().parents[2]
 
 #: Optional extras (see ``[project.optional-dependencies]``) and heavy third-party libraries.
 BLOCKED = (
-    "ray", "webdataset", "onnx", "onnxruntime", "onnxscript", "peft", "transformers", "cv2", "imageio",
-    "matplotlib", "PIL", "tensorboard", "safetensors", "mlx", "tensorrt", "qai_hub", "lifting", "datasets",
-    "torchcodec", "decord", "av",
+    "ray",
+    "webdataset",
+    "onnx",
+    "onnxruntime",
+    "onnxscript",
+    "peft",
+    "transformers",
+    "cv2",
+    "imageio",
+    "matplotlib",
+    "PIL",
+    "tensorboard",
+    "safetensors",
+    "mlx",
+    "tensorrt",
+    "qai_hub",
+    "lifting",
+    "datasets",
+    "torchcodec",
+    "decord",
+    "av",
 )
 
 SCRIPT = textwrap.dedent(
@@ -56,7 +74,11 @@ def test_all_modules_import_without_optional_extras() -> None:
     # ``src/Halo_VLA`` holds models / dual_system / training ...; the repo root holds config / dataloader / utils.
     roots = [str(ROOT / "src" / "Halo_VLA"), str(ROOT)]
     code = SCRIPT.format(blocked=BLOCKED, roots=roots)
-    env = {**os.environ, "PYTHONPATH": os.pathsep.join(p for p in sys.path if p)}  # the parent's import roots
-    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env, cwd=ROOT,
-                            timeout=300)
+    env = {
+        **os.environ,
+        "PYTHONPATH": os.pathsep.join(p for p in sys.path if p),
+    }  # the parent's import roots
+    result = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, env=env, cwd=ROOT, timeout=300
+    )
     assert result.returncode == 0, result.stdout + result.stderr

@@ -41,14 +41,21 @@ class PretrainedLanguageDecoder(nn.Module):
 
         tokens = get_all_custom_tokens()  # <image>, <halo_action>, <state>, <halo_world_video>
         self.llm, ids = build_language_backbone(config.llm_backbone_config(), special_tokens=tokens)
-        config.image_token_id, config.action_token_id, config.state_token_id, config.world_video_token_id = (
-            ids[t] for t in tokens
-        )
+        (
+            config.image_token_id,
+            config.action_token_id,
+            config.state_token_id,
+            config.world_video_token_id,
+        ) = (ids[t] for t in tokens)
         config.vocab_size = self.llm.vocab_size
         hidden = self.llm.hidden_size
         # Trainable bridges (fp32); identity when the widths already agree.
-        self.to_llm = nn.Linear(config.emb_dim, hidden) if hidden != config.emb_dim else nn.Identity()
-        self.from_llm = nn.Linear(hidden, config.emb_dim) if hidden != config.emb_dim else nn.Identity()
+        self.to_llm = (
+            nn.Linear(config.emb_dim, hidden) if hidden != config.emb_dim else nn.Identity()
+        )
+        self.from_llm = (
+            nn.Linear(hidden, config.emb_dim) if hidden != config.emb_dim else nn.Identity()
+        )
         for layer in (self.to_llm, self.from_llm):
             if isinstance(layer, nn.Linear):
                 nn.init.xavier_uniform_(layer.weight)
@@ -73,7 +80,10 @@ class PretrainedLanguageDecoder(nn.Module):
         return self.to_llm(x)
 
     def forward(
-        self, inputs_embeds: torch.Tensor, attention_mask: torch.Tensor, token_ids: torch.Tensor | None = None
+        self,
+        inputs_embeds: torch.Tensor,
+        attention_mask: torch.Tensor,
+        token_ids: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Run the LLM over the spliced sequence.
 
@@ -88,7 +98,11 @@ class PretrainedLanguageDecoder(nn.Module):
             ``logits (B, T, V)`` and hidden states mapped back to ``(B, T, emb_dim)``.
         """
         dtype = self.llm.embedding_parameters()[0].dtype  # the LLM's weight dtype (e.g. bfloat16)
-        out = self.llm(inputs_embeds=inputs_embeds.to(dtype), attention_mask=attention_mask, token_ids=token_ids)
+        out = self.llm(
+            inputs_embeds=inputs_embeds.to(dtype),
+            attention_mask=attention_mask,
+            token_ids=token_ids,
+        )
         hidden = out.hidden_states
         if isinstance(self.from_llm, nn.Linear):
             hidden = hidden.to(self.from_llm.weight.dtype)

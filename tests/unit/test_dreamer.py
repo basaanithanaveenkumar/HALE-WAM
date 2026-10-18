@@ -16,14 +16,15 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src" / "Halo_VLA"))
 
-from rl.rssm import RSSM
 from rl.actor_critic import Actor, Critic, lambda_return
-from rl.dreamer import world_model_loss, imagine, actor_critic_loss
+from rl.dreamer import actor_critic_loss, imagine, world_model_loss
+from rl.rssm import RSSM
 
 
 def _make(action_dim=3, obs_dim=8):
-    rssm = RSSM(action_dim=action_dim, obs_embed_dim=obs_dim,
-                deter_dim=16, stoch_dim=8, hidden_dim=32)
+    rssm = RSSM(
+        action_dim=action_dim, obs_embed_dim=obs_dim, deter_dim=16, stoch_dim=8, hidden_dim=32
+    )
     actor = Actor(feature_dim=rssm.feature_dim, action_dim=action_dim, hidden_dim=32)
     critic = Critic(feature_dim=rssm.feature_dim, hidden_dim=32)
     return rssm, actor, critic
@@ -108,9 +109,7 @@ def test_actor_critic_losses_scalar_and_isolated():
         roll = rssm.observe(obs, acts)
     init_state = roll["state"]
 
-    actor_loss, critic_loss, metrics = actor_critic_loss(
-        rssm, actor, critic, init_state, horizon=8
-    )
+    actor_loss, critic_loss, metrics = actor_critic_loss(rssm, actor, critic, init_state, horizon=8)
     assert actor_loss.dim() == 0 and critic_loss.dim() == 0
 
     (actor_loss + critic_loss).backward()

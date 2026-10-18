@@ -11,13 +11,13 @@ Expected output: state embedding   [B, emb_dim]    (matches transformer dim)
 
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
 
 import torch
 import torch.nn as nn
+from loguru import logger
 
 from config import HaloVLMConfig
-from loguru import logger
 
 
 class StateEncoder(nn.Module):

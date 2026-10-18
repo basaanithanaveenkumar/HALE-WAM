@@ -12,23 +12,36 @@ CHUNK, ACTION_DIM, STATE_DIM, IMG = 4, 3, 5, 32
 
 
 def make_policy(policy: str, **kw) -> System1Policy:
-    cfg = DualSystemConfig(policy=policy, system1_dim=16, system1_layers=1, system1_heads=4, sample_steps=3,
-                           diffusion_train_steps=20, **kw)
+    cfg = DualSystemConfig(
+        policy=policy,
+        system1_dim=16,
+        system1_layers=1,
+        system1_heads=4,
+        sample_steps=3,
+        diffusion_train_steps=20,
+        **kw,
+    )
     torch.manual_seed(0)
     return System1Policy(cfg, IMG, STATE_DIM, CHUNK, ACTION_DIM)
 
 
 def conditioned(policy: System1Policy, batch: int = 2):
     latent = torch.randn(batch, 1, 16)
-    cond, mask = policy.condition(latent, torch.ones(batch, 1, dtype=torch.long), torch.rand(batch, 3, IMG, IMG),
-                                  torch.randn(batch, STATE_DIM))
+    cond, mask = policy.condition(
+        latent,
+        torch.ones(batch, 1, dtype=torch.long),
+        torch.rand(batch, 3, IMG, IMG),
+        torch.randn(batch, STATE_DIM),
+    )
     return cond, mask
 
 
 @pytest.mark.parametrize("name", ["regression", "diffusion", "flow_matching"])
 def test_strategy_loss_is_finite_and_trains_the_shared_head(name: str) -> None:
     policy = make_policy(name)
-    assert isinstance(policy.strategy, ActionPolicyStrategy) and isinstance(policy.strategy, SYSTEM1_POLICIES.get(name))
+    assert isinstance(policy.strategy, ActionPolicyStrategy) and isinstance(
+        policy.strategy, SYSTEM1_POLICIES.get(name)
+    )
     cond, mask = conditioned(policy)
     actions = torch.randn(2, CHUNK, ACTION_DIM)
     loss = policy.loss(cond, mask, actions, torch.ones(2, CHUNK))
@@ -63,7 +76,10 @@ def test_sample_equals_sample_from_noise_with_the_same_noise(name: str) -> None:
 def test_regression_needs_no_noise_and_has_no_sampler_step() -> None:
     strategy = SYSTEM1_POLICIES.get("regression")
     assert not strategy.needs_noise and not strategy.has_sampler_step
-    assert SYSTEM1_POLICIES.get("diffusion").needs_noise and SYSTEM1_POLICIES.get("flow_matching").has_sampler_step
+    assert (
+        SYSTEM1_POLICIES.get("diffusion").needs_noise
+        and SYSTEM1_POLICIES.get("flow_matching").has_sampler_step
+    )
 
 
 def test_diffusion_schedule_is_a_non_persistent_buffer_with_evenly_spaced_levels() -> None:

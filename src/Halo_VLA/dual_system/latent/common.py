@@ -15,7 +15,9 @@ def _text_slice(enc: dict[str, Any]) -> slice:
     return slice(enc["num_prefix"], enc["num_prefix"] + enc["text_len"])
 
 
-def build_latent_extractor(config: DualSystemConfig, emb_dim: int, layer_width: int) -> LatentExtractor:
+def build_latent_extractor(
+    config: DualSystemConfig, emb_dim: int, layer_width: int
+) -> LatentExtractor:
     """Build the extractor registered for ``config.latent``.
 
     Args:

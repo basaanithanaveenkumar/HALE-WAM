@@ -6,5 +6,4 @@ from exceptions.halo_vla_error import HaloVLAError
 
 
 class DatasetError(HaloVLAError, RuntimeError):
-    """No usable dataset was configured or a stage resolved to zero sources.
-    """
+    """No usable dataset was configured or a stage resolved to zero sources."""

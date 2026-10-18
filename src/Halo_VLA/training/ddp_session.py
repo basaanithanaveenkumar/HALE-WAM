@@ -59,7 +59,9 @@ class DDPSession:
         if resolved.type == "cuda" and world > 1:
             resolved = torch.device(f"cuda:{local_rank}")
             torch.cuda.set_device(resolved)
-        return cls(rank=rank, local_rank=local_rank, world_size=world, device=resolved, owns_group=owns)
+        return cls(
+            rank=rank, local_rank=local_rank, world_size=world, device=resolved, owns_group=owns
+        )
 
     # ------------------------------------------------------------------ properties
     @property

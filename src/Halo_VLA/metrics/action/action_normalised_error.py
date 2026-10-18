@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 import torch
 from torch import Tensor
 
@@ -45,9 +43,9 @@ class ActionNormalisedError(RoboticsMetricBase):
 
     def update(
         self,
-        pred: Tensor,                   # [B, T, action_dim]
-        target: Tensor,                 # [B, T, action_dim]
-        mask: Optional[Tensor] = None,  # [B, T]
+        pred: Tensor,  # [B, T, action_dim]
+        target: Tensor,  # [B, T, action_dim]
+        mask: Tensor | None = None,  # [B, T]
     ) -> None:
         """Accumulate one batch.
 
@@ -56,8 +54,8 @@ class ActionNormalisedError(RoboticsMetricBase):
             target: ground-truth actions ``[B, T, action_dim]``.
             mask: ``[B, T]``, True where the timestep is valid (default: all valid).
         """
-        pred_f = _apply_mask(pred.detach().cpu(), mask)    # [N, D]
-        tgt_f  = _apply_mask(target.detach().cpu(), mask)  # [N, D]
+        pred_f = _apply_mask(pred.detach().cpu(), mask)  # [N, D]
+        tgt_f = _apply_mask(target.detach().cpu(), mask)  # [N, D]
 
         # Track observed range from target (ground truth)
         self._dim_min = torch.minimum(self._dim_min, tgt_f.min(0).values)
@@ -73,7 +71,7 @@ class ActionNormalisedError(RoboticsMetricBase):
             ``normalised_action_error``: mean L1 divided by the observed range of each dimension.
         """
         n = max(self._n, 1)
-        mean_err = self._total_err / n                            # [D]
+        mean_err = self._total_err / n  # [D]
         dim_range = (self._dim_max - self._dim_min).clamp(min=self.eps)  # [D]
-        normalised = mean_err / dim_range                         # [D]
+        normalised = mean_err / dim_range  # [D]
         return {"normalised_action_error": float(normalised.mean())}

@@ -16,7 +16,9 @@ class PatchEmb(nn.Module):
         emb_dim: embedding width.
     """
 
-    def __init__(self, img_size: int = 224, p_size: int = 16, in_chans: int = 3, emb_dim: int = 1024) -> None:
+    def __init__(
+        self, img_size: int = 224, p_size: int = 16, in_chans: int = 3, emb_dim: int = 1024
+    ) -> None:
         super().__init__()
         self.img_size = img_size
         self.p_size = p_size

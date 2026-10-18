@@ -22,8 +22,12 @@ class FlowActionHeadMixin:
     # that the velocity field is aware of the full visual-language context
     # when predicting robot actions.
     # ------------------------------------------------------------------ #
-    def compute_flow_loss(self, action_hiddens: torch.Tensor | None, target_actions: torch.Tensor,
-                          action_mask_seq: torch.Tensor) -> torch.Tensor:
+    def compute_flow_loss(
+        self,
+        action_hiddens: torch.Tensor | None,
+        target_actions: torch.Tensor,
+        action_mask_seq: torch.Tensor,
+    ) -> torch.Tensor:
         """
         Conditional Flow Matching (CFM) loss for action prediction.
 
@@ -56,7 +60,7 @@ class FlowActionHeadMixin:
         T_need = n_act * chunk
         # Truncate or pad target actions to match n_act * chunk_size
         if T_avail >= T_need:
-            targets = target_actions[:, :T_need, :]   # [B, T_need, act_dim]
+            targets = target_actions[:, :T_need, :]  # [B, T_need, act_dim]
         else:
             pad = torch.zeros(B, T_need - T_avail, act_dim, device=device)
             targets = torch.cat([target_actions, pad], dim=1)
@@ -70,14 +74,16 @@ class FlowActionHeadMixin:
             mask_seq = action_mask_seq[:, :T_need].to(device=device, dtype=x_1.dtype)
         else:
             mask_pad = torch.zeros(B, T_need - T_mask, device=device, dtype=x_1.dtype)
-            mask_seq = torch.cat([action_mask_seq.to(device=device, dtype=x_1.dtype), mask_pad], dim=1)
+            mask_seq = torch.cat(
+                [action_mask_seq.to(device=device, dtype=x_1.dtype), mask_pad], dim=1
+            )
         # [B, T_need] → [B, n_act, chunk] → [B*n_act, chunk] → [B*n_act, flat_dim]
         loss_mask = (
             mask_seq.view(B, n_act, chunk)
-                    .reshape(B * n_act, chunk)
-                    .unsqueeze(-1)
-                    .expand(-1, -1, act_dim)
-                    .reshape(B * n_act, flat_dim)
+            .reshape(B * n_act, chunk)
+            .unsqueeze(-1)
+            .expand(-1, -1, act_dim)
+            .reshape(B * n_act, flat_dim)
         )
 
         # --- Condition vector: flatten to [B*n_act, emb_dim] ---
@@ -107,7 +113,7 @@ class FlowActionHeadMixin:
         # action x_1.  The straight-line interpolation is the optimal transport
         # displacement map for Gaussian → point-mass, and its derivative w.r.t. t
         # is the constant velocity  v* = x_1 - x_0.
-        t_expand = t.unsqueeze(-1)                     # [B*n_act, 1]
+        t_expand = t.unsqueeze(-1)  # [B*n_act, 1]
         x_t = (1.0 - t_expand) * x_0 + t_expand * x_1  # [B*n_act, flat_dim]
 
         # --- Predict velocity field v_theta(x_t, t, cond) ---
@@ -116,7 +122,7 @@ class FlowActionHeadMixin:
         # transformer conditioning vector.  It outputs a velocity vector of
         # the same dimensionality as x_t, representing its estimate of the
         # direction and magnitude needed to move from noise toward data.
-        v_pred = self.flow_decoder(x_t, t, cond)       # [B*n_act, flat_dim]
+        v_pred = self.flow_decoder(x_t, t, cond)  # [B*n_act, flat_dim]
 
         # --- Ground-truth velocity: dx/dt = x_1 - x_0 (constant for OT path) ---
         # Because the interpolant is linear in t, its time-derivative is just
@@ -142,7 +148,9 @@ class FlowActionHeadMixin:
     # source to its mouth.
     # ------------------------------------------------------------------ #
     @torch.no_grad()
-    def sample_actions(self, action_hiddens: torch.Tensor | None, num_steps: int | None = None) -> torch.Tensor | None:
+    def sample_actions(
+        self, action_hiddens: torch.Tensor | None, num_steps: int | None = None
+    ) -> torch.Tensor | None:
         """
         Generate actions by integrating the learned velocity field from t=0 to t=1
         using the Euler method.

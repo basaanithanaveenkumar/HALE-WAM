@@ -40,15 +40,15 @@ def lambda_return(
         bootstrap = value[:, -1]
 
     # next_values[t] = V(s_{t+1}); the last one uses the bootstrap value.
-    next_values = torch.cat([value[:, 1:], bootstrap[:, None]], dim=1)   # [B, H]
-    pcont = gamma * continue_                                             # [B, H]
+    next_values = torch.cat([value[:, 1:], bootstrap[:, None]], dim=1)  # [B, H]
+    pcont = gamma * continue_  # [B, H]
 
     # inputs[t] = r_t + γ·c_t·(1−λ)·V(s_{t+1}); the λ·Gλ_{t+1} term is folded in
     # by the backward scan below.
     inputs = reward + pcont * next_values * (1.0 - lam)
 
     returns = torch.zeros_like(reward)
-    agg = bootstrap                                  # Gλ_{H} = bootstrap
+    agg = bootstrap  # Gλ_{H} = bootstrap
     for t in reversed(range(H)):
         agg = inputs[:, t] + pcont[:, t] * lam * agg
         returns[:, t] = agg

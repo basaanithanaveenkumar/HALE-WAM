@@ -23,14 +23,11 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from exceptions import HaloVLAConfigError
-
 from hale_core.config import load_registered_config
 from hale_core.config.sections.common import StrictModel
 from hale_core.registry import register_config
 from pydantic import Field
 
-from config.sections.base import VLASection
 from config.sections import (
     VLADataConfig,
     VLAEvalConfig,
@@ -39,6 +36,8 @@ from config.sections import (
     VLATrainConfig,
     VLAVizConfig,
 )
+from config.sections.base import VLASection
+from exceptions import HaloVLAConfigError
 
 
 @register_config("vla")
@@ -46,7 +45,7 @@ class VLARunConfig(StrictModel):
     """Full configuration of one Halo-VLA training run."""
 
     variant: str = "halo_vla"
-    device: str | None = None              # cpu / cuda / cuda:1 / mps; None = cuda if available
+    device: str | None = None  # cpu / cuda / cuda:1 / mps; None = cuda if available
     model: VLAModelConfig = Field(default_factory=VLAModelConfig)
     train: VLATrainConfig = Field(default_factory=VLATrainConfig)
     data: VLADataConfig = Field(default_factory=VLADataConfig)
@@ -79,11 +78,15 @@ def load_vla_config(path: str | Path) -> VLARunConfig:
     """Load ``path`` (following ``inherits:``) and validate it as a :class:`VLARunConfig`."""
     cfg = load_registered_config(path, schema="vla")
     if not isinstance(cfg, VLARunConfig):
-        raise HaloVLAConfigError(f"{path} did not validate as a Halo-VLA run config (got {type(cfg).__name__})")
+        raise HaloVLAConfigError(
+            f"{path} did not validate as a Halo-VLA run config (got {type(cfg).__name__})"
+        )
     return cfg
 
 
-def save_resolved_config(source: str | Path, destination: str | Path, argv: list[str] | None = None) -> Path:
+def save_resolved_config(
+    source: str | Path, destination: str | Path, argv: list[str] | None = None
+) -> Path:
     """Write ``source`` with its inheritance resolved to ``destination``.
 
     Only keys set somewhere in the ``inherits:`` chain are written (unset keys keep the code's
@@ -95,5 +98,7 @@ def save_resolved_config(source: str | Path, destination: str | Path, argv: list
     if argv:
         header += f"# command-line overrides: {' '.join(argv)}\n"
     destination = Path(destination)
-    destination.write_text(header + yaml.safe_dump(cfg.model_dump(mode="json", exclude_unset=True), sort_keys=False))
+    destination.write_text(
+        header + yaml.safe_dump(cfg.model_dump(mode="json", exclude_unset=True), sort_keys=False)
+    )
     return destination

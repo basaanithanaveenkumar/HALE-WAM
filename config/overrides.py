@@ -39,7 +39,9 @@ def parse_model_options(items: list[str] | None) -> dict[str, Any]:
     for item in items or []:
         key, sep, raw = item.partition("=")
         if not sep or key not in _FIELDS:
-            raise HaloVLAConfigError(f"bad model option {item!r}; use KEY=VALUE with KEY a HaloVLMConfig field")
+            raise HaloVLAConfigError(
+                f"bad model option {item!r}; use KEY=VALUE with KEY a HaloVLMConfig field"
+            )
         out[key] = _parse(_FIELDS[key], raw)
     return out
 

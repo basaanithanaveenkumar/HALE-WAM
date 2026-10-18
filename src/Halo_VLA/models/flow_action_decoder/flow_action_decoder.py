@@ -18,8 +18,9 @@ class FlowActionDecoder(nn.Module):
         time_embed_dim: width of the sinusoidal time embedding.
     """
 
-    def __init__(self, action_dim_flat: int, obs_dim: int, hidden_dim: int = 1024,
-                 time_embed_dim: int = 128) -> None:
+    def __init__(
+        self, action_dim_flat: int, obs_dim: int, hidden_dim: int = 1024, time_embed_dim: int = 128
+    ) -> None:
         super().__init__()
         self.action_dim_flat = action_dim_flat
         self.obs_dim = obs_dim
@@ -36,7 +37,7 @@ class FlowActionDecoder(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, action_dim_flat)
+            nn.Linear(hidden_dim, action_dim_flat),
         )
 
     def forward(self, x_t: torch.Tensor, t: torch.Tensor, cond: torch.Tensor) -> torch.Tensor:
@@ -53,5 +54,7 @@ class FlowActionDecoder(nn.Module):
         # Sinusoidal embedding of t: (batch,) → (batch, time_embed_dim)
         t_emb = self.time_embed(t)
         # Concatenate along feature dimension
-        inp = torch.cat([x_t, t_emb, cond], dim=1)  # (batch, action_dim_flat+time_embed_dim+obs_dim)
+        inp = torch.cat(
+            [x_t, t_emb, cond], dim=1
+        )  # (batch, action_dim_flat+time_embed_dim+obs_dim)
         return self.net(inp)

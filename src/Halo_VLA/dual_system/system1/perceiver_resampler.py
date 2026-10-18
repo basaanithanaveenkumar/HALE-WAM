@@ -16,7 +16,9 @@ class PerceiverResampler(nn.Module):
         super().__init__()
         self.latents = nn.Parameter(torch.randn(1, num_latents, dim) * 0.02)
         self.attn = nn.MultiheadAttention(dim, heads, batch_first=True)
-        self.ff = nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, 4 * dim), nn.GELU(), nn.Linear(4 * dim, dim))
+        self.ff = nn.Sequential(
+            nn.LayerNorm(dim), nn.Linear(dim, 4 * dim), nn.GELU(), nn.Linear(4 * dim, dim)
+        )
         self.norm = nn.LayerNorm(dim)
 
     def forward(self, tokens: torch.Tensor) -> torch.Tensor:

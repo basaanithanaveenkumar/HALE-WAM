@@ -5,9 +5,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import torch
-from exceptions import DatasetError
 from loguru import logger
 from torch.utils.data import ConcatDataset, DataLoader
+
+from exceptions import DatasetError
 
 if TYPE_CHECKING:  # annotation only; the runtime import is lazy (import cycle)
     from .mid_train_dataset_config import MidTrainDatasetConfig
@@ -197,6 +198,7 @@ class MidTrainDatasetRegistry:
 
     def __init__(self, **config_overrides) -> None:
         from .mid_train_dataset_config import MidTrainDatasetConfig  # lazy: avoids an import cycle
+
         self.cfg = MidTrainDatasetConfig(**config_overrides)
 
     def build(self) -> DataLoader:

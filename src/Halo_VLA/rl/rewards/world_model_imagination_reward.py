@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import torch
 import torch.nn as nn
+
 from exceptions import ModelStateError
 
 
@@ -67,10 +68,10 @@ class WorldModelImaginationReward:
         )
         if not preds or "rgb" not in preds:
             raise ModelStateError("World model produced no RGB prediction.")
-        imagined = preds["rgb"][:, -1]                       # [B, 3, H, W]
+        imagined = preds["rgb"][:, -1]  # [B, 3, H, W]
 
         goal = self.goal_frame
         if goal.dim() == 3:
-            goal = goal.unsqueeze(0)                         # [1, 3, H, W]
+            goal = goal.unsqueeze(0)  # [1, 3, H, W]
         goal = goal.to(imagined.device, imagined.dtype)
         return -((imagined - goal) ** 2).mean(dim=(1, 2, 3))  # [B]

@@ -18,11 +18,13 @@ class StubDecoderTransformer(nn.Module):
         mlp_dim: feed-forward hidden width.
     """
 
-    def __init__(self, emb_dim: int = 1024, n_layers: int = 6, n_heads: int = 8, mlp_dim: int = 2048) -> None:
+    def __init__(
+        self, emb_dim: int = 1024, n_layers: int = 6, n_heads: int = 8, mlp_dim: int = 2048
+    ) -> None:
         super().__init__()
-        self.blocks = nn.ModuleList([
-            StubTransformerBlock(emb_dim, n_heads, mlp_dim) for _ in range(n_layers)
-        ])
+        self.blocks = nn.ModuleList(
+            [StubTransformerBlock(emb_dim, n_heads, mlp_dim) for _ in range(n_layers)]
+        )
         self.norm = nn.LayerNorm(emb_dim)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

@@ -15,18 +15,19 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 _TOKENS_FILE = Path(__file__).parent / "special_tokens.json"
 
-def load_special_tokens() -> Dict[str, Any]:
+
+def load_special_tokens() -> dict[str, Any]:
     """Load and return the special tokens config dict."""
-    with open(_TOKENS_FILE, "r") as f:
+    with open(_TOKENS_FILE) as f:
         return json.load(f)
 
 
 # Module-level singleton — loaded once on import
-SPECIAL_TOKENS: Dict[str, Any] = load_special_tokens()
+SPECIAL_TOKENS: dict[str, Any] = load_special_tokens()
 
 
 def get_token(name: str) -> str:

@@ -28,8 +28,12 @@ class SelfAttn(nn.Module):
         self.scale = 1.0 / math.sqrt(emb_dim)
         self.return_attn_weights = return_attn_weights
 
-    def forward(self, inputs: torch.Tensor, causal_mask: torch.Tensor | None = None,
-                pad_mask: torch.Tensor | None = None) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self,
+        inputs: torch.Tensor,
+        causal_mask: torch.Tensor | None = None,
+        pad_mask: torch.Tensor | None = None,
+    ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
         """Attend over ``inputs``.
 
         Args:
@@ -41,20 +45,22 @@ class SelfAttn(nn.Module):
             ``[B, L, D]``, plus the attention weights when ``return_attn_weights`` is set.
         """
         Query = self.query_proj(inputs)  # [B, Seq_len, D]
-        Key = self.key_proj(inputs)      # [B, Seq_len, D]
-        Val = self.val_proj(inputs)      # [B, Seq_len, D]
+        Key = self.key_proj(inputs)  # [B, Seq_len, D]
+        Val = self.val_proj(inputs)  # [B, Seq_len, D]
 
-        attn_scores = torch.matmul(Query, Key.transpose(-2, -1)) * self.scale  # [B, Seq_len, Seq_len]
+        attn_scores = (
+            torch.matmul(Query, Key.transpose(-2, -1)) * self.scale
+        )  # [B, Seq_len, Seq_len]
 
         if causal_mask is not None:
-            attn_scores = attn_scores.masked_fill(causal_mask == 0, float('-inf'))
+            attn_scores = attn_scores.masked_fill(causal_mask == 0, float("-inf"))
 
         # pad_mask: [B, Seq_len] with 1=real, 0=pad; mask out pad key positions
         if pad_mask is not None:
-            attn_scores = attn_scores.masked_fill(pad_mask.unsqueeze(1) == 0, float('-inf'))
+            attn_scores = attn_scores.masked_fill(pad_mask.unsqueeze(1) == 0, float("-inf"))
 
         attn_weights = F.softmax(attn_scores, dim=-1)  # [B, Seq_len, Seq_len]
-        attn_output = torch.matmul(attn_weights, Val)   # [B, Seq_len, D]
+        attn_output = torch.matmul(attn_weights, Val)  # [B, Seq_len, D]
 
         if self.return_attn_weights:
             return attn_output, attn_weights

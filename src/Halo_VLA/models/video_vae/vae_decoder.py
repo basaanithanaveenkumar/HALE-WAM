@@ -24,14 +24,16 @@ class VAEDecoder(nn.Module):
         ch = [base_ch * 4, base_ch * 4, base_ch * 2, base_ch]
 
         self.conv_in = nn.Conv2d(latent_ch, ch[0], 3, padding=1)
-        self.mid     = MidBlock(ch[0])
+        self.mid = MidBlock(ch[0])
 
-        self.blocks = nn.ModuleList([
-            DecoderBlock(ch[0], ch[1], num_res=3, upsample=True),    # H/8 → H/4
-            DecoderBlock(ch[1], ch[2], num_res=3, upsample=True),    # H/4 → H/2
-            DecoderBlock(ch[2], ch[3], num_res=3, upsample=True),    # H/2 → H
-            DecoderBlock(ch[3], ch[3], num_res=3, upsample=False),   # H   (final refine)
-        ])
+        self.blocks = nn.ModuleList(
+            [
+                DecoderBlock(ch[0], ch[1], num_res=3, upsample=True),  # H/8 → H/4
+                DecoderBlock(ch[1], ch[2], num_res=3, upsample=True),  # H/4 → H/2
+                DecoderBlock(ch[2], ch[3], num_res=3, upsample=True),  # H/2 → H
+                DecoderBlock(ch[3], ch[3], num_res=3, upsample=False),  # H   (final refine)
+            ]
+        )
 
         self.norm_out = nn.GroupNorm(32, ch[-1], eps=1e-6, affine=True)
         self.conv_out = nn.Conv2d(ch[-1], out_ch, 3, padding=1)

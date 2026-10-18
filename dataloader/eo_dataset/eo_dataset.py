@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import torch
@@ -31,7 +31,7 @@ WORLD_VIDEO_TOKEN = get_token("world_video_token")
 # ---------------------------------------------------------------------------
 # Image transforms
 # ---------------------------------------------------------------------------
-def build_image_transform(img_size: int, mean: Tuple, std: Tuple) -> Compose:
+def build_image_transform(img_size: int, mean: tuple, std: tuple) -> Compose:
     """Build torchvision transforms for images."""
     from torchvision import transforms
 
@@ -66,7 +66,7 @@ class EODataset(Dataset):
 
     def __init__(
         self,
-        config: Optional[EODatasetConfig] = None,
+        config: EODatasetConfig | None = None,
         hf_dataset: Any = None,
         tokenizer: Any = None,
         **kwargs: Any,
@@ -95,8 +95,8 @@ class EODataset(Dataset):
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
         # Add special tokens for image / action / state if missing
-        special_tokens: Dict[str, str] = {}
-        additional_special: List[str] = []
+        special_tokens: dict[str, str] = {}
+        additional_special: list[str] = []
         for tok in get_all_custom_tokens():
             if tok not in self.tokenizer.get_vocab():
                 additional_special.append(tok)
@@ -184,18 +184,20 @@ class EODataset(Dataset):
                 j += 1
             counts[i] = max(n_pairs, 1)  # at least 1 item per sample
 
-        self._cum_pairs = np.cumsum(counts)          # [n_samples]
+        self._cum_pairs = np.cumsum(counts)  # [n_samples]
         self._total_items = int(self._cum_pairs[-1])
 
         logger.info(
             "Expanded to {} items ({} samples × avg {:.1f} pairs)",
-            self._total_items, n_samples,
+            self._total_items,
+            n_samples,
             self._total_items / max(n_samples, 1),
         )
 
-    def _virtual_to_real(self, idx: int) -> Tuple[int, int]:
+    def _virtual_to_real(self, idx: int) -> tuple[int, int]:
         """Map a flat virtual index → (sample_idx, pair_idx) via binary search."""
         import numpy as np
+
         sample_idx = int(np.searchsorted(self._cum_pairs, idx, side="right"))
         pair_idx = idx if sample_idx == 0 else idx - int(self._cum_pairs[sample_idx - 1])
         return sample_idx, pair_idx
@@ -204,7 +206,7 @@ class EODataset(Dataset):
     def __len__(self) -> int:
         return self._total_items
 
-    def __getitem__(self, idx: int) -> Dict[str, Any]:
+    def __getitem__(self, idx: int) -> dict[str, Any]:
         sample_idx, pair_idx = self._virtual_to_real(idx)
         sample = self.dataset[sample_idx]
 
@@ -215,12 +217,12 @@ class EODataset(Dataset):
         # If the sequence is long enough, hold back the last `num_predict_frames`
         # frames as prediction targets; otherwise use all frames as context only.
         n_predict = self.cfg.num_predict_frames
-        n_total   = all_images.size(0)
+        n_total = all_images.size(0)
         if n_total > n_predict:
-            images        = all_images[: n_total - n_predict]   # context
-            future_frames = all_images[n_total - n_predict :]   # targets [P, 3, H, W]
+            images = all_images[: n_total - n_predict]  # context
+            future_frames = all_images[n_total - n_predict :]  # targets [P, 3, H, W]
         else:
-            images        = all_images
+            images = all_images
             future_frames = None
 
         # ----- Conversation → token ids (single user–assistant pair) -----
@@ -233,14 +235,14 @@ class EODataset(Dataset):
         states, state_mask = self._process_states(sample)
 
         item = {
-            "images": images,                 # [N-P, 3, H, W]
-            "input_ids": input_ids,           # [seq_len]
+            "images": images,  # [N-P, 3, H, W]
+            "input_ids": input_ids,  # [seq_len]
             "attention_mask": attention_mask,  # [seq_len]
-            "labels": labels,                 # [seq_len]
-            "actions": actions,               # [T, action_dim]
-            "action_mask": action_mask,        # [T]
-            "states": states,                 # [T, state_dim]
-            "state_mask": state_mask,          # [T]
+            "labels": labels,  # [seq_len]
+            "actions": actions,  # [T, action_dim]
+            "action_mask": action_mask,  # [T]
+            "states": states,  # [T, state_dim]
+            "state_mask": state_mask,  # [T]
             "num_images": images.size(0),
             "pad_token_id": self.cfg.pad_token_id,
         }
@@ -249,7 +251,7 @@ class EODataset(Dataset):
         return item
 
     # ------------------------------------------------------------- images
-    def _process_images(self, sample: Dict) -> torch.Tensor:
+    def _process_images(self, sample: dict) -> torch.Tensor:
         """
         Extract and transform images.
 
@@ -264,7 +266,7 @@ class EODataset(Dataset):
         from PIL import Image
 
         raw = sample.get("image")
-        imgs: List[torch.Tensor] = []
+        imgs: list[torch.Tensor] = []
 
         if raw is None:
             # No image → return a black placeholder
@@ -298,7 +300,7 @@ class EODataset(Dataset):
         return torch.stack(imgs, dim=0)  # [N, 3, H, W]
 
     # ------------------------------------------------------- conversation
-    def _pair_conversations(self, sample: Dict) -> List[List[Dict]]:
+    def _pair_conversations(self, sample: dict) -> list[list[dict]]:
         """
         Split a multi-turn conversation into individual (user, assistant) pairs.
 
@@ -307,7 +309,7 @@ class EODataset(Dataset):
         each containing exactly one user question and one assistant response.
         """
         conversation = sample.get("conversation", [])
-        pairs: List[List[Dict]] = []
+        pairs: list[list[dict]] = []
         i = 0
         while i < len(conversation):
             turn = conversation[i]
@@ -328,8 +330,8 @@ class EODataset(Dataset):
         return pairs if pairs else [[]]
 
     def _process_conversation(
-        self, sample: Dict, pair_idx: int = 0
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        self, sample: dict, pair_idx: int = 0
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Build a token sequence for a single (system + user + assistant) triple.
 
@@ -349,11 +351,12 @@ class EODataset(Dataset):
         pair_idx = min(pair_idx, len(pairs) - 1)
         pair = pairs[pair_idx]
 
-        text_parts: List[str] = []
-        role_is_assistant: List[bool] = []
+        text_parts: list[str] = []
+        role_is_assistant: list[bool] = []
 
         # 1. System prompt
         from config import HaloVLMConfig
+
         model_cfg = HaloVLMConfig()
         system_msg = f"{self.cfg.system_prefix}{model_cfg.system_prompt}{self.cfg.turn_end}"
         text_parts.append(system_msg)
@@ -386,15 +389,13 @@ class EODataset(Dataset):
             padding=False,
             return_tensors="pt",
         )
-        input_ids = encoding["input_ids"].squeeze(0)             # [seq_len]
-        attention_mask = encoding["attention_mask"].squeeze(0)    # [seq_len]
+        input_ids = encoding["input_ids"].squeeze(0)  # [seq_len]
+        attention_mask = encoding["attention_mask"].squeeze(0)  # [seq_len]
 
         # Build labels: mask out human turns (set to -100 so loss ignores them)
         labels = input_ids.clone()
         # Simple heuristic: tokenise each turn individually to find boundaries
-        labels = self._mask_human_turns(
-            full_text, text_parts, role_is_assistant, labels
-        )
+        labels = self._mask_human_turns(full_text, text_parts, role_is_assistant, labels)
         # Also mask padding
         labels[attention_mask == 0] = -100
 
@@ -403,8 +404,8 @@ class EODataset(Dataset):
     def _mask_human_turns(
         self,
         full_text: str,
-        text_parts: List[str],
-        role_is_assistant: List[bool],
+        text_parts: list[str],
+        role_is_assistant: list[bool],
         labels: torch.Tensor,
     ) -> torch.Tensor:
         """Set labels to -100 for tokens corresponding to human turns."""
@@ -447,9 +448,7 @@ class EODataset(Dataset):
         return ids, mask, labels
 
     # --------------------------------------------------------- actions
-    def _process_actions(
-        self, sample: Dict
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    def _process_actions(self, sample: dict) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Process robot action chunks — no zero-padding, original sizes.
 
@@ -478,7 +477,7 @@ class EODataset(Dataset):
             arr = arr.reshape(1, -1)
 
         D = min(arr.shape[1], self.cfg.action_dim)
-        actions = torch.tensor(arr[:, :D], dtype=torch.float32)    # [T, D]
+        actions = torch.tensor(arr[:, :D], dtype=torch.float32)  # [T, D]
         action_mask = torch.ones(actions.shape[0], dtype=torch.long)
 
         # Honour action_is_pad if present
@@ -494,9 +493,7 @@ class EODataset(Dataset):
         return actions, action_mask
 
     # ---------------------------------------------------------- states
-    def _process_states(
-        self, sample: Dict
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    def _process_states(self, sample: dict) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Process robot proprioceptive state — no zero-padding, original sizes.
 
@@ -526,7 +523,7 @@ class EODataset(Dataset):
 
     # ---------------------------------------------------------- utils
     @staticmethod
-    def _to_numpy(raw) -> Optional[np.ndarray]:
+    def _to_numpy(raw) -> np.ndarray | None:
         """Convert various action/state representations to numpy."""
         if isinstance(raw, np.ndarray):
             return raw.astype(np.float32)

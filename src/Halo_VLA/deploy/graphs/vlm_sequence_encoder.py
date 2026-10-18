@@ -37,10 +37,14 @@ class VLMSequenceEncoder(nn.Module):
     def _grab(self, _module: nn.Module, _inputs: tuple, output: torch.Tensor | tuple) -> None:
         self._captured["h"] = output[0] if isinstance(output, tuple) else output
 
-    def forward(self, images: torch.Tensor, input_ids: torch.Tensor, attention_mask: torch.Tensor,
-                states: torch.Tensor,
-                extra_embeds: torch.Tensor | None = None,
-                ) -> tuple[torch.Tensor, torch.Tensor, int, torch.Tensor | None]:
+    def forward(
+        self,
+        images: torch.Tensor,
+        input_ids: torch.Tensor,
+        attention_mask: torch.Tensor,
+        states: torch.Tensor,
+        extra_embeds: torch.Tensor | None = None,
+    ) -> tuple[torch.Tensor, torch.Tensor, int, torch.Tensor | None]:
         """Encode the observation and prompt with the VLM decoder.
 
         Args:
@@ -55,17 +59,30 @@ class VLMSequenceEncoder(nn.Module):
         """
         b = input_ids.shape[0]
         combined, num_prefix = self.embedder(images, input_ids, states)
-        mask = torch.cat([torch.ones(b, num_prefix, dtype=attention_mask.dtype, device=attention_mask.device),
-                          attention_mask], dim=1)
+        mask = torch.cat(
+            [
+                torch.ones(b, num_prefix, dtype=attention_mask.dtype, device=attention_mask.device),
+                attention_mask,
+            ],
+            dim=1,
+        )
         num_extra = 0
         if extra_embeds is not None:
-            extra = self.language.project_in(extra_embeds) if self.language is not None else extra_embeds
+            extra = (
+                self.language.project_in(extra_embeds)
+                if self.language is not None
+                else extra_embeds
+            )
             combined = torch.cat([combined, extra.to(combined.dtype)], dim=1)
-            mask = torch.cat([mask, torch.ones(b, extra.shape[1], dtype=mask.dtype, device=mask.device)], dim=1)
+            mask = torch.cat(
+                [mask, torch.ones(b, extra.shape[1], dtype=mask.dtype, device=mask.device)], dim=1
+            )
             num_extra = extra.shape[1]
         self._captured.clear()
         if self.language is not None:
-            token_ids = torch.cat([input_ids.new_full((b, num_prefix), self.image_token_id), input_ids], dim=1)
+            token_ids = torch.cat(
+                [input_ids.new_full((b, num_prefix), self.image_token_id), input_ids], dim=1
+            )
             if num_extra:
                 pad = getattr(self.language.tokenizer, "pad_token_id", None) or 0
                 token_ids = torch.cat([token_ids, input_ids.new_full((b, num_extra), pad)], dim=1)

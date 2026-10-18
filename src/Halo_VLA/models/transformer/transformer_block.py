@@ -26,19 +26,31 @@ class TransformerBlock(nn.Module):
         moe_num_shared_experts: always-on shared experts.
     """
 
-    def __init__(self, emb_dim: int = 256, num_heads: int = 8, mlp_dim: int = 512, drop_fact: float = 0.0,
-                 causal_mask: bool = False, use_moe: bool = True, moe_hid_scale: float = 1.2,
-                 moe_num_routed_experts: int = 16, moe_top_k: int = 4,
-                 moe_num_shared_experts: int = 2) -> None:
+    def __init__(
+        self,
+        emb_dim: int = 256,
+        num_heads: int = 8,
+        mlp_dim: int = 512,
+        drop_fact: float = 0.0,
+        causal_mask: bool = False,
+        use_moe: bool = True,
+        moe_hid_scale: float = 1.2,
+        moe_num_routed_experts: int = 16,
+        moe_top_k: int = 4,
+        moe_num_shared_experts: int = 2,
+    ) -> None:
         super().__init__()
-        self.attn = MultiHeadAttn(emb_dim=emb_dim, num_heads=num_heads, drop_fact=drop_fact, causal_mask=causal_mask)
+        self.attn = MultiHeadAttn(
+            emb_dim=emb_dim, num_heads=num_heads, drop_fact=drop_fact, causal_mask=causal_mask
+        )
         self.norm1 = nn.LayerNorm(emb_dim)
 
         self.use_moe = use_moe
         if use_moe:
             moe_hid_dim = round(emb_dim * moe_hid_scale)
             self.ffn = DeepseekMoE(
-                emb_dim, moe_hid_dim,
+                emb_dim,
+                moe_hid_dim,
                 num_router_exprts=moe_num_routed_experts,
                 best_k=moe_top_k,
                 num_shared_exprts=moe_num_shared_experts,

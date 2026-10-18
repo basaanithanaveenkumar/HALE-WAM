@@ -12,11 +12,11 @@ from __future__ import annotations
 from dataclasses import fields, replace
 from typing import Any
 
-from exceptions import HaloVLAConfigError
 from hale_core.exceptions import RegistryError
 
 from dual_system.config import DualSystemConfig
 from dual_system.presets import DUAL_SYSTEM_PRESETS
+from exceptions import HaloVLAConfigError
 
 #: ``dual_system`` value that disables the dual system.
 NONE = "none"
@@ -40,7 +40,9 @@ def parse_overrides(items: list[str] | None) -> dict[str, Any]:
     for item in items or []:
         key, sep, raw = item.partition("=")
         if not sep or key not in types:
-            raise HaloVLAConfigError(f"bad dual-system option {item!r}; use KEY=VALUE with KEY in {sorted(types)}")
+            raise HaloVLAConfigError(
+                f"bad dual-system option {item!r}; use KEY=VALUE with KEY in {sorted(types)}"
+            )
         kind = str(types[key])
         if raw.lower() in ("none", "null"):
             value: Any = None
@@ -56,7 +58,9 @@ def parse_overrides(items: list[str] | None) -> dict[str, Any]:
     return out
 
 
-def resolve_dual_system_config(name: str | None, overrides: dict[str, Any] | None = None) -> DualSystemConfig | None:
+def resolve_dual_system_config(
+    name: str | None, overrides: dict[str, Any] | None = None
+) -> DualSystemConfig | None:
     """The preset ``name`` (or ``None`` for ``none``) with ``overrides`` applied.
 
     ``name="custom"`` starts from the dataclass defaults, so any combination can be built from

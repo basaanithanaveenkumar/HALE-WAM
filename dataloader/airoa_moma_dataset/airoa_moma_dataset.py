@@ -3,18 +3,19 @@
 from __future__ import annotations
 
 import random
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any
 
 import numpy as np
 import torch
-from exceptions import DatasetNotFoundError
 from loguru import logger
 from torch.utils.data import Dataset
 
 from dataloader.airoa_moma_dataset.moma_episode_index import MomaEpisodeIndexMixin
 from dataloader.airoa_moma_dataset.moma_prompt import MomaPromptMixin
 from dataloader.eo_dataset import build_image_transform
+from exceptions import DatasetNotFoundError
 
 from .airoa_moma_config import AiroaMomaConfig
 
@@ -29,7 +30,7 @@ class AiroaMomaDataset(MomaPromptMixin, MomaEpisodeIndexMixin, Dataset):
 
     def __init__(
         self,
-        config: Optional[AiroaMomaConfig] = None,
+        config: AiroaMomaConfig | None = None,
         tokenizer: Any = None,
         split: str = "train",
         **kwargs: Any,
@@ -68,14 +69,6 @@ class AiroaMomaDataset(MomaPromptMixin, MomaEpisodeIndexMixin, Dataset):
     # Episode discovery: parquet → video scan → jsonl (priority order)
     # ------------------------------------------------------------------
 
-
-
-
-
-
-
-
-
     # def _probe_num_frames(self, video_path: Path) -> int:
     #     cv2 = _import_cv2()
     #     cap = cv2.VideoCapture(str(video_path))
@@ -96,6 +89,7 @@ class AiroaMomaDataset(MomaPromptMixin, MomaEpisodeIndexMixin, Dataset):
         long robot episodes and was called on every __getitem__ call.
         """
         import av
+
         try:
             container = av.open(str(video_path))
             stream = container.streams.video[0]
@@ -108,7 +102,7 @@ class AiroaMomaDataset(MomaPromptMixin, MomaEpisodeIndexMixin, Dataset):
             # Fast path 2: duration × average frame rate (no decoding).
             if stream.duration and stream.average_rate:
                 dur_s = float(stream.duration) * stream.time_base
-                fps   = float(stream.average_rate)
+                fps = float(stream.average_rate)
                 if dur_s > 0 and fps > 0:
                     container.close()
                     return max(1, round(dur_s * fps))
@@ -120,6 +114,7 @@ class AiroaMomaDataset(MomaPromptMixin, MomaEpisodeIndexMixin, Dataset):
         except Exception as e:
             logger.warning(f"Failed to get frame count for {video_path}: {e}")
             return 0
+
     # def _read_frames_at_indices(
     #     self, video_path: Path, indices: Sequence[int]
     # ) -> List[torch.Tensor]:
@@ -225,7 +220,9 @@ class AiroaMomaDataset(MomaPromptMixin, MomaEpisodeIndexMixin, Dataset):
     #             logger.warning(f"Frame index {ii} missing in {video_path.name}; using blank")
     #             out.append(blank.clone())
     #     return out
-    def _read_frames_at_indices(self, video_path: Path, indices: Sequence[int]) -> List[torch.Tensor]:
+    def _read_frames_at_indices(
+        self, video_path: Path, indices: Sequence[int]
+    ) -> list[torch.Tensor]:
         """Read specific frame indices using PyAV with a simple counter."""
         import av
 
@@ -238,7 +235,7 @@ class AiroaMomaDataset(MomaPromptMixin, MomaEpisodeIndexMixin, Dataset):
         for packet in container.demux(stream):
             for frame in packet.decode():
                 if frame_counter in required:
-                    img = frame.to_image().convert('RGB')
+                    img = frame.to_image().convert("RGB")
                     frame_map[frame_counter] = self.img_transform(img)
                     required.remove(frame_counter)
                     if not required:
@@ -260,7 +257,8 @@ class AiroaMomaDataset(MomaPromptMixin, MomaEpisodeIndexMixin, Dataset):
                 logger.warning(f"Frame index {ii} missing in {video_path.name}; using blank")
                 out.append(blank.clone())
         return out
-    def _load_state_trajectory(self, episode_index: int) -> Optional[np.ndarray]:
+
+    def _load_state_trajectory(self, episode_index: int) -> np.ndarray | None:
         sub = self.root / self.cfg.state_npy_subdir / f"episode_{int(episode_index):06d}.npy"
         if not sub.is_file():
             return None
@@ -268,8 +266,6 @@ class AiroaMomaDataset(MomaPromptMixin, MomaEpisodeIndexMixin, Dataset):
         if arr.ndim == 1:
             arr = arr.reshape(1, -1)
         return arr.astype(np.float32)
-
-
 
     def _generate_dummy_frames(self, num_frames: int) -> torch.Tensor:
         """Return [num_frames, 3, H, W] black images."""
@@ -279,7 +275,7 @@ class AiroaMomaDataset(MomaPromptMixin, MomaEpisodeIndexMixin, Dataset):
     def __len__(self) -> int:
         return len(self.episodes)
 
-    def __getitem__(self, idx: int) -> Dict[str, Any]:
+    def __getitem__(self, idx: int) -> dict[str, Any]:
         meta = self.episodes[idx]
         ep = int(meta.get("episode_index", idx))
         vid_path = self._video_path(ep, meta=meta)
@@ -313,7 +309,7 @@ class AiroaMomaDataset(MomaPromptMixin, MomaEpisodeIndexMixin, Dataset):
             rng = random.Random(self.cfg.seed + idx)
             t0 = rng.randint(0, t0_max)
         all_indices = [t0 + j * stride for j in range(total)]
-        frame_indices = all_indices[:n]   # context/input frames
+        frame_indices = all_indices[:n]  # context/input frames
         future_indices = all_indices[n:]  # prediction target frames
 
         # Clamp indices to valid range (0 .. T-1) if video exists
@@ -328,8 +324,8 @@ class AiroaMomaDataset(MomaPromptMixin, MomaEpisodeIndexMixin, Dataset):
             frame_indices = list(range(n))
         else:
             frame_tensors = self._read_frames_at_indices(vid_path, frame_indices + future_indices)
-            images = torch.stack(frame_tensors[:n], dim=0)           # [n, 3, H, W]
-            future_frames = torch.stack(frame_tensors[n:], dim=0)    # [p, 3, H, W]
+            images = torch.stack(frame_tensors[:n], dim=0)  # [n, 3, H, W]
+            future_frames = torch.stack(frame_tensors[n:], dim=0)  # [p, 3, H, W]
 
         user_body, assistant_body = self._build_text(meta, num_images=n)
         input_ids, attention_mask, labels = self._tokenise_turns(user_body, assistant_body)
@@ -348,7 +344,7 @@ class AiroaMomaDataset(MomaPromptMixin, MomaEpisodeIndexMixin, Dataset):
 
         return {
             "images": images,
-            "future_frames": future_frames,   # [p, 3, H, W] — prediction targets
+            "future_frames": future_frames,  # [p, 3, H, W] — prediction targets
             "input_ids": input_ids,
             "attention_mask": attention_mask,
             "labels": labels,
@@ -362,9 +358,9 @@ class AiroaMomaDataset(MomaPromptMixin, MomaEpisodeIndexMixin, Dataset):
 
     def _align_actions_states(
         self,
-        state_traj: Optional[np.ndarray],
-        frame_indices: List[int],
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        state_traj: np.ndarray | None,
+        frame_indices: list[int],
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Align proprio to frame indices. Actions = consecutive differences in state.
         If no ``states/*.npy``, return empty tensors (masked).
@@ -382,8 +378,8 @@ class AiroaMomaDataset(MomaPromptMixin, MomaEpisodeIndexMixin, Dataset):
             action_mask = torch.ones(dummy_actions.shape[0], dtype=torch.long)
             # truncation
             if dummy_actions.shape[0] > self.cfg.max_action_len:
-                dummy_actions = dummy_actions[:self.cfg.max_action_len]
-                action_mask = action_mask[:self.cfg.max_action_len]
+                dummy_actions = dummy_actions[: self.cfg.max_action_len]
+                action_mask = action_mask[: self.cfg.max_action_len]
             return dummy_actions, action_mask, dummy_states, state_mask
 
         T = state_traj.shape[0]

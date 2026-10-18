@@ -9,7 +9,9 @@ import torch.nn.functional as F
 from .step_output import StepOutput
 
 
-def compute_language_loss(logits: torch.Tensor, labels: torch.Tensor, num_prepended: int) -> torch.Tensor:
+def compute_language_loss(
+    logits: torch.Tensor, labels: torch.Tensor, num_prepended: int
+) -> torch.Tensor:
     """
     Cross-entropy loss on the text portion of the sequence.
 
@@ -21,7 +23,7 @@ def compute_language_loss(logits: torch.Tensor, labels: torch.Tensor, num_prepen
     # The logits for text tokens start after the prepended image patches.
     # Shift by 1 for next-token prediction: predict token t+1 from position t.
     text_logits = logits[:, num_prepended:-1, :]  # [B, seq_len-1, V]
-    target = labels[:, 1:]                         # [B, seq_len-1]
+    target = labels[:, 1:]  # [B, seq_len-1]
 
     # Truncate to the shorter of the two (in case of length mismatch)
     min_len = min(text_logits.size(1), target.size(1))
@@ -102,5 +104,6 @@ class HaloVLATrainingStep(nn.Module):
             temporal_weight=self.temporal_weight,
         )
         total = lang + self.action_loss_weight * act + self.visual_loss_weight * vis
-        return StepOutput(total=total, lang=lang, act=act, vis=vis, vis_sub=vis_sub,
-                          action_hiddens=action_hiddens)
+        return StepOutput(
+            total=total, lang=lang, act=act, vis=vis, vis_sub=vis_sub, action_hiddens=action_hiddens
+        )

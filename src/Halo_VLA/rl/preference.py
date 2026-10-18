@@ -15,8 +15,8 @@ from __future__ import annotations
 
 import torch
 
-from rl.policy import GaussianActionPolicy, RewardFn
 from exceptions import ModelInputError
+from rl.policy import GaussianActionPolicy, RewardFn
 
 
 def build_preference_pairs(
@@ -36,11 +36,11 @@ def build_preference_pairs(
     if candidate_actions.dim() != 3:
         raise ModelInputError("candidate_actions must be [B, K, A]")
     B = candidate_actions.size(0)
-    best = rewards.argmax(dim=1)                       # [B]
-    worst = rewards.argmin(dim=1)                      # [B]
+    best = rewards.argmax(dim=1)  # [B]
+    worst = rewards.argmin(dim=1)  # [B]
     idx = torch.arange(B, device=candidate_actions.device)
-    chosen = candidate_actions[idx, best]             # [B, A]
-    rejected = candidate_actions[idx, worst]          # [B, A]
+    chosen = candidate_actions[idx, best]  # [B, A]
+    rejected = candidate_actions[idx, worst]  # [B, A]
     return chosen, rejected
 
 
@@ -65,8 +65,8 @@ def sample_preference_pairs(
     """
     B, _ = cond.shape
     K = num_candidates
-    cond_rep = cond.repeat_interleave(K, dim=0)              # [B*K, D]
-    actions = policy.distribution(cond_rep).sample()        # [B*K, A]
-    rewards = reward_fn(actions).view(B, K)                 # [B, K]
-    cand = actions.view(B, K, -1)                           # [B, K, A]
+    cond_rep = cond.repeat_interleave(K, dim=0)  # [B*K, D]
+    actions = policy.distribution(cond_rep).sample()  # [B*K, A]
+    rewards = reward_fn(actions).view(B, K)  # [B, K]
+    cand = actions.view(B, K, -1)  # [B, K, A]
     return build_preference_pairs(cand, rewards)

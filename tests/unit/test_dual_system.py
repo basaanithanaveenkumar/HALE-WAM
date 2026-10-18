@@ -2,20 +2,17 @@
 
 from __future__ import annotations
 
-import functools
 import sys
 from pathlib import Path
 
 import pytest
 import torch
-from torch.utils.data import DataLoader
 
 ROOT = Path(__file__).resolve().parents[2]
 for _path in (ROOT, ROOT / "src" / "Halo_VLA"):
     if str(_path) not in sys.path:
         sys.path.insert(0, str(_path))
 
-from config import HaloVLMConfig  # noqa: E402
 from dual_system import (  # noqa: E402
     PRESETS,
     DualSystemController,
@@ -24,7 +21,6 @@ from dual_system import (  # noqa: E402
 )
 from dual_system.resolution import parse_overrides  # noqa: E402
 from models.halo_vla import HaloVLM  # noqa: E402
-
 from tests.support.llm_support import batch_for, hf_patched, small_config  # noqa: E402,F401
 
 SMALL_S1 = {"system1_dim": 32, "system1_layers": 1, "system1_heads": 4, "sample_steps": 2}
@@ -53,16 +49,30 @@ def test_none_disables_and_presets_resolve() -> None:
     with pytest.raises(ValueError, match="unknown dual_system options"):
         resolve_dual_system_config("basic", {"latnt": "pooled"})
     with pytest.raises(ValueError, match="prompt_tuning"):
-        resolve_dual_system_config("custom", {"system2_training": "prompt_tuning", "latent": "pooled"})
+        resolve_dual_system_config(
+            "custom", {"system2_training": "prompt_tuning", "latent": "pooled"}
+        )
     with pytest.raises(ValueError):
         resolve_dual_system_config("none", {"latent": "pooled"})
 
 
 def test_cli_overrides_are_typed() -> None:
-    over = parse_overrides(["latent=pooled", "async_steps=4", "aux_weight=0.5", "obs_resampler_tokens=none",
-                            "multi_act_with_language=true"])
-    assert over == {"latent": "pooled", "async_steps": 4, "aux_weight": 0.5, "obs_resampler_tokens": None,
-                    "multi_act_with_language": True}
+    over = parse_overrides(
+        [
+            "latent=pooled",
+            "async_steps=4",
+            "aux_weight=0.5",
+            "obs_resampler_tokens=none",
+            "multi_act_with_language=true",
+        ]
+    )
+    assert over == {
+        "latent": "pooled",
+        "async_steps": 4,
+        "aux_weight": 0.5,
+        "obs_resampler_tokens": None,
+        "multi_act_with_language": True,
+    }
     with pytest.raises(ValueError):
         parse_overrides(["nonsense"])
 
@@ -85,7 +95,11 @@ def test_latent_shapes(llm, request) -> None:
         tokens = enc["latent_tokens"]
         total = enc["hidden"].size(1)
         assert tokens.size(1) == (total if k is None else k), (name, tokens.shape)
-        width = model.system2.model.layer_width if name == "custom" else model.system2.model.config.emb_dim
+        width = (
+            model.system2.model.layer_width
+            if name == "custom"
+            else model.system2.model.config.emb_dim
+        )
         assert tokens.size(-1) == width
 
 
@@ -101,17 +115,25 @@ def test_act_latent_sees_the_image() -> None:
 
 # ---------------------------------------------------------------------------- training recipes
 def trainable_groups(model: DualSystemVLA) -> set[str]:
-    names = {n.split(".")[0] if not n.startswith("system2.") else ("system2.act_queries" if "act_queries" in n
-             else "system2.model") for n, p in model.named_parameters() if p.requires_grad}
+    names = {
+        n.split(".")[0]
+        if not n.startswith("system2.")
+        else ("system2.act_queries" if "act_queries" in n else "system2.model")
+        for n, p in model.named_parameters()
+        if p.requires_grad
+    }
     return names
 
 
-@pytest.mark.parametrize("name, expected", [
-    ("dp_vla", {"bridge", "system1"}),
-    ("openhelix", {"bridge", "system1", "system2.act_queries"}),
-    ("basic", {"bridge", "system1", "system2.act_queries", "system2.model"}),
-    ("hirt", {"bridge", "system1", "latent", "system2.model"}),
-])
+@pytest.mark.parametrize(
+    "name, expected",
+    [
+        ("dp_vla", {"bridge", "system1"}),
+        ("openhelix", {"bridge", "system1", "system2.act_queries"}),
+        ("basic", {"bridge", "system1", "system2.act_queries", "system2.model"}),
+        ("hirt", {"bridge", "system1", "latent", "system2.model"}),
+    ],
+)
 def test_system2_training_modes(name: str, expected: set[str]) -> None:
     model = build(name)
     assert trainable_groups(model) == expected
@@ -145,7 +167,10 @@ def test_prealignment_holds_system1_then_releases_it() -> None:
     model(batch(model)).total.backward()
     model.mask_frozen_gradients()
     assert all(p.grad is None for p in model.system1.parameters())
-    assert model.bridge.projector.weight.grad is not None and model.system2.act_queries.grad is not None
+    assert (
+        model.bridge.projector.weight.grad is not None
+        and model.system2.act_queries.grad is not None
+    )
     model.zero_grad(set_to_none=True)
     model.set_training_step(2)
     model(batch(model)).total.backward()
@@ -198,7 +223,7 @@ def test_diffusion_policy_learns_to_sample_the_target() -> None:
     opt = torch.optim.AdamW(model.optimizer_parameters(), lr=3e-3)
     model.eval()
     torch.manual_seed(1)
-    before = (model.predict_actions(b) - b["actions"][:, :model.chunk]).abs().mean()
+    before = (model.predict_actions(b) - b["actions"][:, : model.chunk]).abs().mean()
     model.train()
     for _ in range(150):
         loss = model(b).policy
@@ -207,7 +232,7 @@ def test_diffusion_policy_learns_to_sample_the_target() -> None:
         opt.step()
     model.eval()
     torch.manual_seed(1)
-    after = (model.predict_actions(b) - b["actions"][:, :model.chunk]).abs().mean()
+    after = (model.predict_actions(b) - b["actions"][:, : model.chunk]).abs().mean()
     assert after < 0.5 * before, (before, after)
 
 
@@ -218,7 +243,11 @@ def test_controller_runs_system2_every_async_steps() -> None:
     b = batch(model)
     for _ in range(7):
         actions = ctrl.act(b)
-    assert ctrl.system2_calls == 3 and actions.shape == (2, model.chunk, model.action_dim)  # steps 0, 3, 6
+    assert ctrl.system2_calls == 3 and actions.shape == (
+        2,
+        model.chunk,
+        model.action_dim,
+    )  # steps 0, 3, 6
     ctrl.reset()
     assert ctrl.latent is None
 

@@ -10,13 +10,13 @@ Expected output: action predictions                         [B, action_chunk_siz
 
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
 
 import torch
 import torch.nn as nn
+from loguru import logger
 
 from config import HaloVLMConfig
-from loguru import logger
 
 
 class ActionDecoder(nn.Module):
@@ -69,7 +69,7 @@ class ActionDecoder(nn.Module):
         Returns:
             actions: Tensor of shape [B, action_chunk_size, action_dim]
         """
-        flat = self.mlp(hidden)                               # [B, chunk*dim]
+        flat = self.mlp(hidden)  # [B, chunk*dim]
         return flat.view(-1, self.chunk_size, self.action_dim)  # [B, T, D]
 
 

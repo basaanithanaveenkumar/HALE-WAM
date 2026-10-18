@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import torch
 import torch.nn as nn
+
 from exceptions import HaloVLAConfigError
 
 #: Statistics the VLA datasets normalise images with (``img_mean`` / ``img_std``).
@@ -36,7 +37,9 @@ class HFVisionEncoder(nn.Module):
         self.model = cls.from_pretrained(model_id)
         native = int(self.model.config.image_size)
         if native != img_size:
-            raise HaloVLAConfigError(f"{model_id} expects {native}px images but img_size={img_size}; set img_size={native}")
+            raise HaloVLAConfigError(
+                f"{model_id} expects {native}px images but img_size={img_size}; set img_size={native}"
+            )
         try:
             proc = AutoImageProcessor.from_pretrained(model_id)
             mean, std = proc.image_mean, proc.image_std
@@ -75,4 +78,6 @@ class HFVisionEncoder(nn.Module):
         """
         pixel_values = images * self.scale + self.shift
         with torch.set_grad_enabled(torch.is_grad_enabled() and not self.frozen):
-            return self.model(pixel_values=pixel_values.to(self.model.dtype)).last_hidden_state.float()
+            return self.model(
+                pixel_values=pixel_values.to(self.model.dtype)
+            ).last_hidden_state.float()

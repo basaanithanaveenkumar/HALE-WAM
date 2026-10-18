@@ -16,7 +16,9 @@ class StubPatchEmbed(nn.Module):
         emb_dim: embedding width.
     """
 
-    def __init__(self, img_size: int = 224, p_size: int = 16, in_chans: int = 3, emb_dim: int = 1024) -> None:
+    def __init__(
+        self, img_size: int = 224, p_size: int = 16, in_chans: int = 3, emb_dim: int = 1024
+    ) -> None:
         super().__init__()
         self.proj = nn.Conv2d(in_chans, emb_dim, kernel_size=p_size, stride=p_size)
         self.num_patches = (img_size // p_size) ** 2

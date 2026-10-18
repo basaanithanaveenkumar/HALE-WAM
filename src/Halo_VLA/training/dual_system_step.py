@@ -32,5 +32,10 @@ class DualSystemTrainingStep(nn.Module):
         """
         losses = self.model(batch)
         zero = losses.policy.new_zeros(())
-        return StepOutput(total=losses.total, lang=losses.lm, act=losses.policy, vis=zero,
-                          vis_sub={"loss_aux": losses.aux.detach(), "loss_align": losses.align.detach()})
+        return StepOutput(
+            total=losses.total,
+            lang=losses.lm,
+            act=losses.policy,
+            vis=zero,
+            vis_sub={"loss_aux": losses.aux.detach(), "loss_align": losses.align.detach()},
+        )

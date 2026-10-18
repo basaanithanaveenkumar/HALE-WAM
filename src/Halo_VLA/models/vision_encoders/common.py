@@ -6,11 +6,11 @@ from typing import TYPE_CHECKING
 
 import torch
 import torch.nn as nn
-from exceptions import HaloVLAConfigError
 from hale_core.exceptions import RegistryError
 
+from exceptions import HaloVLAConfigError
+
 from . import encoder_builders  # noqa: F401 - registers the built-in encoders
-from .encoder_builders import DEFAULT_HF_ENCODERS
 from .encoder_registry import VISION_ENCODERS
 from .vision_encoder_info import VisionEncoderInfo
 
@@ -46,7 +46,9 @@ def build_vision_encoder(config: HaloVLMConfig) -> tuple[nn.Module, VisionEncode
     try:
         builder = VISION_ENCODERS.get(kind)
     except RegistryError as err:
-        raise HaloVLAConfigError(f"vision_encoder must be one of {ENCODER_TYPES}, got {kind!r}") from err
+        raise HaloVLAConfigError(
+            f"vision_encoder must be one of {ENCODER_TYPES}, got {kind!r}"
+        ) from err
     encoder, info = builder(config)
     if info is not None:
         return encoder, info

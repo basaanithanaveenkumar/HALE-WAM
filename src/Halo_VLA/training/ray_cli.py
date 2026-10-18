@@ -23,16 +23,32 @@ class RayCliOptions:
     def add_arguments(parser: argparse.ArgumentParser) -> None:
         """Add the ``--ray*`` flags to ``parser``."""
         group = parser.add_argument_group("Ray Train (optional, needs hale-blocks[ray])")
-        group.add_argument("--ray", action="store_true", help="Launch training on Ray Train workers")
-        group.add_argument("--ray_address", default=None,
-                           help="Ray cluster to join ('auto' or ray://host:10001); default: local Ray")
-        group.add_argument("--ray_num_workers", type=int, default=1, help="Training processes (one per GPU)")
+        group.add_argument(
+            "--ray", action="store_true", help="Launch training on Ray Train workers"
+        )
+        group.add_argument(
+            "--ray_address",
+            default=None,
+            help="Ray cluster to join ('auto' or ray://host:10001); default: local Ray",
+        )
+        group.add_argument(
+            "--ray_num_workers", type=int, default=1, help="Training processes (one per GPU)"
+        )
         group.add_argument("--ray_use_gpu", action="store_true", help="Give each worker a GPU")
-        group.add_argument("--ray_cpus_per_worker", type=float, default=None, help="CPUs reserved per worker")
-        group.add_argument("--ray_storage_path", default="ray_results",
-                           help="Where Ray stores reported checkpoints (local, NFS or s3://)")
-        group.add_argument("--ray_max_failures", type=int, default=0,
-                           help="Restart the worker group this many times after a failure")
+        group.add_argument(
+            "--ray_cpus_per_worker", type=float, default=None, help="CPUs reserved per worker"
+        )
+        group.add_argument(
+            "--ray_storage_path",
+            default="ray_results",
+            help="Where Ray stores reported checkpoints (local, NFS or s3://)",
+        )
+        group.add_argument(
+            "--ray_max_failures",
+            type=int,
+            default=0,
+            help="Restart the worker group this many times after a failure",
+        )
 
     @staticmethod
     def build_config(args: argparse.Namespace) -> Any:
@@ -43,7 +59,8 @@ class RayCliOptions:
             from hale_core.exceptions import MissingDependencyError
 
             raise MissingDependencyError(
-                "hale_core.config.sections.ray", "--ray needs HaleBlocks with Ray: pip install -e '.[ray]'"
+                "hale_core.config.sections.ray",
+                "--ray needs HaleBlocks with Ray: pip install -e '.[ray]'",
             ) from exc
         resources = {}
         if args.ray_cpus_per_worker is not None:

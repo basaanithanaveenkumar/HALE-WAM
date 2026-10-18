@@ -100,16 +100,23 @@ class TinyHaloVLM(nn.Module):
         return loss, {"loss_rgb_cfm": loss.detach()}
 
 
-def build_tiny_loader(batch_size: int = 2, num_workers: int = 0, max_samples: int | None = 16, **_kw):
+def build_tiny_loader(
+    batch_size: int = 2, num_workers: int = 0, max_samples: int | None = 16, **_kw
+):
     """Drop-in for ``build_eo_dataloader`` (ignores the dataset-specific arguments)."""
     return DataLoader(
-        TinyVLADataset(max_samples or 16), batch_size=batch_size, shuffle=True, num_workers=num_workers
+        TinyVLADataset(max_samples or 16),
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
     )
 
 
 def load_train_script() -> ModuleType:
     """Import ``scripts/train.py`` and swap in the tiny model and dataloader."""
-    spec = importlib.util.spec_from_file_location("halo_train_script", ROOT / "scripts" / "train.py")
+    spec = importlib.util.spec_from_file_location(
+        "halo_train_script", ROOT / "scripts" / "train.py"
+    )
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
@@ -119,7 +126,8 @@ def load_train_script() -> ModuleType:
     # The "eo" dataset builder stands in for EO-Data1.5M with the tiny in-memory loader.
     TRAIN_DATASETS.register_module(name="eo", force=True)(
         lambda args, config, tokenizer: build_tiny_loader(
-            batch_size=args.batch_size, num_workers=args.num_workers, max_samples=args.max_samples)
+            batch_size=args.batch_size, num_workers=args.num_workers, max_samples=args.max_samples
+        )
     )
     module.log_module_parameters = lambda *a, **k: None
     return module
@@ -133,9 +141,30 @@ def train_tiny(args: argparse.Namespace) -> None:
 def tiny_args(module: ModuleType, ckpt_dir: Path, *extra: str) -> argparse.Namespace:
     """Parse the script's real CLI with settings small enough for a CPU test."""
     argv = [
-        "train.py", "--device", "cpu", "--epochs", "2", "--batch_size", "2", "--num_workers", "0",
-        "--max_samples", "16", "--save_every", "1", "--keep_ckpts", "0", "--vis_every", "0",
-        "--tensorboard_dir", "", "--ckpt_dir", str(ckpt_dir), "--log_every", "1000", *extra,
+        "train.py",
+        "--device",
+        "cpu",
+        "--epochs",
+        "2",
+        "--batch_size",
+        "2",
+        "--num_workers",
+        "0",
+        "--max_samples",
+        "16",
+        "--save_every",
+        "1",
+        "--keep_ckpts",
+        "0",
+        "--vis_every",
+        "0",
+        "--tensorboard_dir",
+        "",
+        "--ckpt_dir",
+        str(ckpt_dir),
+        "--log_every",
+        "1000",
+        *extra,
     ]
     old, sys.argv = sys.argv, argv
     try:

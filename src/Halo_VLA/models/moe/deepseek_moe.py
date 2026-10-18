@@ -23,15 +23,22 @@ class DeepseekMoE(nn.Module):
         num_shared_exprts: shared experts applied to every token.
     """
 
-    def __init__(self, emb_dim: int, hid_dim: int, num_router_exprts: int, best_k: int,
-                 num_shared_exprts: int) -> None:
+    def __init__(
+        self,
+        emb_dim: int,
+        hid_dim: int,
+        num_router_exprts: int,
+        best_k: int,
+        num_shared_exprts: int,
+    ) -> None:
         super().__init__()
         self.router = NoiseBestKRouter(emb_dim, num_router_exprts, best_k)
-        self.shared_experts = nn.ModuleList([
-            Expert(emb_dim, hid_dim) 
-            for _ in range(num_shared_exprts)
-        ])
-        self.routed_experts = nn.ModuleList([Expert(emb_dim,hid_dim) for _ in range(num_router_exprts)])
+        self.shared_experts = nn.ModuleList(
+            [Expert(emb_dim, hid_dim) for _ in range(num_shared_exprts)]
+        )
+        self.routed_experts = nn.ModuleList(
+            [Expert(emb_dim, hid_dim) for _ in range(num_router_exprts)]
+        )
         self.best_k = best_k
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -64,4 +71,4 @@ class DeepseekMoE(nn.Module):
                 gating_scores = flat_gating_output[flat_mask, i].unsqueeze(1)
                 weighted_output = expert_output * gating_scores
                 final_output[expert_mask] += weighted_output.squeeze(1)
-        return final_output + shared_output.view(batch,seq,dim)
+        return final_output + shared_output.view(batch, seq, dim)

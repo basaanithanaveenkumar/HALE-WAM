@@ -32,7 +32,9 @@ class LatentExtractor(nn.Module, ABC):
         self.width = width
 
     @classmethod
-    def from_config(cls, config: DualSystemConfig, emb_dim: int, layer_width: int) -> LatentExtractor:
+    def from_config(
+        cls, config: DualSystemConfig, emb_dim: int, layer_width: int
+    ) -> LatentExtractor:
         """Build the extractor for ``config``.
 
         Args:
