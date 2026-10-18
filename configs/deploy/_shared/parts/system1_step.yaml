@@ -1,0 +1,3 @@
+# Graph: DualSystem1ActionStepAdapter (see Halo_VLA.deploy.adapters).
+adapter:
+  type: halo_vla.DualSystem1ActionStepAdapter   # scope-qualified: resolved in the halo_vla child registry

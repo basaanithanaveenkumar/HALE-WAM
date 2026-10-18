@@ -1,0 +1,3 @@
+# Graph: DualSystem1PolicyAdapter (see Halo_VLA.deploy.adapters).
+adapter:
+  type: halo_vla.DualSystem1PolicyAdapter   # scope-qualified: resolved in the halo_vla child registry

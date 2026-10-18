@@ -1,0 +1,3 @@
+# Graph: HaloFlowActionStepAdapter (see Halo_VLA.deploy.adapters).
+adapter:
+  type: halo_vla.HaloFlowActionStepAdapter   # scope-qualified: resolved in the halo_vla child registry

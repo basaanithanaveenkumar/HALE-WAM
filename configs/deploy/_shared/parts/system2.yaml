@@ -1,0 +1,9 @@
+# Graph: DualSystem2EncoderAdapter (see Halo_VLA.deploy.adapters).
+adapter:
+  type: halo_vla.DualSystem2EncoderAdapter   # scope-qualified: resolved in the halo_vla child registry
+  num_images: 2
+  num_states: 1
+  num_action_tokens: 1
+  num_world_video_tokens: 5
+  opt_seq: 128
+  max_seq: 384

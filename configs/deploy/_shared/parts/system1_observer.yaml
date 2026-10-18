@@ -1,0 +1,3 @@
+# Graph: DualSystem1ObserverAdapter (see Halo_VLA.deploy.adapters).
+adapter:
+  type: halo_vla.DualSystem1ObserverAdapter   # scope-qualified: resolved in the halo_vla child registry

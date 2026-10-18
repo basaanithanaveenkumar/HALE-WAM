@@ -1,0 +1,3 @@
+# Graph: HaloLanguageModelAdapter (see Halo_VLA.deploy.adapters).
+adapter:
+  type: halo_vla.HaloLanguageModelAdapter   # scope-qualified: resolved in the halo_vla child registry

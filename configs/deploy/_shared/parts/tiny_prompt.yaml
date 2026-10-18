@@ -1,0 +1,2 @@
+# Prompt geometry of the CI models: 2 frames, 1 state, 1 world-video token, 1 action token.
+adapter: {num_images: 2, num_states: 1, num_action_tokens: 1, num_world_video_tokens: 1, opt_seq: 16, max_seq: 48}
