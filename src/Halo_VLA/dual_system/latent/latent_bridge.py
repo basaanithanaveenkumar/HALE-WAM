@@ -8,7 +8,7 @@ from exceptions import HaloVLAConfigError
 
 from dual_system.config import DualSystemConfig
 
-from .common import _text_slice
+from .sequence_slices import _text_slice
 
 
 class LatentBridge(nn.Module):

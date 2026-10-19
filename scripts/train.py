@@ -11,7 +11,6 @@ Distributed (same script, same losses - see src/Halo_VLA/training/):
     python scripts/train.py --webdataset --webdataset_root /fast/shards ...   # any dataset -> WebDataset shards
 """
 
-import argparse
 import sys
 import time
 from contextlib import nullcontext
@@ -20,9 +19,8 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+from torch.amp import GradScaler, autocast
 from torch.optim import AdamW
-from torch.amp import autocast, GradScaler
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
 # ---------------------------------------------------------------------------
@@ -32,50 +30,37 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src" / "Halo_VLA"))
 
-from config import HaloVLMConfig
-from exceptions import CheckpointNotFoundError, HaloVLAConfigError
-from config.overrides import apply_model_overrides, parse_model_options
+from dual_system import DualSystemVLA, resolve_dual_system_config
+from dual_system.config import parse_overrides
+from exceptions import CheckpointNotFoundError
+from loguru import logger
 from models.halo_vla import HaloVLM
-from dataloader.eo_dataset import build_eo_dataloader
-from dataloader.airoa_moma_dataset import build_airoa_moma_dataloader
-from dataloader.droid_dataset import build_droid_dataloader
 from training import (
     DDPSession,
     DualSystemTrainingStep,
     HaloVLATrainingStep,
-    RayCliOptions,
     VLAEvaluator,
     WebDatasetCliOptions,
     launch_train_on_ray,
     split_validation,
 )
-from dual_system import PRESETS as DUAL_PRESETS, DualSystemVLA, resolve_dual_system_config
-from dual_system.config import parse_overrides
-from utils import log_module_parameters
-from scripts.visualize import (
-    unnormalise_image,
-    generate_text,
-    get_font,
-    action_comparison_image,
-    sample_dit_with_intermediates,
-    save_diffusion_gif,
-    tensor_to_display_image,
-)
 
-from loguru import logger
+from config import HaloVLMConfig
+from config.overrides import apply_model_overrides, parse_model_options
+from utils import log_module_parameters
 
 try:
     from torch.utils.tensorboard import SummaryWriter
 except ImportError:
     SummaryWriter = None  # type: ignore[misc, assignment]
 
-import numpy as np
+from training.train_arg_parser import (  # noqa: F401 - moved; re-exported for callers
+    parse_args,
+)
+from training.train_dataloaders import build_train_dataloader
 from training.training_visualization import (  # noqa: F401 - moved; re-exported for callers
     draw_overlays,
     generate_training_visualization,
-)
-from training.train_arg_parser import (  # noqa: F401 - moved; re-exported for callers
-    parse_args,
 )
 
 
@@ -194,62 +179,7 @@ def train(args):
     llm_tokenizer = language.tokenizer if language is not None else None
 
     # ---- Dataloader ----
-    if args.dataset == "eo":
-        train_loader = build_eo_dataloader(
-            subset=args.subset,
-            split="train",
-            batch_size=args.batch_size,
-            num_workers=args.num_workers,
-            img_size=config.img_size,
-            max_seq_len=args.max_seq_len,
-            action_dim=args.action_dim,
-            state_dim=args.state_dim,
-            num_predict_frames=args.num_predict_frames,
-            shuffle=True,
-            max_samples=args.max_samples,
-            tokenizer=llm_tokenizer,
-        )
-    elif args.dataset == "droid":
-        if not args.droid_data_root:
-            raise HaloVLAConfigError("--droid_data_root is required when --dataset droid")
-        train_loader = build_droid_dataloader(
-            data_root=args.droid_data_root,
-            batch_size=args.batch_size,
-            num_workers=args.moma_num_workers,
-            img_size=config.img_size,
-            max_seq_len=args.max_seq_len,
-            max_action_len=args.moma_max_action_len,
-            action_dim=args.action_dim,
-            state_dim=args.state_dim,
-            camera=args.droid_camera,
-            num_sample_frames=args.moma_num_frames,
-            num_predict_frames=args.num_predict_frames,
-            frame_stride=args.moma_frame_stride,
-            shuffle=True,
-            max_samples=args.max_samples,
-            tokenizer=llm_tokenizer,
-        )
-    else:
-        if not args.moma_data_root:
-            raise HaloVLAConfigError("--moma_data_root is required when --dataset moma")
-        moma_workers = args.moma_num_workers
-        train_loader = build_airoa_moma_dataloader(
-            data_root=args.moma_data_root,
-            batch_size=args.batch_size,
-            num_workers=moma_workers,
-            img_size=config.img_size,
-            max_seq_len=args.max_seq_len,
-            max_action_len=args.moma_max_action_len,
-            action_dim=args.action_dim,
-            state_dim=args.state_dim,
-            num_sample_frames=args.moma_num_frames,
-            num_predict_frames=args.num_predict_frames,
-            frame_stride=args.moma_frame_stride,
-            camera=args.moma_camera,
-            shuffle=True,
-            max_samples=args.max_samples,
-            tokenizer=llm_tokenizer,
-        )
+    train_loader = build_train_dataloader(args, config.img_size, llm_tokenizer)
     # ---- Grab tokenizer from dataset for debug decoding (before any dataset swap) ----
     tokenizer = train_loader.dataset.tokenizer
 

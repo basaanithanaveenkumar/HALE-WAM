@@ -5,6 +5,7 @@ from __future__ import annotations
 import torch
 
 from .latent_extractor import LatentExtractor
+from .sequence_slices import _text_slice
 
 
 def _act_slice(enc: dict) -> slice:
@@ -20,7 +21,6 @@ class ActTokenLatent(LatentExtractor):
         self.with_language = with_language
 
     def forward(self, enc):
-        from .common import _text_slice  # lazy: avoids an import cycle
         tokens = enc["hidden"][:, _act_slice(enc)]
         mask = enc["mask"][:, _act_slice(enc)]
         if self.with_language:  # RoboDual: task latent (instruction states) + action latent
