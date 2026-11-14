@@ -2,7 +2,7 @@
 
 # Halo-WAM
 
-### A compact Vision-Language-Action model with an integrated world model
+### A compact World Action Model (WAM): vision, language and action with an integrated world model
 
 *Perceive · Reason · Act · Imagine*
 
@@ -17,7 +17,7 @@
 
 ---
 
-Halo-VLA is a single unified model that handles **language grounding**, **robot action prediction**, and **future-frame imagination** in one forward pass. It takes camera frames and proprioceptive state as input, generates a natural-language description of the scene, predicts a continuous action trajectory, and synthesises what the world will look like next — all jointly trained end-to-end.
+Halo-WAM is a single unified world action model that handles **language grounding**, **robot action prediction**, and **future-frame imagination** in one forward pass. It takes camera frames and proprioceptive state as input, generates a natural-language description of the scene, predicts a continuous action trajectory, and synthesises what the world will look like next — all jointly trained end-to-end.
 
 <div align="center">
 
@@ -130,8 +130,8 @@ Training uses three auxiliary losses on top of the flow-matching MSE to combat b
 ## Project structure
 
 ```
-Han-WAM/
-├── src/Halo_VLA/models/
+HALE-WAM/
+├── src/Halo_VLA/models/         # package name kept as Halo_VLA for import compatibility
 │   ├── halo_vla.py              # Main model: forward, action loss, visual loss
 │   ├── vit.py                   # Vision Transformer encoder
 │   ├── image_proj.py            # Vision -> decoder projector (MLP / Q-Former / gated cross-attention)
@@ -180,7 +180,7 @@ uv pip install -e .          # recommended
 
 ```bash
 python scripts/train.py --config configs/overfit.yaml                       # smoke test
-python scripts/train.py --config configs/dual_system/openhelix.yaml         # dual-system VLA
+python scripts/train.py --config configs/dual_system/openhelix.yaml         # dual-system WAM
 python scripts/train.py --config configs/examples/llm_qwen3_5_4b_base.yaml  # Qwen3.5 decoder, LoRA
 ```
 
@@ -354,7 +354,7 @@ Detailed developer documentation lives in [`docs/`](docs/):
 | [`docs/architecture.md`](docs/architecture.md) | Mermaid architecture diagrams (system, flow head, DiT conditioning, sampler, training step) |
 | [`docs/configuration.md`](docs/configuration.md) | Every `HaloVLMConfig` field and training flag |
 | [`docs/world_model.md`](docs/world_model.md) | Full technical write-up of the DiT world model — per-frame conditioning, CFG, Heun solver, auxiliary losses, and bug fixes |
-| [`docs/dual_system.md`](docs/dual_system.md) | Dual-system VLA from first principles (slow System 2 → latent → fast System 1) and the LCB / DP-VLA / HiRT / RoboDual / DexVLA / OpenHelix variants, each with a Mermaid diagram; `--dual_system none\|basic\|…\|custom` · notebook: [`notebooks/dual_system/`](notebooks/dual_system/dual_system_from_first_principles.ipynb) |
+| [`docs/dual_system.md`](docs/dual_system.md) | Dual-system WAM from first principles (slow System 2 → latent → fast System 1) and the LCB / DP-VLA / HiRT / RoboDual / DexVLA / OpenHelix variants, each with a Mermaid diagram; `--dual_system none\|basic\|…\|custom` · notebook: [`notebooks/dual_system/`](notebooks/dual_system/dual_system_from_first_principles.ipynb) |
 | [`docs/llm_backbone.md`](docs/llm_backbone.md) | Pretrained, LoRA-finetunable LLM decoders (`--llm_backbone`) |
 | [`docs/vision_encoders_and_validation.md`](docs/vision_encoders_and_validation.md) | SigLIP / CLIP / HaleBlocks vision encoders, validation metrics, trainable-only optimisation |
 | [`docs/distributed.md`](docs/distributed.md) | torchrun, Ray Train and WebDataset training |
