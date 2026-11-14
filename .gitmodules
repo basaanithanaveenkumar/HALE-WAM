@@ -50,3 +50,6 @@
 	path = ext_pkgs/executorch
 	url = https://github.com/pytorch/executorch.git
 	shallow = true
+[submodule "ext_pkgs/robocasa"]
+	path = ext_pkgs/robocasa
+	url = https://github.com/robocasa/robocasa.git
